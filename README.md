@@ -38,12 +38,49 @@ openssl rand -hex 24
 ```bash
 sudo bash deploy_panel.sh monitor.example.com change-this-token
 ```
-没有域名将域名替换成主机
+没有域名就填中心 VPS 公网 IP：
+```bash
+sudo bash deploy_panel.sh 1.2.3.4 change-this-token
+```
+检查：
+```bash
+systemctl status vps-monitor-api
+```
+```bash
+curl http://127.0.0.1:8000/api/health
+```
 访问：
 ```text
 http://1.2.3.4
 ```
-看到面板即可，确保已经将域名的A记录解析到本主机。
+有域名时，确保已经将域名的 A 记录解析到本机。
+
+## 快速开启本机监控
+以下命令都在中心 VPS 执行。本机 Agent 直接上报到 `127.0.0.1:8000`，不走域名、不走 Cloudflare、不走 8080。
+```bash
+sudo nano /etc/vps-monitor-agent.toml
+```
+```toml
+server_url = "http://127.0.0.1:8000"
+node_id = "center"
+token = "change-this-token"
+interval = 1
+name = "中心 VPS"
+os_type = "Linux"
+disk_paths = ["/"]
+```
+```bash
+.venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once
+```
+```bash
+sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
+```
+```bash
+sudo systemctl daemon-reload
+```
+```bash
+sudo systemctl enable --now vps-monitor-agent
+```
 
 ## 快速开启 HTTPS
 只有绑定域名时才需要 HTTPS。
