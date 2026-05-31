@@ -69,6 +69,7 @@ curl http://127.0.0.1:8000/api/health
 ```text
 http://monitor.example.com
 ```
+确保已经将域名的A记录解析到本主机
 
 ## 快速开启 HTTPS
 
