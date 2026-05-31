@@ -19,7 +19,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f "$APP_DIR/server.py" || ! -f "$APP_DIR/app.py" ]]; then
+if [[ ! -f "$APP_DIR/server.py" ]]; then
   echo "Project files were not found in $APP_DIR"
   echo "Upload/copy this project to $APP_DIR first, or run with APP_DIR=/path/to/project."
   exit 1
@@ -49,7 +49,6 @@ fi
 cat > "$ENV_FILE" <<EOF
 VPS_MONITOR_TOKEN=$TOKEN
 VPS_MONITOR_DB=$APP_DIR/vps_monitor.db
-VPS_MONITOR_API_URL=http://127.0.0.1:8000
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -71,24 +70,6 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-cat > /etc/systemd/system/vps-monitor-dashboard.service <<EOF
-[Unit]
-Description=VPS Monitor Dashboard
-After=network-online.target vps-monitor-api.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=$APP_DIR
-EnvironmentFile=$ENV_FILE
-ExecStart=$APP_DIR/.venv/bin/python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --server.headless true --browser.gatherUsageStats false
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
 cat > "$NGINX_SITE" <<EOF
 server {
     listen 80;
@@ -96,26 +77,8 @@ server {
 
     client_max_body_size 10m;
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location /_stcore/stream {
-        proxy_pass http://127.0.0.1:8501/_stcore/stream;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_read_timeout 86400;
-    }
-
     location / {
-        proxy_pass http://127.0.0.1:8501;
+        proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -129,7 +92,9 @@ ln -sf "$NGINX_SITE" "$NGINX_LINK"
 nginx -t
 
 systemctl daemon-reload
-systemctl enable --now vps-monitor-api vps-monitor-dashboard nginx
+systemctl disable --now vps-monitor-dashboard 2>/dev/null || true
+rm -f /etc/systemd/system/vps-monitor-dashboard.service
+systemctl enable --now vps-monitor-api nginx
 systemctl reload nginx
 
 echo

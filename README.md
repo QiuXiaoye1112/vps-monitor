@@ -1,204 +1,290 @@
 # VPS Monitor
 
-VPS Monitor 是一个轻量级多 VPS 资源监控系统。它由中心服务端、SQLite 数据库、Streamlit Dashboard 和每台 VPS 上的 Python Agent 组成，适合先用最小成本监控 CPU、核心数、内存、Swap、磁盘路径和网络流量。
+VPS Monitor 是一个适合 512MB 小内存 VPS 长期运行的轻量监控面板。
 
-## 架构说明
+中心 VPS 只运行一个 FastAPI 服务，负责：
+
+- 接收多台 VPS Agent 上报
+- 写入 SQLite
+- 提供极简 HTML Dashboard
+- 提供查询 API
+
+被监控 VPS 只运行 `agent.py`，定时采集本机 CPU、内存、Swap、磁盘和网络状态，然后通过 HTTP 上报到中心服务端。
+
+本版本不再依赖 Streamlit、pandas 或 paramiko，也不提供 Dashboard 里的 SSH 一键部署 Agent。
+
+## 架构
 
 ```text
 VPS Agent 1 ┐
-VPS Agent 2 ├─ HTTP + Token ─> FastAPI Server ─> SQLite
-VPS Agent 3 ┘                         │
-                                       └─ Streamlit Dashboard
+VPS Agent 2 ├─ HTTP + Bearer Token ─> FastAPI + SQLite + HTML Dashboard
+VPS Agent 3 ┘
 ```
 
-- Agent：运行在每台 VPS 上，使用 `psutil` 采集系统状态，定时上报。
-- Server：FastAPI 服务，负责节点注册、指标写入、节点列表、详情和历史查询。
-- Dashboard：Streamlit 页面，只从 Server API 读取数据，不生成假数据。
-- 数据库：默认 SQLite 文件 `vps_monitor.db`，后续可以把 `storage.py` 替换成 PostgreSQL 实现。
+## 采集内容
 
-## 服务端部署
+- CPU 使用率和核心数
+- 内存、Swap 使用率
+- 磁盘容量、使用率和多磁盘路径
+- 网络当前上传 / 下载速度
+- 网络累计上传 / 下载流量
+- 最后上报时间
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-$env:VPS_MONITOR_TOKEN="change-this-token"
-$env:VPS_MONITOR_DB="C:\opt\vps-monitor\vps_monitor.db"
-.\.venv\Scripts\python.exe -m uvicorn server:app --host 0.0.0.0 --port 8000
+Dashboard 显示：
+
+- 节点名称
+- online / offline
+- CPU 使用率
+- 内存使用率
+- 磁盘使用率
+- 当前上传速度
+- 当前下载速度
+- 最后上报时间
+
+页面每 5 秒自动刷新一次，不使用图表、历史曲线或前端框架。
+
+## 依赖
+
+中心服务端：
+
+```text
+fastapi
+uvicorn
+psutil
+requests
 ```
 
-Linux 示例：
+Agent：
+
+```text
+psutil
+requests
+tomli  # Python < 3.11 时需要
+```
+
+## 本地运行
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+
 export VPS_MONITOR_TOKEN="change-this-token"
-export VPS_MONITOR_DB="/opt/vps-monitor/vps_monitor.db"
+export VPS_MONITOR_DB="./vps_monitor.db"
+
 python -m uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-## Dashboard 部署
+浏览器打开：
 
-Dashboard 需要知道中心服务端地址和同一个 token。
-
-```powershell
-$env:VPS_MONITOR_API_URL="http://127.0.0.1:8000"
-$env:VPS_MONITOR_TOKEN="change-this-token"
-.\.venv\Scripts\python.exe -m streamlit run app.py
+```text
+http://127.0.0.1:8000
 ```
 
-打开 Streamlit 显示的本地地址即可查看多 VPS 面板。
-
-## Agent 部署
-
-在每台 VPS 上复制项目文件，安装依赖，然后创建配置：
-
-```bash
-cp agent.example.toml /etc/vps-monitor-agent.toml
-nano /etc/vps-monitor-agent.toml
-```
-
-配置项：
-
-```toml
-server_url = "http://YOUR_SERVER_IP:8000"
-node_id = "hk-01"
-token = "change-this-token"
-interval = 10
-
-name = "香港 01"
-os_type = "Linux"
-
-disk_paths = ["/"]
-```
-
-手动运行一次：
-
-```bash
-. /opt/vps-monitor/.venv/bin/activate
-python /opt/vps-monitor/agent.py --config /etc/vps-monitor-agent.toml --once
-```
-
-持续运行：
-
-```bash
-python /opt/vps-monitor/agent.py --config /etc/vps-monitor-agent.toml
-```
-
-上报失败时 Agent 不会崩溃，会按退避策略重试。
-
-## 通过 SSH 登录安装 Agent
-
-Dashboard 里也提供了可视化入口：左侧打开「SSH 部署 Agent」，输入主机 IP、端口、用户名、密码和监控标识，然后点击「登录并部署 Agent」。密码只用于本次 SSH 连接，不会写入 SQLite。
-
-如果你希望中心机器直接登录 VPS 完成安装，可以使用 `ssh_bootstrap.py`。它只使用你的 SSH key 临时登录，不会把 VPS 密码保存进数据库。
-
-```bash
-python ssh_bootstrap.py \
-  --host 1.2.3.4 \
-  --user root \
-  --key ~/.ssh/id_rsa \
-  --server-url http://YOUR_SERVER_IP:8000 \
-  --node-id hk-01 \
-  --token change-this-token \
-  --name "香港 01"
-```
-
-如果 SSH 用户不是 root，但有 sudo 权限，加上：
-
-```bash
---sudo
-```
-
-这个命令会在远端创建 `/opt/vps-monitor`，上传 agent 文件，写入 `/etc/vps-monitor-agent.toml`，安装 Python 依赖，并启用 `vps-monitor-agent` systemd 服务。
-
-## systemd 配置
-
-项目内提供了 `vps-monitor-agent.service` 示例。按你的安装路径调整 `WorkingDirectory` 和 `ExecStart` 后安装：
-
-```bash
-sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now vps-monitor-agent
-sudo systemctl status vps-monitor-agent
-```
-
-查看日志：
-
-```bash
-journalctl -u vps-monitor-agent -f
-```
-
-## 如何添加一台 VPS
-
-1. 在 Dashboard 左侧「添加 / 更新 VPS」填写 `Node ID` 和名称。
-2. 保存后记下返回的 `node_id`。也可以自己填写固定 `node_id`，例如 `hk-01`。
-3. 在该 VPS 的 `/etc/vps-monitor-agent.toml` 中填入同一个 `node_id`、`server_url` 和 `token`。
-4. 启动 Agent。
-5. Dashboard 会在下一次刷新后显示在线状态和真实指标。
-
-如果 Agent 停止上报超过 30 秒，该 VPS 会显示为 `offline`。可用环境变量 `VPS_MONITOR_OFFLINE_AFTER` 修改阈值。
-
-## Token 配置
-
-服务端和 Dashboard/Agent 必须使用同一个 token：
-
-```bash
-export VPS_MONITOR_TOKEN="change-this-token"
-```
-
-API 支持两种传递方式：
-
-- `Authorization: Bearer <token>`
-- `X-Monitor-Token: <token>`
-
-默认 token 是 `change-me`，生产环境请务必修改。
-
-## API 简要说明
-
-所有 `/api` 写入和查询接口都需要 token，`/api/health` 除外。
-
-- `GET /api/health`：健康检查
-- `POST /api/nodes/register`：注册或更新节点
-- `PUT /api/nodes/{node_id}`：更新节点
-- `GET /api/nodes`：节点列表，包含在线状态和最新指标
-- `GET /api/nodes/{node_id}`：单节点详情
-- `POST /api/metrics`：Agent 上报指标
-- `GET /api/nodes/{node_id}/metrics?window=5m|1h|24h`：历史指标
-
-## 采集内容
-
-Agent 只采集系统状态，不采集文件内容、用户数据、环境变量或命令历史。
-
-- CPU 使用率和核心数
-- 内存、Swap、磁盘容量与使用率
-- 网络当前上行 / 下行速度与累计流量
-- 多磁盘路径容量、剩余空间和使用率
-- 少量节点识别信息：OS、内核版本、架构、hostname
-
-## 常见问题
-
-### Dashboard 提示无法连接中心服务端
-
-先确认 Server 正在运行：
+健康检查：
 
 ```bash
 curl http://127.0.0.1:8000/api/health
 ```
 
-如果 Dashboard 和 Server 不在同一台机器，设置：
+## 域名部署
 
-```bash
-export VPS_MONITOR_API_URL="http://SERVER_IP:8000"
+先把域名 A 记录解析到中心 VPS。
+
+例如：
+
+```text
+monitor.example.com -> 中心 VPS 公网 IP
 ```
 
-### 返回 401
+把项目上传到中心 VPS 的 `/opt/vps-monitor`，然后执行：
 
-Dashboard、Agent 和 Server 的 `VPS_MONITOR_TOKEN` 不一致。统一 token 后重启相关进程。
+```bash
+cd /opt/vps-monitor
+sudo bash deploy_panel.sh monitor.example.com change-this-token
+```
 
-### 节点一直 offline
+脚本会创建一个 systemd 服务：
 
-检查 Agent 是否运行、`server_url` 是否能访问、token 是否正确。超过 30 秒没有上报时节点会自动变成 offline。
+```text
+vps-monitor-api.service
+```
 
-### 没有历史曲线
+并用 Nginx 把整个站点反代到：
 
-历史曲线只显示真实上报数据。新节点需要等待 Agent 上报几次后才会有曲线。
+```text
+http://127.0.0.1:8000
+```
+
+部署后访问：
+
+```text
+http://monitor.example.com
+```
+
+如需 HTTPS：
+
+```bash
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d monitor.example.com
+```
+
+## 监控中心 VPS 自己
+
+在中心 VPS 上创建 Agent 配置：
+
+```bash
+sudo nano /etc/vps-monitor-agent.toml
+```
+
+示例：
+
+```toml
+server_url = "http://127.0.0.1:8000"
+node_id = "main"
+token = "change-this-token"
+interval = 10
+
+name = "Main VPS"
+os_type = "Linux"
+
+disk_paths = ["/"]
+```
+
+启动 Agent：
+
+```bash
+cd /opt/vps-monitor
+. .venv/bin/activate
+python agent.py --config /etc/vps-monitor-agent.toml --once
+```
+
+确认能上报后，可以安装 systemd 服务：
+
+```bash
+sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now vps-monitor-agent
+```
+
+## 监控其他 VPS
+
+在每台被监控 VPS 上上传这些文件：
+
+```text
+agent.py
+monitor_common.py
+settings.py
+requirements-agent.txt
+vps-monitor-agent.service
+```
+
+安装依赖：
+
+```bash
+mkdir -p /opt/vps-monitor
+cd /opt/vps-monitor
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-agent.txt
+```
+
+创建配置：
+
+```bash
+sudo nano /etc/vps-monitor-agent.toml
+```
+
+示例：
+
+```toml
+server_url = "https://monitor.example.com"
+node_id = "hk-01"
+token = "change-this-token"
+interval = 10
+
+name = "Hong Kong VPS"
+os_type = "Linux"
+
+disk_paths = ["/"]
+```
+
+如果有多个磁盘路径：
+
+```toml
+disk_paths = ["/", "/data", "/www"]
+```
+
+测试上报：
+
+```bash
+cd /opt/vps-monitor
+. .venv/bin/activate
+python agent.py --config /etc/vps-monitor-agent.toml --once
+```
+
+安装为后台服务：
+
+```bash
+sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now vps-monitor-agent
+```
+
+## Token
+
+Agent 写入接口需要 token。中心服务端和所有 Agent 必须使用同一个 token：
+
+```bash
+export VPS_MONITOR_TOKEN="change-this-token"
+```
+
+Agent 会使用：
+
+```text
+Authorization: Bearer <token>
+```
+
+写入接口 token 不正确会返回 `401`。
+
+Dashboard 读取 `/api/nodes`，不需要在浏览器里配置 token。
+
+## API
+
+保留接口：
+
+- `GET /api/health`
+- `POST /api/nodes/register`
+- `PUT /api/nodes/{node_id}`
+- `GET /api/nodes`
+- `GET /api/nodes/{node_id}`
+- `POST /api/metrics`
+- `GET /api/nodes/{node_id}/metrics?window=5m|1h|24h`
+
+写入接口仍需要 token：
+
+- `POST /api/nodes/register`
+- `PUT /api/nodes/{node_id}`
+- `POST /api/metrics`
+
+## 常用命令
+
+中心服务状态：
+
+```bash
+systemctl status vps-monitor-api
+journalctl -u vps-monitor-api -f
+```
+
+Agent 状态：
+
+```bash
+systemctl status vps-monitor-agent
+journalctl -u vps-monitor-agent -f
+```
+
+节点离线判断默认是 30 秒。可以通过环境变量调整：
+
+```bash
+export VPS_MONITOR_OFFLINE_AFTER=60
+```
