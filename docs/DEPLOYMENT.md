@@ -8,7 +8,7 @@
 
 - 一台中心 VPS
 - 一台或多台被监控 VPS
-- 一个域名，例如 `monitor.example.com`
+- 一个域名，例如 `monitor.example.com`；没有域名也可以直接使用中心 VPS 公网 IP
 - Python 3
 - Nginx
 - Git
@@ -20,10 +20,18 @@
 - 被监控 VPS：只运行 `agent.py`
 - 中心 VPS 也可以监控自己
 
+本项目部署方式固定为 Nginx 对外访问：
+
+- 浏览器访问 Nginx 的 `80/443`
+- 远程 Agent 访问 Nginx 的 `8080`
+- FastAPI 只监听 `127.0.0.1:8000`
+- 不推荐把 `8000` 直接暴露到公网
+
 地址用途：
 
 - `127.0.0.1:8000`：中心 VPS 本机 API
-- `https://monitor.example.com`：浏览器访问 Dashboard
+- `http://中心VPS公网IP`：没有域名时浏览器访问 Dashboard
+- `https://monitor.example.com`：有域名和 HTTPS 时浏览器访问 Dashboard
 - `http://中心VPS公网IP:8080`：远程 VPS Agent 上报
 
 生成 token：
@@ -36,14 +44,14 @@ openssl rand -hex 24
 
 以下命令都在中心 VPS 执行。
 
-安装依赖：
+安装依赖。这里直接安装完整依赖，不需要先判断系统里有没有：
 
 ```bash
 sudo apt-get update
 ```
 
 ```bash
-sudo apt-get install -y git python3 python3-venv python3-pip nginx
+sudo apt-get install -y git python3 python3-venv python3-pip nginx curl sqlite3
 ```
 
 clone 项目：
@@ -58,10 +66,16 @@ git clone https://github.com/QiuXiaoye1112/vps-monitor.git /opt/vps-monitor
 cd /opt/vps-monitor
 ```
 
-运行部署脚本：
+运行部署脚本。有域名就填域名：
 
 ```bash
 sudo bash deploy_panel.sh monitor.example.com change-this-token
+```
+
+没有域名就填中心 VPS 公网 IP：
+
+```bash
+sudo bash deploy_panel.sh 1.2.3.4 change-this-token
 ```
 
 检查服务：
@@ -76,7 +90,13 @@ systemctl status vps-monitor-api
 curl http://127.0.0.1:8000/api/health
 ```
 
-访问 Dashboard：
+访问 Dashboard。没有域名时：
+
+```text
+http://1.2.3.4
+```
+
+有域名时：
 
 ```text
 http://monitor.example.com
@@ -85,6 +105,8 @@ http://monitor.example.com
 ## 3. HTTPS 配置
 
 以下命令都在中心 VPS 执行。
+
+HTTPS 需要域名。如果你暂时没有域名，跳过本节，直接使用 `http://中心VPS公网IP` 访问 Dashboard。
 
 安装 certbot：
 
