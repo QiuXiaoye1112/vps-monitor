@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+nodes.db
+*.db
+*.sqlite
+*.sqlite3
+*.png
+.streamlit/
