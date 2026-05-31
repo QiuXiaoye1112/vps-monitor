@@ -219,6 +219,17 @@ DASHBOARD_HTML = """<!doctype html>
       return date.toLocaleString();
     }
 
+    function fmtDuration(seconds) {
+      if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return "-";
+      const total = Math.max(0, Math.floor(Number(seconds)));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
+    }
+
     function metricBlock(label, value) {
       const wrap = document.createElement("div");
       wrap.className = "metric";
@@ -275,6 +286,7 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock("CPU", fmtPercent(metric.cpu_percent)),
           metricBlock("内存", fmtPercent(metric.memory_percent)),
           metricBlock("磁盘", fmtPercent(metric.disk_percent)),
+          metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
           metricBlock("上传", fmtSpeed(metric.net_upload_bps)),
           metricBlock("下载", fmtSpeed(metric.net_download_bps))
         );

@@ -154,7 +154,7 @@ def collect_metrics(
         "net_download_bps": float(download_bps),
         "net_bytes_sent": int(net.bytes_sent),
         "net_bytes_recv": int(net.bytes_recv),
-        "uptime_seconds": None,
+        "uptime_seconds": float(time.time() - psutil.boot_time()),
         "load_1": None,
         "load_5": None,
         "load_15": None,
