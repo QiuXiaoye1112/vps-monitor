@@ -176,7 +176,7 @@ DASHBOARD_HTML = """<!doctype html>
     <header>
       <div>
         <h1>VPS Monitor</h1>
-        <div class="sub">每 5 秒自动刷新</div>
+        <div class="sub">每 1 秒自动刷新</div>
       </div>
       <div class="summary">
         <div class="badge" id="online-count">online 0</div>
@@ -309,7 +309,7 @@ DASHBOARD_HTML = """<!doctype html>
     }
 
     refresh();
-    setInterval(refresh, 5000);
+    setInterval(refresh, 1000);
   </script>
 </body>
 </html>

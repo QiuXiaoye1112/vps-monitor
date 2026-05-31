@@ -1,7 +1,7 @@
 server_url = "http://YOUR_SERVER_IP:8000"
 node_id = "hk-01"
 token = "change-me"
-interval = 10
+interval = 1
 
 name = "香港 01"
 os_type = "Linux"

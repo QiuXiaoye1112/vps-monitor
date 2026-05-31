@@ -27,7 +27,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config.setdefault("server_url", os.getenv("VPS_MONITOR_SERVER_URL", "http://127.0.0.1:8000"))
     config.setdefault("node_id", os.getenv("VPS_MONITOR_NODE_ID", platform.node() or "local-node"))
     config.setdefault("token", os.getenv("VPS_MONITOR_TOKEN", "change-me"))
-    config.setdefault("interval", int(os.getenv("VPS_MONITOR_AGENT_INTERVAL", "10")))
+    config.setdefault("interval", int(os.getenv("VPS_MONITOR_AGENT_INTERVAL", "1")))
     config.setdefault("name", os.getenv("VPS_MONITOR_NODE_NAME", config["node_id"]))
     config.setdefault("ip", os.getenv("VPS_MONITOR_NODE_IP", ""))
     config.setdefault("region", os.getenv("VPS_MONITOR_NODE_REGION", ""))
@@ -36,7 +36,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config.setdefault("disk_paths", os.getenv("VPS_MONITOR_DISK_PATHS", ",".join(default_disk_paths())))
 
     config["disk_paths"] = parse_items(config.get("disk_paths"))
-    config["interval"] = max(2, int(config["interval"]))
+    config["interval"] = max(1, int(config["interval"]))
     return config
 
 
