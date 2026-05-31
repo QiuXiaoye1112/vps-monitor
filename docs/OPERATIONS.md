@@ -36,6 +36,46 @@ systemctl status vps-monitor-agent
 journalctl -u vps-monitor-agent -f
 ```
 
+## 保活和开机自启
+
+每台需要上报的 VPS 都要启用 Agent 自启。机器宕机或重启后，systemd 会自动拉起 `vps-monitor-agent` 继续上报。
+
+在被监控 VPS 执行：
+
+```bash
+sudo systemctl enable --now vps-monitor-agent
+```
+
+确认已经设置为开机自启：
+
+```bash
+systemctl is-enabled vps-monitor-agent
+```
+
+确认当前正在运行：
+
+```bash
+systemctl status vps-monitor-agent
+```
+
+如果 Agent 配置改过，重启 Agent：
+
+```bash
+sudo systemctl restart vps-monitor-agent
+```
+
+中心 VPS 的 API 服务也建议保持开机自启：
+
+```bash
+sudo systemctl enable --now vps-monitor-api
+```
+
+确认中心 API 自启：
+
+```bash
+systemctl is-enabled vps-monitor-api
+```
+
 ## 查看节点数据库
 
 在中心 VPS 执行：

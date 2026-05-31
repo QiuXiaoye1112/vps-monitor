@@ -160,11 +160,19 @@ systemctl status vps-monitor-agent
 ```bash
 journalctl -u vps-monitor-agent -f
 ```
+
+## 保活和开机自启
+每台需要上报的 VPS 都执行一次。`enable --now` 会立即启动 Agent，并设置重启后自动启动。
 ```bash
-systemctl status vps-monitor-api
+sudo systemctl enable --now vps-monitor-agent
 ```
+确认已经开启自启：
 ```bash
-curl http://127.0.0.1:8000/api/health
+systemctl is-enabled vps-monitor-agent
+```
+确认正在运行：
+```bash
+systemctl status vps-monitor-agent
 ```
 
 ## 详细文档
