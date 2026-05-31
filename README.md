@@ -4,9 +4,6 @@
 
 项目当前方案：
 
-- 不使用 Streamlit
-- 不使用 pandas
-- 不使用 paramiko
 - Dashboard 每 1 秒刷新
 - Agent 默认每 1 秒上报
 - Dashboard 通过域名 + Nginx + HTTPS 访问
@@ -219,11 +216,11 @@ sudo nano /etc/vps-monitor-agent.toml
 
 ```toml
 server_url = "http://127.0.0.1:8000"
-node_id = "vmrack"
+node_id = "每台ID不能相同"
 token = "change-this-token"
 interval = 1
 
-name = "Vmrack 洛杉矶"
+name = "主机名称"
 os_type = "Linux"
 
 disk_paths = ["/"]
@@ -774,10 +771,10 @@ journalctl -u vps-monitor-agent -f
 sqlite3 /opt/vps-monitor/vps_monitor.db "SELECT id,name,last_seen_at FROM nodes;"
 ```
 
-在中心 VPS 删除脏节点，只保留 `vmrack` 和 `vimss`：
+在中心 VPS 删除脏节点，只保留 `主机名`：
 
 ```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM nodes WHERE id NOT IN ('vmrack','vimss');"
+sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM nodes WHERE id NOT IN ('主机名','主机名');"
 ```
 
 在中心 VPS 或远程 VPS 同步 GitHub 最新代码：
