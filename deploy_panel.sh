@@ -99,6 +99,7 @@ systemctl reload nginx
 
 echo
 echo "Done."
-echo "Dashboard: http://$DOMAIN"
-echo "Agent server_url for other VPS: http://$DOMAIN"
+echo "Dashboard URL: http://$DOMAIN"
+echo "Local API URL: http://127.0.0.1:8000"
+echo "Remote Agent ingress can be enabled with: sudo bash deploy_agent_ingress.sh"
 echo "Token: $TOKEN"

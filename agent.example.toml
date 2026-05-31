@@ -1,9 +1,9 @@
-server_url = "http://YOUR_SERVER_IP:8000"
-node_id = "hk-01"
+server_url = "http://YOUR_PANEL_IP:8080"
+node_id = "vmrack"
 token = "change-me"
 interval = 1
 
-name = "香港 01"
+name = "Vmrack 洛杉矶"
 os_type = "Linux"
 
 disk_paths = ["/"]
