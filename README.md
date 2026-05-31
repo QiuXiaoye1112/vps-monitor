@@ -38,22 +38,12 @@ openssl rand -hex 24
 ```bash
 sudo bash deploy_panel.sh monitor.example.com change-this-token
 ```
-没有域名：
-```bash
-sudo bash deploy_panel.sh 1.2.3.4 change-this-token
-```
-检查：
-```bash
-systemctl status vps-monitor-api
-```
-```bash
-curl http://127.0.0.1:8000/api/health
-```
+没有域名将域名替换成主机
 访问：
 ```text
 http://1.2.3.4
 ```
-确保已经将域名的A记录解析到本主机
+看到面板即可，确保已经将域名的A记录解析到本主机。
 
 ## 快速开启 HTTPS
 只有绑定域名时才需要 HTTPS。
@@ -132,6 +122,12 @@ systemctl status vps-monitor-agent
 ```
 ```bash
 journalctl -u vps-monitor-agent -f
+```
+```bash
+systemctl status vps-monitor-api
+```
+```bash
+curl http://127.0.0.1:8000/api/health
 ```
 
 ## 详细文档
