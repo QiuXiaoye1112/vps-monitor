@@ -81,13 +81,13 @@ DASHBOARD_HTML = """<!doctype html>
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 14px;
+      gap: 12px;
     }
     .card {
       border: 1px solid var(--border);
       border-radius: 8px;
       background: var(--panel);
-      padding: 16px;
+      padding: 14px;
       min-width: 0;
     }
     .card-head {
@@ -95,7 +95,7 @@ DASHBOARD_HTML = """<!doctype html>
       justify-content: space-between;
       align-items: flex-start;
       gap: 10px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .name {
       font-size: 18px;
@@ -130,12 +130,12 @@ DASHBOARD_HTML = """<!doctype html>
     .metrics {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
     }
     .metric {
       border-radius: 8px;
       background: var(--panel-2);
-      padding: 10px;
+      padding: 9px 10px;
       min-width: 0;
     }
     .label {
@@ -149,7 +149,7 @@ DASHBOARD_HTML = """<!doctype html>
       overflow-wrap: anywhere;
     }
     .last-seen {
-      margin-top: 13px;
+      margin-top: 11px;
       color: var(--muted);
       font-size: 12px;
       overflow-wrap: anywhere;
@@ -163,11 +163,28 @@ DASHBOARD_HTML = """<!doctype html>
     }
     .error { color: #fecaca; border-color: rgba(239, 68, 68, 0.45); }
     @media (max-width: 640px) {
-      main { width: min(100% - 20px, 1120px); padding-top: 20px; }
+      main { width: min(100% - 18px, 1120px); padding-top: 12px; padding-bottom: 22px; }
       header { display: block; }
-      .summary { justify-content: flex-start; margin-top: 14px; }
-      h1 { font-size: 24px; }
-      .metrics { grid-template-columns: 1fr; }
+      h1, .sub { display: none; }
+      .summary {
+        justify-content: flex-start;
+        gap: 7px;
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 12px;
+      }
+      .badge { padding: 5px 8px; border-radius: 7px; }
+      .grid { grid-template-columns: 1fr; gap: 10px; }
+      .card { padding: 12px; }
+      .card-head { align-items: center; margin-bottom: 10px; }
+      .name { font-size: 19px; line-height: 1.15; }
+      .node-id { display: none; }
+      .status { padding: 3px 8px; font-size: 12px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .metric { padding: 8px; border-radius: 7px; }
+      .label { font-size: 12px; margin-bottom: 3px; }
+      .value { font-size: 18px; line-height: 1.18; }
+      .last-seen { margin-top: 9px; font-size: 12px; }
     }
   </style>
 </head>
