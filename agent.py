@@ -77,7 +77,7 @@ def try_register_node(config: dict[str, Any]) -> bool:
     try:
         register_node(config)
     except requests.RequestException as exc:
-        print(f"register failed: {exc}", file=sys.stderr, flush=True)
+        print(f"register failed: {exc.__class__.__name__}", file=sys.stderr, flush=True)
         return False
     return True
 
@@ -151,7 +151,7 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
             report_started_at = time.monotonic()
             previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
             elapsed_ms = int((time.monotonic() - report_started_at) * 1000)
-            print(f"reported metrics for {config['node_id']} in {elapsed_ms}ms", flush=True)
+            print(f"reported metrics in {elapsed_ms}ms", flush=True)
             if once:
                 return 0
             next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
@@ -161,12 +161,12 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 cpu_sampler.stop()
             return 0
         except requests.RequestException as exc:
-            print(f"report failed: {exc}", file=sys.stderr, flush=True)
+            print(f"report failed: {exc.__class__.__name__}", file=sys.stderr, flush=True)
             if once:
                 return 1
             next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
         except Exception as exc:
-            print(f"agent error: {exc}", file=sys.stderr, flush=True)
+            print(f"agent error: {exc.__class__.__name__}", file=sys.stderr, flush=True)
             if once:
                 return 1
             next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())

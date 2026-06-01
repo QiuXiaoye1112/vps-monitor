@@ -397,7 +397,7 @@ DASHBOARD_HTML = """<!doctype html>
         received.textContent = fmtAge(item.received_at, serverNow);
         const node = document.createElement("div");
         node.className = "log-node";
-        node.textContent = `${item.node_name || item.node_id} (${item.node_id})`;
+        node.textContent = item.node_name || "node";
         const latency = document.createElement("div");
         latency.textContent = item.latency_ms === null || item.latency_ms === undefined ? "latency -" : `latency ${item.latency_ms}ms`;
         const message = document.createElement("div");

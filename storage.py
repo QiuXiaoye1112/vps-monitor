@@ -361,7 +361,6 @@ def recent_metric_logs(limit: int = 80) -> list[dict[str, Any]]:
             """
             SELECT
                 metrics.id,
-                metrics.node_id,
                 nodes.name AS node_name,
                 metrics.collected_at,
                 metrics.received_at,
@@ -387,8 +386,7 @@ def recent_metric_logs(limit: int = 80) -> list[dict[str, Any]]:
         logs.append(
             {
                 "id": row["id"],
-                "node_id": row["node_id"],
-                "node_name": row["node_name"] or row["node_id"],
+                "node_name": row["node_name"] or "node",
                 "collected_at": row["collected_at"],
                 "received_at": row["received_at"],
                 "latency_ms": latency_ms,
