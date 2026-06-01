@@ -148,8 +148,10 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 try_register_node(config)
                 register_after = started_at + 300
             cpu_percent = cpu_sampler.current() if cpu_sampler else None
+            report_started_at = time.monotonic()
             previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
-            print(f"reported metrics for {config['node_id']}", flush=True)
+            elapsed_ms = int((time.monotonic() - report_started_at) * 1000)
+            print(f"reported metrics for {config['node_id']} in {elapsed_ms}ms", flush=True)
             if once:
                 return 0
             next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
