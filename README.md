@@ -178,7 +178,29 @@ systemctl is-enabled vps-monitor-agent
 systemctl status vps-monitor-agent
 ```
 
+中心 VPS 的 API 服务也建议开启自启：
+```bash
+sudo systemctl enable --now vps-monitor-api
+```
+
+如果你给 8080 设置了 iptables 访问限制，还需要保存防火墙规则，避免重启后丢失：
+```bash
+sudo apt install -y iptables-persistent
+```
+```bash
+sudo netfilter-persistent save
+```
+```bash
+systemctl status netfilter-persistent
+```
+```bash
+grep 8080 /etc/iptables/rules.v4
+```
+
+本项目默认不启用 `ufw`，避免和手动 iptables 规则混用导致 SSH、Nginx 或 8080 入口异常。
+
 ## 详细文档
+- [完整部署命令清单](docs/FULL_DEPLOY_COMMANDS.md)
 - [完整部署流程](docs/DEPLOYMENT.md)
 - [常见问题排查](docs/TROUBLESHOOTING.md)
 - [安全说明](docs/SECURITY.md)
