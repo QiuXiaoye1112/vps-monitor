@@ -340,23 +340,3 @@ sudo bash allow_agent_ip.sh 远程VPS_IP
 ```
 
 注意：iptables 规则重启后会丢。确认稳定后再考虑持久化，不要默认自动安装 `iptables-persistent`。
-
-## 8. 多 VPS 添加流程
-
-每台 VPS 使用不同 `node_id`。
-
-第一台：
-
-```toml
-node_id = "vmrack"
-name = "Vmrack 洛杉矶"
-```
-
-第二台：
-
-```toml
-node_id = "vimss"
-name = "Vimss 洛杉矶"
-```
-
-每台远程 VPS 重复“远程 VPS Agent 部署”流程，改掉 `node_id` 和 `name` 即可。
