@@ -81,8 +81,6 @@ DASHBOARD_HTML = """<!doctype html>
       color: var(--muted);
       font: inherit;
     }
-    button.badge { cursor: pointer; }
-    button.badge.active { color: var(--text); border-color: rgba(56, 189, 248, 0.55); }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -167,39 +165,6 @@ DASHBOARD_HTML = """<!doctype html>
       color: var(--muted);
     }
     .error { color: #fecaca; border-color: rgba(239, 68, 68, 0.45); }
-    .logs {
-      margin-top: 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--panel);
-      overflow: hidden;
-    }
-    .logs-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .log-list {
-      max-height: 280px;
-      overflow: auto;
-    }
-    .log-row {
-      display: grid;
-      grid-template-columns: 140px minmax(120px, 1fr) 120px minmax(180px, 1.4fr);
-      gap: 10px;
-      padding: 8px 12px;
-      border-bottom: 1px solid rgba(37, 50, 70, 0.62);
-      color: var(--muted);
-      font-size: 12px;
-      align-items: center;
-    }
-    .log-row:last-child { border-bottom: 0; }
-    .log-node, .log-message { color: var(--text); overflow-wrap: anywhere; }
     @media (max-width: 640px) {
       main { width: min(100% - 18px, 1120px); padding-top: 12px; padding-bottom: 22px; }
       header { display: block; }
@@ -223,7 +188,6 @@ DASHBOARD_HTML = """<!doctype html>
       .label { font-size: 12px; margin-bottom: 3px; }
       .value { font-size: 18px; line-height: 1.18; }
       .last-seen { margin-top: 9px; font-size: 12px; }
-      .log-row { grid-template-columns: 1fr; gap: 3px; }
     }
   </style>
 </head>
@@ -237,30 +201,14 @@ DASHBOARD_HTML = """<!doctype html>
       <div class="summary">
         <div class="badge" id="online-count">online 0</div>
         <div class="badge" id="offline-count">offline 0</div>
-        <div class="badge" id="updated-at">loading</div>
-        <button class="badge" id="log-toggle" type="button">logs</button>
       </div>
     </header>
     <section id="content" class="grid"></section>
-    <section class="logs" id="logs" hidden>
-      <div class="logs-head">
-        <div>上报日志</div>
-        <div id="logs-updated">-</div>
-      </div>
-      <div class="log-list" id="log-list"></div>
-    </section>
   </main>
   <script>
     const content = document.querySelector("#content");
     const onlineCount = document.querySelector("#online-count");
     const offlineCount = document.querySelector("#offline-count");
-    const updatedAt = document.querySelector("#updated-at");
-    const logToggle = document.querySelector("#log-toggle");
-    const logsPanel = document.querySelector("#logs");
-    const logList = document.querySelector("#log-list");
-    const logsUpdated = document.querySelector("#logs-updated");
-    let showLogs = false;
-    let lastLogFetchAt = 0;
 
     function fmtPercent(value) {
       return value === null || value === undefined ? "-" : `${Number(value).toFixed(1)}%`;
@@ -379,45 +327,6 @@ DASHBOARD_HTML = """<!doctype html>
 
       onlineCount.textContent = `online ${online}`;
       offlineCount.textContent = `offline ${offline}`;
-      updatedAt.textContent = "refreshed";
-    }
-
-    function renderLogs(logs, serverNow) {
-      logList.innerHTML = "";
-      if (!logs.length) {
-        const row = document.createElement("div");
-        row.className = "log-row";
-        row.textContent = "暂无日志";
-        logList.append(row);
-      }
-      for (const item of logs) {
-        const row = document.createElement("div");
-        row.className = "log-row";
-        const received = document.createElement("div");
-        received.textContent = fmtAge(item.received_at, serverNow);
-        const node = document.createElement("div");
-        node.className = "log-node";
-        node.textContent = item.node_name || "node";
-        const latency = document.createElement("div");
-        latency.textContent = item.latency_ms === null || item.latency_ms === undefined ? "latency -" : `latency ${item.latency_ms}ms`;
-        const message = document.createElement("div");
-        message.className = "log-message";
-        message.textContent = `${item.message} · CPU ${fmtPercent(item.cpu_percent)} · MEM ${fmtPercent(item.memory_percent)}`;
-        row.append(received, node, latency, message);
-        logList.append(row);
-      }
-      logsUpdated.textContent = `server ${fmtTime(serverNow)}`;
-    }
-
-    async function refreshLogs(force = false) {
-      if (!showLogs) return;
-      const now = Date.now();
-      if (!force && now - lastLogFetchAt < 2000) return;
-      lastLogFetchAt = now;
-      const res = await fetch("/api/logs?limit=80", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      renderLogs(data.logs || [], data.server_now);
     }
 
     async function refresh() {
@@ -426,9 +335,6 @@ DASHBOARD_HTML = """<!doctype html>
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         render(data.nodes || [], data.server_now);
-        await refreshLogs().catch((err) => {
-          logsUpdated.textContent = `logs error: ${err.message}`;
-        });
       } catch (err) {
         content.className = "";
         content.innerHTML = "";
@@ -436,18 +342,8 @@ DASHBOARD_HTML = """<!doctype html>
         error.className = "error";
         error.textContent = `无法加载节点数据：${err.message}`;
         content.append(error);
-        updatedAt.textContent = "error";
       }
     }
-
-    logToggle.addEventListener("click", async () => {
-      showLogs = !showLogs;
-      logsPanel.hidden = !showLogs;
-      logToggle.classList.toggle("active", showLogs);
-      if (showLogs) {
-        await refreshLogs(true);
-      }
-    });
 
     refresh();
     setInterval(refresh, 500);
@@ -546,11 +442,6 @@ def update_node(node_id: str, payload: NodePayload) -> dict[str, Any]:
 @app.get("/api/nodes")
 def get_nodes() -> dict[str, Any]:
     return {"server_now": iso_now(), "nodes": storage.list_nodes()}
-
-
-@app.get("/api/logs")
-def get_logs(limit: int = 80) -> dict[str, Any]:
-    return {"server_now": iso_now(), "logs": storage.recent_metric_logs(limit)}
 
 
 @app.get("/api/nodes/{node_id}")
