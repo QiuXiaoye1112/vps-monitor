@@ -73,6 +73,15 @@ def register_node(config: dict[str, Any]) -> None:
     response.raise_for_status()
 
 
+def try_register_node(config: dict[str, Any]) -> bool:
+    try:
+        register_node(config)
+    except requests.RequestException as exc:
+        print(f"register failed: {exc}", file=sys.stderr, flush=True)
+        return False
+    return True
+
+
 class CpuSampler:
     def __init__(self, interval: float) -> None:
         self.interval = max(1.0, interval)
@@ -137,7 +146,7 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
 
             started_at = time.monotonic()
             if started_at >= register_after:
-                register_node(config)
+                try_register_node(config)
                 register_after = started_at + 300
             cpu_percent = cpu_sampler.current() if cpu_sampler else None
             previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
