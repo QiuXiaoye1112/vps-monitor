@@ -278,7 +278,7 @@ git fetch --all
 git reset --hard origin/master
 ```
 
-注意：这会丢弃服务器当前目录里的本地代码改动。
+注意：这会丢弃 `/opt/vps-monitor` 目录里的本地代码改动。正常部署时，配置文件在 `/etc/vps-monitor-agent.toml` 和 `/etc/vps-monitor.env`，不会被这条命令覆盖。
 
 中心 VPS 同步后安装中心依赖：
 
@@ -302,13 +302,17 @@ pip install -r requirements-agent.txt
 
 ## 重启服务
 
-中心 VPS 重启 API：
+中心 VPS 同步后重启 API 和本机 Agent：
 
 ```bash
 sudo systemctl restart vps-monitor-api
 ```
 
-被监控 VPS 重启 Agent：
+```bash
+sudo systemctl restart vps-monitor-agent
+```
+
+远程 VPS 同步后只需要重启 Agent：
 
 ```bash
 sudo systemctl restart vps-monitor-agent

@@ -206,4 +206,4 @@ git fetch --all
 git reset --hard origin/master
 ```
 
-注意：这会丢弃服务器当前目录里的本地代码改动。
+注意：这会丢弃 `/opt/vps-monitor` 目录里的本地代码改动。正常部署时，配置文件在 `/etc/vps-monitor-agent.toml` 和 `/etc/vps-monitor.env`，不会被这条命令覆盖。

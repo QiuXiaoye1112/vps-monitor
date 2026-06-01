@@ -151,7 +151,27 @@ sudo systemctl enable --now vps-monitor-agent
 ```
 ## 查看token
 ```bash
-cat /root/vps-monitor-token.txt
+sudo grep VPS_MONITOR_TOKEN /etc/vps-monitor.env
+```
+## 同步 GitHub 最新代码
+以下命令会让服务器上的项目文件与 GitHub `master` 保持一致。它会丢弃 `/opt/vps-monitor` 目录里的本地代码改动，但不会覆盖 `/etc/vps-monitor-agent.toml` 和 `/etc/vps-monitor.env`。
+```bash
+cd /opt/vps-monitor
+```
+```bash
+git fetch --all
+```
+```bash
+git reset --hard origin/master
+```
+中心 VPS 执行：
+```bash
+sudo systemctl restart vps-monitor-api
+sudo systemctl restart vps-monitor-agent
+```
+远程 VPS 只需要执行：
+```bash
+sudo systemctl restart vps-monitor-agent
 ```
 ## 常用状态检查
 ```bash
