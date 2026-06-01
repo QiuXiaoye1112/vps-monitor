@@ -95,13 +95,13 @@ cp /opt/vps-monitor/vps_monitor.db "/opt/vps-monitor/vps_monitor.db.bak.$(date +
 只保留指定节点：
 
 ```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM nodes WHERE id NOT IN ('vmrack','vimss');"
+sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM nodes WHERE id NOT IN ('node-01','node-02');"
 ```
 
 清理旧指标：
 
 ```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM metrics WHERE node_id NOT IN ('vmrack','vimss');"
+sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM metrics WHERE node_id NOT IN ('node-01','node-02');"
 ```
 
 ## 修改显示名

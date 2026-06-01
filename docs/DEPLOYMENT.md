@@ -241,11 +241,11 @@ sudo nano /etc/vps-monitor-agent.toml
 
 ```toml
 server_url = "http://中心VPS公网IP:8080"
-node_id = "vmrack"
+node_id = "node-01"
 token = "change-this-token"
 interval = 1
 
-name = "Vmrack 洛杉矶"
+name = "Example Node 01"
 os_type = "Linux"
 
 disk_paths = ["/"]
