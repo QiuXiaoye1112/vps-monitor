@@ -149,7 +149,10 @@ sudo systemctl daemon-reload
 ```bash
 sudo systemctl enable --now vps-monitor-agent
 ```
-
+## 查看token
+```bash
+cat /root/vps-monitor-token.txt
+```
 ## 常用状态检查
 ```bash
 systemctl status vps-monitor-api
