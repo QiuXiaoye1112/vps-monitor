@@ -124,6 +124,140 @@ name = "新的显示名"
 sudo systemctl restart vps-monitor-agent
 ```
 
+## 8080 防火墙规则
+
+这些命令都在中心 VPS 执行。
+
+8080 是远程 Agent 上报入口。建议只允许你的远程 VPS 公网 IP 访问，不要全网开放。
+
+### 放行指定 VPS IP 访问 8080
+
+放行一台远程 VPS：
+
+```bash
+iptables -I INPUT -p tcp -s 38.207.187.37 --dport 8080 -j ACCEPT
+```
+
+再放行另一台远程 VPS：
+
+```bash
+iptables -I INPUT -p tcp -s 43.110.32.2 --dport 8080 -j ACCEPT
+```
+
+### 拒绝其他所有 IP 访问 8080
+
+```bash
+iptables -A INPUT -p tcp --dport 8080 -j DROP
+```
+
+规则顺序很重要：指定 IP 的 `ACCEPT` 必须在通用 `DROP` 前面。
+
+### 查看当前 8080 规则
+
+查看原始规则：
+
+```bash
+iptables -S INPUT | grep 8080
+```
+
+查看详细规则和编号：
+
+```bash
+iptables -L INPUT -n -v --line-numbers | grep 8080
+```
+
+### 删除 8080 防火墙规则
+
+先查看规则编号：
+
+```bash
+iptables -L INPUT -n --line-numbers | grep 8080
+```
+
+按编号删除某一条规则，例如删除第 2 条：
+
+```bash
+iptables -D INPUT 2
+```
+
+如果要删除多条规则，先删编号大的，再删编号小的。因为删除一条后，后面的编号会变化。
+
+按具体 IP 删除放行规则：
+
+```bash
+iptables -D INPUT -p tcp -s 38.207.187.37 --dport 8080 -j ACCEPT
+```
+
+```bash
+iptables -D INPUT -p tcp -s 43.110.32.2 --dport 8080 -j ACCEPT
+```
+
+删除 8080 的通用 DROP 规则：
+
+```bash
+iptables -D INPUT -p tcp --dport 8080 -j DROP
+```
+
+### 保存防火墙规则，重启后继续生效
+
+安装持久化工具：
+
+```bash
+apt install -y iptables-persistent
+```
+
+保存当前规则：
+
+```bash
+netfilter-persistent save
+```
+
+查看持久化服务状态：
+
+```bash
+systemctl status netfilter-persistent
+```
+
+查看保存到文件里的 8080 规则：
+
+```bash
+grep 8080 /etc/iptables/rules.v4
+```
+
+手动重新加载已保存规则：
+
+```bash
+netfilter-persistent reload
+```
+
+每次修改 iptables 规则后，如果希望重启后仍然生效，都要再次执行：
+
+```bash
+netfilter-persistent save
+```
+
+### 验证 8080 是否只对指定 IP 开放
+
+在被允许的远程 VPS 上执行：
+
+```bash
+curl http://中心VPS公网IP:8080/api/health
+```
+
+正常应该返回：
+
+```json
+{"status":"ok"}
+```
+
+在未被允许的第三台机器上执行：
+
+```bash
+curl --connect-timeout 5 http://中心VPS公网IP:8080/api/health
+```
+
+如果返回连接超时，说明 8080 已经被防火墙拦住。
+
 ## 同步 GitHub 最新代码
 
 在中心 VPS 或远程 VPS 执行：
