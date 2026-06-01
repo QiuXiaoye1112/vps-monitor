@@ -4,10 +4,12 @@ import argparse
 import os
 import platform
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
+import psutil
 import requests
 
 from monitor_common import collect_metrics, default_disk_paths, parse_items
@@ -48,6 +50,10 @@ def headers(config: dict[str, Any]) -> dict[str, str]:
     return {"Authorization": f"Bearer {config['token']}", "Content-Type": "application/json"}
 
 
+def request_timeout(config: dict[str, Any]) -> float:
+    return min(2.0, max(0.5, float(config["interval"]) * 0.8))
+
+
 def register_node(config: dict[str, Any]) -> None:
     payload = {
         "node_id": config["node_id"],
@@ -58,18 +64,58 @@ def register_node(config: dict[str, Any]) -> None:
         "note": config["note"],
         "services": [],
     }
-    response = requests.post(api_url(config, "/api/nodes/register"), json=payload, headers=headers(config), timeout=8)
+    response = requests.post(
+        api_url(config, "/api/nodes/register"),
+        json=payload,
+        headers=headers(config),
+        timeout=request_timeout(config),
+    )
     response.raise_for_status()
 
 
-def report_once(config: dict[str, Any], previous_net: dict[str, float] | None) -> dict[str, float]:
-    if previous_net is None:
-        _, previous_net = collect_metrics(disk_paths=config["disk_paths"], previous_net=None)
-        time.sleep(min(1.0, float(config["interval"])))
+class CpuSampler:
+    def __init__(self, interval: float) -> None:
+        self.interval = max(1.0, interval)
+        self.value = 0.0
+        self.lock = threading.Lock()
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self.run, daemon=True)
 
-    metrics, current_net = collect_metrics(disk_paths=config["disk_paths"], previous_net=previous_net)
+    def start(self) -> None:
+        psutil.cpu_percent(interval=None)
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+
+    def current(self) -> float:
+        with self.lock:
+            return self.value
+
+    def run(self) -> None:
+        while not self.stop_event.is_set():
+            value = psutil.cpu_percent(interval=self.interval)
+            with self.lock:
+                self.value = float(value)
+
+
+def report_once(
+    config: dict[str, Any],
+    previous_net: dict[str, float] | None,
+    cpu_percent: float | None = None,
+) -> dict[str, float]:
+    metrics, current_net = collect_metrics(
+        disk_paths=config["disk_paths"],
+        previous_net=previous_net,
+        cpu_percent=cpu_percent,
+    )
     payload = {"node_id": config["node_id"], **metrics}
-    response = requests.post(api_url(config, "/api/metrics"), json=payload, headers=headers(config), timeout=8)
+    response = requests.post(
+        api_url(config, "/api/metrics"),
+        json=payload,
+        headers=headers(config),
+        timeout=request_timeout(config),
+    )
     response.raise_for_status()
     return current_net
 
@@ -77,18 +123,33 @@ def report_once(config: dict[str, Any], previous_net: dict[str, float] | None) -
 def run_agent(config: dict[str, Any], once: bool = False) -> int:
     previous_net: dict[str, float] | None = None
     backoff = 2
+    register_after = 0.0
+    next_report_at = time.monotonic()
+    cpu_sampler = None if once else CpuSampler(float(config["interval"]))
+    if cpu_sampler:
+        cpu_sampler.start()
 
     while True:
         try:
-            register_node(config)
-            previous_net = report_once(config, previous_net)
+            wait_seconds = next_report_at - time.monotonic()
+            if wait_seconds > 0:
+                time.sleep(wait_seconds)
+
+            started_at = time.monotonic()
+            if started_at >= register_after:
+                register_node(config)
+                register_after = started_at + 300
+            cpu_percent = cpu_sampler.current() if cpu_sampler else None
+            previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
             backoff = 2
             print(f"reported metrics for {config['node_id']}", flush=True)
             if once:
                 return 0
-            time.sleep(config["interval"])
+            next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
         except KeyboardInterrupt:
             print("agent stopped", flush=True)
+            if cpu_sampler:
+                cpu_sampler.stop()
             return 0
         except requests.RequestException as exc:
             print(f"report failed: {exc}", file=sys.stderr, flush=True)
@@ -96,12 +157,14 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 return 1
             time.sleep(backoff)
             backoff = min(backoff * 2, 60)
+            next_report_at = time.monotonic()
         except Exception as exc:
             print(f"agent error: {exc}", file=sys.stderr, flush=True)
             if once:
                 return 1
             time.sleep(backoff)
             backoff = min(backoff * 2, 60)
+            next_report_at = time.monotonic()
 
 
 def main() -> int:

@@ -116,10 +116,12 @@ def collect_metrics(
     service_names: list[str] | None = None,
     disk_paths: list[str] | None = None,
     previous_net: dict[str, float] | None = None,
+    cpu_percent: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, float]]:
     disk_paths = disk_paths or default_disk_paths()
 
-    cpu_percent = psutil.cpu_percent(interval=0.35)
+    if cpu_percent is None:
+        cpu_percent = psutil.cpu_percent(interval=None)
     memory = psutil.virtual_memory()
     swap = psutil.swap_memory()
     disk, disks = disk_snapshot(disk_paths)
