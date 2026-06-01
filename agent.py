@@ -131,7 +131,6 @@ def report_once(
 
 def run_agent(config: dict[str, Any], once: bool = False) -> int:
     previous_net: dict[str, float] | None = None
-    backoff = 2
     register_after = 0.0
     next_report_at = time.monotonic()
     cpu_sampler = None if once else CpuSampler(float(config["interval"]))
@@ -150,7 +149,6 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 register_after = started_at + 300
             cpu_percent = cpu_sampler.current() if cpu_sampler else None
             previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
-            backoff = 2
             print(f"reported metrics for {config['node_id']}", flush=True)
             if once:
                 return 0
@@ -164,16 +162,12 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
             print(f"report failed: {exc}", file=sys.stderr, flush=True)
             if once:
                 return 1
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 60)
-            next_report_at = time.monotonic()
+            next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
         except Exception as exc:
             print(f"agent error: {exc}", file=sys.stderr, flush=True)
             if once:
                 return 1
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 60)
-            next_report_at = time.monotonic()
+            next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
 
 
 def main() -> int:
