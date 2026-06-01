@@ -1,113 +1,16 @@
 from __future__ import annotations
 
-import threading
-import time
 from typing import Any
 
-import psutil
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 import storage
-from monitor_common import collect_metrics, parse_items
-from settings import (
-    LOCAL_MONITOR_DISK_PATHS,
-    LOCAL_MONITOR_ENABLED,
-    LOCAL_MONITOR_INTERVAL,
-    LOCAL_MONITOR_NODE_ID,
-    LOCAL_MONITOR_NODE_NAME,
-    SERVER_TOKEN,
-)
-
-
-class CpuSampler:
-    def __init__(self, interval: float) -> None:
-        self.interval = max(1.0, interval)
-        self.value = 0.0
-        self.lock = threading.Lock()
-        self.stop_event = threading.Event()
-        self.thread = threading.Thread(target=self.run, daemon=True)
-
-    def start(self) -> None:
-        psutil.cpu_percent(interval=None)
-        self.thread.start()
-
-    def stop(self) -> None:
-        self.stop_event.set()
-
-    def current(self) -> float:
-        with self.lock:
-            return self.value
-
-    def run(self) -> None:
-        while not self.stop_event.is_set():
-            value = psutil.cpu_percent(interval=self.interval)
-            with self.lock:
-                self.value = float(value)
-
-
-class LocalMonitor:
-    def __init__(self) -> None:
-        self.interval = float(LOCAL_MONITOR_INTERVAL)
-        self.disk_paths = parse_items(LOCAL_MONITOR_DISK_PATHS)
-        self.previous_net: dict[str, float] | None = None
-        self.register_after = 0.0
-        self.next_report_at = time.monotonic()
-        self.stop_event = threading.Event()
-        self.cpu_sampler = CpuSampler(self.interval)
-        self.thread = threading.Thread(target=self.run, daemon=True)
-
-    def start(self) -> None:
-        self.cpu_sampler.start()
-        self.thread.start()
-
-    def stop(self) -> None:
-        self.stop_event.set()
-        self.cpu_sampler.stop()
-
-    def register_node(self) -> None:
-        storage.create_or_update_node(
-            {
-                "node_id": LOCAL_MONITOR_NODE_ID,
-                "name": LOCAL_MONITOR_NODE_NAME,
-                "ip": "127.0.0.1",
-                "region": "local",
-                "os_type": "Linux",
-                "note": "internal monitor",
-                "services": [],
-            }
-        )
-
-    def report_once(self) -> None:
-        metrics, self.previous_net = collect_metrics(
-            disk_paths=self.disk_paths,
-            previous_net=self.previous_net,
-            cpu_percent=self.cpu_sampler.current(),
-        )
-        storage.insert_metric({"node_id": LOCAL_MONITOR_NODE_ID, **metrics})
-
-    def run(self) -> None:
-        while not self.stop_event.is_set():
-            wait_seconds = self.next_report_at - time.monotonic()
-            if wait_seconds > 0 and self.stop_event.wait(wait_seconds):
-                return
-
-            started_at = time.monotonic()
-            try:
-                if started_at >= self.register_after:
-                    self.register_node()
-                    self.register_after = started_at + 300
-                self.report_once()
-            except Exception:
-                self.next_report_at = time.monotonic() + self.interval
-                continue
-
-            self.next_report_at = max(self.next_report_at + self.interval, time.monotonic())
+from settings import SERVER_TOKEN
 
 
 app = FastAPI(title="VPS Monitor API", version="1.0.0")
-local_monitor: LocalMonitor | None = None
 
 
 DASHBOARD_HTML = """<!doctype html>
@@ -503,17 +406,7 @@ def require_token(token: str | None = Depends(token_from_request)) -> None:
 
 @app.on_event("startup")
 def on_startup() -> None:
-    global local_monitor
     storage.init_db()
-    if LOCAL_MONITOR_ENABLED:
-        local_monitor = LocalMonitor()
-        local_monitor.start()
-
-
-@app.on_event("shutdown")
-def on_shutdown() -> None:
-    if local_monitor:
-        local_monitor.stop()
 
 
 @app.get("/api/health")
