@@ -236,6 +236,14 @@ DASHBOARD_HTML = """<!doctype html>
       return date.toLocaleString();
     }
 
+    function fmtAge(value) {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "-";
+      const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+      return `${seconds}s ago`;
+    }
+
     function fmtDuration(seconds) {
       if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return "-";
       const total = Math.max(0, Math.floor(Number(seconds)));
@@ -310,7 +318,7 @@ DASHBOARD_HTML = """<!doctype html>
 
         const lastSeen = document.createElement("div");
         lastSeen.className = "last-seen";
-        lastSeen.textContent = `最后上报：${fmtTime(node.last_seen_at)}`;
+        lastSeen.textContent = `最后上报：${fmtAge(node.last_seen_at)} · ${fmtTime(node.last_seen_at)}`;
         card.append(head, metrics, lastSeen);
         content.append(card);
       }
@@ -338,7 +346,7 @@ DASHBOARD_HTML = """<!doctype html>
     }
 
     refresh();
-    setInterval(refresh, 1000);
+    setInterval(refresh, 500);
   </script>
 </body>
 </html>
