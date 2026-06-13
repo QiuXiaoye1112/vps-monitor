@@ -420,7 +420,7 @@ def configure_agent(local: bool) -> None:
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
     token = ask("通信 token", default_token, secret=True)
     interval_text = ask("上报间隔（秒）", "1")
-    disk_paths = ask("监控磁盘路径，多个用逗号分隔", "/")
+    disk_paths = ask("磁盘挂载路径（直接回车监控系统盘；额外磁盘如 /data）", "/")
     try:
         interval = max(1, int(interval_text))
     except ValueError:
@@ -913,6 +913,15 @@ def main() -> int:
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看最近日志"),
+                    ("3", "删除中心 VPS 本机监控"),
+                    ("4", "更新程序"),
+                    ("5", "高级设置"),
+                    ("0", "退出"),
+                ]
+                if role == "center"
+                else [
+                    ("1", "查看运行状态"),
+                    ("2", "查看最近日志"),
                     ("3", "更新程序"),
                     ("4", "高级设置"),
                     ("0", "退出"),
@@ -927,6 +936,20 @@ def main() -> int:
                 show_overview()
             elif selected == "3":
                 quick_logs()
+            elif selected == "4":
+                quick_update()
+            elif selected == "5":
+                advanced_menu()
+            else:
+                return 0
+            continue
+        if role == "center":
+            if selected == "1":
+                show_overview()
+            elif selected == "2":
+                quick_logs()
+            elif selected == "3":
+                remove_agent()
             elif selected == "4":
                 quick_update()
             elif selected == "5":
