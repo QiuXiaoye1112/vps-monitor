@@ -35,7 +35,14 @@ class ManagerTests(unittest.TestCase):
 
     def test_server_url_adds_scheme_and_port(self) -> None:
         self.assertEqual(manager.server_url("1.2.3.4", 8080), "http://1.2.3.4:8080")
-        self.assertEqual(manager.server_url("https://monitor.example.com", 443), "https://monitor.example.com:443")
+        self.assertEqual(manager.server_url("2001:db8::1", 8080), "http://[2001:db8::1]:8080")
+
+    def test_agent_token_reads_toml_value(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "agent.toml"
+            path.write_text('node_id = "node-1"\ntoken = "secret-token"\n', encoding="utf-8")
+            with mock.patch.object(manager, "AGENT_CONFIG", path):
+                self.assertEqual(manager.agent_token(), "secret-token")
 
     def test_nginx_value_reads_exact_directive(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
