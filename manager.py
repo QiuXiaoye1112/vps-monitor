@@ -1366,9 +1366,9 @@ def main() -> int:
                     ("3", "查看 token"),
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
-                    ("6", "更新程序"),
-                    ("7", "重新部署中心面板"),
-                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("6", "重新部署中心面板"),
+                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("8", "更新程序"),
                     ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
@@ -1378,9 +1378,9 @@ def main() -> int:
                     ("2", "查看 token"),
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
-                    ("5", "更新程序"),
-                    ("6", "重新部署中心面板"),
-                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("5", "重新部署中心面板"),
+                    ("6", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("7", "更新程序"),
                     ("8", "完整卸载"),
                     ("0", "退出"),
                 ]
@@ -1409,11 +1409,11 @@ def main() -> int:
             elif selected == "5":
                 temp_open_for_new_agent()
             elif selected == "6":
-                quick_update()
-            elif selected == "7":
                 install_panel()
-            elif selected == "8":
+            elif selected == "7":
                 toggle_https()
+            elif selected == "8":
+                quick_update()
             elif selected == "9":
                 full_uninstall()
             else:
@@ -1429,11 +1429,11 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                quick_update()
-            elif selected == "6":
                 install_panel()
-            elif selected == "7":
+            elif selected == "6":
                 toggle_https()
+            elif selected == "7":
+                quick_update()
             elif selected == "8":
                 full_uninstall()
             else:
