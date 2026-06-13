@@ -420,7 +420,6 @@ def configure_agent(local: bool) -> None:
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
     token = ask("通信 token", default_token, secret=True)
     interval_text = ask("上报间隔（秒）", "1")
-    disk_paths = ask("磁盘挂载路径（直接回车监控系统盘；额外磁盘如 /data）", "/")
     try:
         interval = max(1, int(interval_text))
     except ValueError:
@@ -437,7 +436,7 @@ def configure_agent(local: bool) -> None:
         "name": name,
         "token": token,
         "interval": interval,
-        "disk_paths": [item.strip() for item in disk_paths.split(",") if item.strip()],
+        "disk_paths": ["/"],
         "os_type": "Linux",
     }
     print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")
