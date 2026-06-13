@@ -87,11 +87,38 @@ def ask_port(prompt: str, default: int) -> int:
         print(color("端口必须在 1 到 65535 之间。", RED))
 
 
+def ask_ip(prompt: str) -> str:
+    while True:
+        value = ask(prompt)
+        try:
+            return str(ipaddress.ip_address(value))
+        except ValueError:
+            print(color("请输入有效的 IPv4 或 IPv6 地址，不能填写域名或 http://。", RED))
+
+
 def server_url(host: str, port: int) -> str:
-    host = host.strip().rstrip("/")
-    if host.startswith("http://") or host.startswith("https://"):
-        return f"{host}:{port}"
-    return f"http://{host}:{port}"
+    address = ipaddress.ip_address(host.strip())
+    rendered = f"[{address}]" if address.version == 6 else str(address)
+    return f"http://{rendered}:{port}"
+
+
+def agent_token() -> str:
+    try:
+        content = AGENT_CONFIG.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(r'^\s*token\s*=\s*"((?:\\.|[^"\\])*)"\s*$', content, re.MULTILINE)
+    if not match:
+        return ""
+    return match.group(1).replace('\\"', '"').replace("\\\\", "\\")
+
+
+def show_token() -> None:
+    title("查看 token")
+    role = installation_role()
+    token = read_env(SERVER_ENV).get("VPS_MONITOR_TOKEN", "") if role == "center" else agent_token()
+    print(f"通信 token：{token or '未配置'}")
+    pause()
 
 
 def choose(prompt: str, options: list[tuple[str, str]], allow_back: bool = True) -> str | None:
@@ -447,12 +474,12 @@ def configure_agent(local: bool) -> None:
         port = ask_port("中心 API 端口", 8000)
         center_url = f"http://127.0.0.1:{port}"
     else:
-        host = ask("中心 VPS IP 或域名")
+        host = ask_ip("中心 VPS IP")
         port = ask_port("Agent 接入端口", 8080)
-        center_url = server_url(host, port) if host else ""
+        center_url = server_url(host, port)
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
-    token = ask("通信 token", default_token, secret=True)
+    token = default_token if local and default_token else ask("通信 token", secret=True)
     interval_text = ask("上报间隔（秒）", "1")
     try:
         interval = max(1, int(interval_text))
@@ -953,25 +980,28 @@ def main() -> int:
                     ("1", "安装中心 VPS 本机监控"),
                     ("2", "查看运行状态"),
                     ("3", "查看最近日志"),
-                    ("4", "更新程序"),
-                    ("5", "高级设置"),
+                    ("4", "查看 token"),
+                    ("5", "更新程序"),
+                    ("6", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看最近日志"),
-                    ("3", "删除中心 VPS 本机监控"),
-                    ("4", "更新程序"),
-                    ("5", "高级设置"),
+                    ("3", "查看 token"),
+                    ("4", "删除中心 VPS 本机监控"),
+                    ("5", "更新程序"),
+                    ("6", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center"
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看最近日志"),
-                    ("3", "更新程序"),
-                    ("4", "高级设置"),
+                    ("3", "查看 token"),
+                    ("4", "更新程序"),
+                    ("5", "高级设置"),
                     ("0", "退出"),
                 ]
             ),
@@ -985,8 +1015,10 @@ def main() -> int:
             elif selected == "3":
                 quick_logs()
             elif selected == "4":
-                quick_update()
+                show_token()
             elif selected == "5":
+                quick_update()
+            elif selected == "6":
                 advanced_menu()
             else:
                 return 0
@@ -997,10 +1029,12 @@ def main() -> int:
             elif selected == "2":
                 quick_logs()
             elif selected == "3":
-                remove_agent()
+                show_token()
             elif selected == "4":
-                quick_update()
+                remove_agent()
             elif selected == "5":
+                quick_update()
+            elif selected == "6":
                 advanced_menu()
             else:
                 return 0
@@ -1010,8 +1044,10 @@ def main() -> int:
         elif selected == "2":
             quick_logs()
         elif selected == "3":
-            quick_update()
+            show_token()
         elif selected == "4":
+            quick_update()
+        elif selected == "5":
             advanced_menu()
         else:
             return 0
