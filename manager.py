@@ -1303,8 +1303,8 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
                     ("3", "重新配置 Agent"),
-                    ("4", "更新程序"),
-                    ("5", "删除 Agent"),
+                    ("4", "删除 Agent"),
+                    ("5", "更新程序"),
                     ("6", "完整卸载"),
                     ("0", "退出"),
                 ]
@@ -1352,9 +1352,9 @@ def main() -> int:
         elif selected == "3":
             configure_agent(local=False)
         elif selected == "4":
-            quick_update()
-        elif selected == "5":
             remove_agent()
+        elif selected == "5":
+            quick_update()
         elif selected == "6":
             full_uninstall()
         else:
