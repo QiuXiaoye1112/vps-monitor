@@ -1095,10 +1095,17 @@ def temp_open_for_new_agent() -> None:
         return
 
     print(color("已开放，请在 5 分钟内启动新 Agent...", GREEN))
+    print(color("按回车键提前关闭", DIM))
+    import select
     for i in range(seconds, 0, -5):
         m, s = divmod(i, 60)
-        print(f"\r  剩余 {m}:{s:02d}...", end="", flush=True)
-        time.sleep(5)
+        print(f"\r  剩余 {m}:{s:02d}（按回车关闭）...", end="", flush=True)
+        # 非阻塞检测回车
+        ready, _, _ = select.select([sys.stdin], [], [], 5)
+        if ready:
+            sys.stdin.readline()
+            print()
+            break
     print()
 
     # 重新加上 DROP
