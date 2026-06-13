@@ -1369,8 +1369,7 @@ def main() -> int:
                     ("6", "更新程序"),
                     ("7", "重新部署中心面板"),
                     ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("9", "删除中心面板"),
-                    ("10", "完整卸载"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1382,8 +1381,7 @@ def main() -> int:
                     ("5", "更新程序"),
                     ("6", "重新部署中心面板"),
                     ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("8", "删除中心面板"),
-                    ("9", "完整卸载"),
+                    ("8", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1417,9 +1415,6 @@ def main() -> int:
             elif selected == "8":
                 toggle_https()
             elif selected == "9":
-                remove_panel()
-                return 0
-            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1440,9 +1435,6 @@ def main() -> int:
             elif selected == "7":
                 toggle_https()
             elif selected == "8":
-                remove_panel()
-                return 0
-            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
