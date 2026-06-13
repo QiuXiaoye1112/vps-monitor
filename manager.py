@@ -1200,11 +1200,8 @@ def advanced_menu() -> None:
             ]
             if role == "center"
             else [
-                ("1", "重新配置 Agent"),
-                ("2", "服务启停与实时日志"),
-                ("3", "重新安装依赖与综合诊断"),
-                ("4", "删除 Agent"),
-                ("5", "完整卸载"),
+                ("1", "服务启停与实时日志"),
+                ("2", "重新安装依赖与综合诊断"),
             ]
         )
         selected = choose("只有需要自定义时才使用这里", options)
@@ -1233,16 +1230,11 @@ def advanced_menu() -> None:
                 full_uninstall()
         else:
             if selected == "1":
-                configure_agent(local=False)
-            elif selected == "2":
                 service_menu()
-            elif selected == "3":
+            elif selected == "2":
                 maintenance_menu()
-            elif selected == "4":
-                remove_agent()
-                return
             else:
-                full_uninstall()
+                return
 
 
 def first_setup(role: str) -> None:
@@ -1310,8 +1302,10 @@ def main() -> int:
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "更新程序"),
-                    ("4", "高级设置"),
+                    ("3", "重新配置 Agent"),
+                    ("4", "更新程序"),
+                    ("5", "删除 Agent"),
+                    ("6", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1356,9 +1350,13 @@ def main() -> int:
         elif selected == "2":
             show_token()
         elif selected == "3":
-            quick_update()
+            configure_agent(local=False)
         elif selected == "4":
-            advanced_menu()
+            quick_update()
+        elif selected == "5":
+            remove_agent()
+        elif selected == "6":
+            full_uninstall()
         else:
             return 0
 
