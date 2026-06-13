@@ -477,7 +477,20 @@ def install_panel() -> None:
         print(color("token 不能包含空格或换行。", RED))
         pause()
         return
-    print("\n即将安装 Python、Nginx、API 服务并写入中心配置。")
+    print(color("正在清理旧防火墙和 Agent 入口...", CYAN))
+    if command_exists("iptables"):
+        port = agent_port()
+        rules = subprocess.run(["iptables", "-S", "INPUT"], capture_output=True, text=True, check=False).stdout
+        for line in rules.splitlines():
+            if f"--dport {port}" in line:
+                parts = shlex.split(line)
+                if parts[0] == "-A":
+                    subprocess.run(["iptables", "-D", *parts[1:]], check=False, capture_output=True)
+    for p in ["/etc/nginx/sites-available/vps-monitor-agent.conf", "/etc/nginx/sites-enabled/vps-monitor-agent.conf",
+              "/etc/nginx/conf.d/vps-monitor-agent.conf"]:
+        remove_path(Path(p))
+    print()
+    print("即将安装 Python、Nginx、API 服务并写入中心配置。")
     try:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
@@ -1219,8 +1232,7 @@ def firewall_rules_menu() -> None:
         line = lines[idx]
         parts = shlex.split(line)
         if parts[0] == "-A":
-            parts[0] = "-D"
-            subprocess.run(["iptables", *parts[1:]], check=False)
+            subprocess.run(["iptables", "-D", *parts[1:]], check=False)
             print(color("规则已删除。", GREEN))
         if command_exists("netfilter-persistent"):
             run(["netfilter-persistent", "save"], check=False)
