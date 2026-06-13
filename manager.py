@@ -1123,8 +1123,7 @@ def monitored_hosts_menu() -> None:
             [
                 ("1", "允许该主机访问 8080 并保存"),
                 ("2", "移除该主机放行规则并保存"),
-                ("3", "临时开放 8080（60秒，添加新机器用）"),
-                ("4", "删除该主机（防火墙规则+数据）"),
+                ("3", "删除该主机（防火墙规则+数据）"),
             ],
         )
         if action == "1":
@@ -1132,8 +1131,6 @@ def monitored_hosts_menu() -> None:
         elif action == "2":
             remove_node_firewall(node)
         elif action == "3":
-            temp_open_for_new_agent()
-        elif action == "4":
             remove_remote_node(node)
 
 
