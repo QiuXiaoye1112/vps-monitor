@@ -1177,14 +1177,10 @@ def advanced_menu() -> None:
         options = (
             [
                 ("1", "重新部署中心面板"),
-                ("2", "重新配置本机 Agent"),
-                ("3", "服务启停与实时日志"),
-                ("4", "Agent 入口、防火墙与 HTTPS"),
-                ("5", "备份、依赖与综合诊断"),
-                ("6", "删除本机 Agent"),
-                ("7", "删除中心面板"),
-                ("8", "删除数据库备份"),
-                ("9", "完整卸载"),
+                ("2", "服务启停与实时日志"),
+                ("3", "备份、依赖与综合诊断"),
+                ("4", "删除中心面板"),
+                ("5", "完整卸载"),
             ]
             if role == "center"
             else [
@@ -1199,21 +1195,12 @@ def advanced_menu() -> None:
             if selected == "1":
                 install_panel()
             elif selected == "2":
-                configure_agent(local=True)
-            elif selected == "3":
                 service_menu()
-            elif selected == "4":
-                ingress_menu()
-            elif selected == "5":
+            elif selected == "3":
                 maintenance_menu()
-            elif selected == "6":
-                remove_agent()
-            elif selected == "7":
+            elif selected == "4":
                 remove_panel()
                 return
-            elif selected == "8":
-                delete_backups()
-                pause()
             else:
                 full_uninstall()
         else:
