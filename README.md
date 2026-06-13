@@ -11,3 +11,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/ma
 ```bash
 sudo vps-monitor
 ```
+
+删除新旧版本：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh)
+```
