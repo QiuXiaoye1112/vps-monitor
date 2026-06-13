@@ -818,15 +818,26 @@ def update_project() -> None:
     status = run(["git", "status", "--porcelain"], capture=True, check=False)
     if status.stdout.strip():
         print(color("检测到本地改动，为避免覆盖，本次更新已取消。", RED))
+        print(color(f"如需强制更新：git -C {PROJECT_DIR} reset --hard origin/master", DIM))
         return
-    run(["git", "pull", "--ff-only"])
-    if VENV_DIR.exists():
-        requirement = "requirements.txt" if SERVER_ENV.exists() else "requirements-agent.txt"
-        ensure_venv(requirement)
+    print(color("正在从 GitHub 拉取更新...", CYAN))
+    try:
+        run(["git", "fetch", "origin", "master"], check=False)
+        run(["git", "reset", "--hard", "origin/master"], check=False)
+    except Exception:
+        print(color("更新失败：网络错误或 Git 异常。", RED))
+        print(color(f"手动更新：cd {PROJECT_DIR} && git fetch origin master && git reset --hard origin/master", DIM))
+        return
+    try:
+        if VENV_DIR.exists():
+            requirement = "requirements.txt" if SERVER_ENV.exists() else "requirements-agent.txt"
+            ensure_venv(requirement)
+    except Exception:
+        print(color("依赖更新失败，但代码已更新。", YELLOW))
     for service in (API_SERVICE, AGENT_SERVICE):
         active, _ = service_state(service)
         if active == "active":
-            run(["systemctl", "restart", service])
+            run(["systemctl", "restart", service], check=False)
     print(color("项目更新完成。", GREEN))
 
 
