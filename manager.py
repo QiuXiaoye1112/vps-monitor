@@ -378,8 +378,6 @@ def install_panel() -> None:
         pause()
         return
     print("\n即将安装 Python、Nginx、API 服务并写入中心配置。")
-    if not confirm("确认继续？", True):
-        return
     try:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
@@ -443,8 +441,6 @@ def configure_agent(local: bool) -> None:
         "os_type": "Linux",
     }
     print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")
-    if not confirm("确认继续？", True):
-        return
     try:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip"])
         ensure_venv("requirements-agent.txt")
@@ -457,8 +453,8 @@ def configure_agent(local: bool) -> None:
             [str(VENV_DIR / "bin/python"), str(PROJECT_DIR / "agent.py"), "--config", str(AGENT_CONFIG), "--once"],
             check=False,
         )
-        if test.returncode != 0 and not confirm("测试上报失败，仍然安装并启动服务？"):
-            return
+        if test.returncode != 0:
+            print(color("测试上报失败，服务仍会安装并启动，请稍后查看 Agent 日志。", YELLOW))
         run(["systemctl", "enable", "--now", AGENT_SERVICE])
         run(["systemctl", "restart", AGENT_SERVICE])
         print(color("\nAgent 已配置并启动。", GREEN))
