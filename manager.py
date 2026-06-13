@@ -1062,8 +1062,14 @@ def monitored_hosts_menu() -> None:
         if is_local:
             print()
             print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
-            print(color("只有远程 VPS 才需要开放 8080 并设置白名单。", DIM))
-            pause()
+            action = choose(
+                "本机操作",
+                [("1", "删除本机监控"), ("2", "临时开放 8080（添加新主机）")],
+            )
+            if action == "1":
+                remove_agent()
+            elif action == "2":
+                temp_open_for_new_agent()
             continue
         action = choose(
             "防火墙操作",
@@ -1201,9 +1207,8 @@ def main() -> int:
                     ("2", "查看 token"),
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
-                    ("5", "删除中心 VPS 本机监控"),
-                    ("6", "更新程序"),
-                    ("7", "高级设置"),
+                    ("5", "更新程序"),
+                    ("6", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1245,10 +1250,8 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                remove_agent()
-            elif selected == "6":
                 quick_update()
-            elif selected == "7":
+            elif selected == "6":
                 advanced_menu()
             else:
                 return 0
