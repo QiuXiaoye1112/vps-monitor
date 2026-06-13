@@ -38,7 +38,7 @@ if command -v iptables >/dev/null 2>&1; then
     printf "  当前已放行：${GREEN}%s${RESET}\n" "$AGENT_IP"
     printf "  即将阻止：  ${RED}所有其他 IP${RESET}\n"
     printf "  ${YELLOW}如有其他远程 VPS 未放行，它们将立即断连。${RESET}\n\n"
-    read -r -p "  确认添加 DROP 规则？[y/N] " confirm
+    read -r -p "  确认添加 DROP 规则？[y/N] " confirm < /dev/tty
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
       iptables -A INPUT -p tcp --dport "$AGENT_PORT" ! -i lo -j DROP
       ok "已阻止外部 IP 访问（本地回路不受限） TCP ${AGENT_PORT}"

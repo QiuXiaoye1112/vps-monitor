@@ -69,7 +69,7 @@ remove_legacy_install() {
 choose_reinstall() {
   local reason="$1"
   printf '\n自动更新无法完成：%s\n\n  1. 删除旧版本并安装最新版\n  0. 退出\n\n' "$reason"
-  while true; do read -r -p "请选择 [1/0]: " choice
+  while true; do read -r -p "请选择 [1/0]: " choice < /dev/tty
     case "$choice" in 1) return 0;; 0) return 1;; *) printf '请输入 1 或 0。\n';; esac
   done
 }
@@ -87,7 +87,7 @@ choose_role() {
   printf "  ${CYAN}1${RESET}. 中心 VPS  ${DIM}— 安装监控面板，集中查看所有 VPS 状态${RESET}\n"
   printf "  ${CYAN}2${RESET}. 远程 VPS  ${DIM}— 作为被监控节点，接入已有的中心 VPS${RESET}\n"
   printf "  ${CYAN}0${RESET}. 退出\n\n"
-  while true; do read -r -p "请选择 [1/2/0]: " choice
+  while true; do read -r -p "请选择 [1/2/0]: " choice < /dev/tty
     case "$choice" in
       1) SETUP_ROLE="center"; printf 'center\n' > "$ROLE_FILE"; chmod 600 "$ROLE_FILE"; return;;
       2) SETUP_ROLE="agent";  printf 'agent\n'  > "$ROLE_FILE"; chmod 600 "$ROLE_FILE"; return;;
@@ -198,7 +198,7 @@ main() {
   echo
   if [[ "$needs_setup" -eq 1 && -n "$SETUP_ROLE" ]]; then
     printf "  ${BOLD}按回车进入初始化配置...${RESET}\n"
-    read -r
+    read -r < /dev/tty
     exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE"
   fi
   exec python3 "$INSTALL_DIR/manager.py"

@@ -190,7 +190,7 @@ print_preflight() {
   printf "  %-16s ${CYAN}%s${RESET}\n" "API 监听" "${API_HOST}:${API_PORT}"
   printf "  %-16s ${CYAN}%s${RESET}\n" "项目目录" "$APP_DIR"
   printf "  %-16s ${GREEN}%s${RESET}\n" "Token" "${TOKEN:0:12}..."
-  echo; read -r -p "确认开始部署？[Y/n] " confirm
+  echo; read -r -p "确认开始部署？[Y/n] " confirm < /dev/tty
   [[ -z "$confirm" || "$confirm" =~ ^[Yy]$ ]] || { info "已取消。"; exit 0; }
 }
 
