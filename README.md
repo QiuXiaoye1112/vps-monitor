@@ -11,9 +11,3 @@ curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/in
 ```bash
 sudo vm
 ```
-
-卸载：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh | bash
-```
