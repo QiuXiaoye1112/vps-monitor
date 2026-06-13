@@ -818,15 +818,22 @@ def update_project() -> None:
     status = run(["git", "status", "--porcelain"], capture=True, check=False)
     if status.stdout.strip():
         print(color("检测到本地改动，为避免覆盖，本次更新已取消。", RED))
-        print(color(f"如需强制更新：git -C {PROJECT_DIR} reset --hard origin/master", DIM))
         return
     print(color("正在从 GitHub 拉取更新...", CYAN))
     try:
-        run(["git", "fetch", "origin", "master"], check=False)
-        run(["git", "reset", "--hard", "origin/master"], check=False)
-    except Exception:
-        print(color("更新失败：网络错误或 Git 异常。", RED))
-        print(color(f"手动更新：cd {PROJECT_DIR} && git fetch origin master && git reset --hard origin/master", DIM))
+        # --update-shallow 解决 --depth 1 浅克隆的更新问题
+        result = run(["git", "fetch", "origin", "master", "--update-shallow"], capture=True, check=False)
+        if result.returncode != 0:
+            print(color("更新失败：网络错误或仓库异常。", RED))
+            print(color(f"手动更新：cd {PROJECT_DIR} && git fetch origin master && git reset --hard FETCH_HEAD", DIM))
+            return
+        if "Already up to date" in result.stderr or "up to date" in result.stdout:
+            print(color("已是最新版本。", GREEN))
+            return
+        run(["git", "reset", "--hard", "FETCH_HEAD"], check=False)
+        print(color(f"已更新到最新版本。", GREEN))
+    except Exception as e:
+        print(color(f"更新失败：{e}", RED))
         return
     try:
         if VENV_DIR.exists():
@@ -838,8 +845,7 @@ def update_project() -> None:
         active, _ = service_state(service)
         if active == "active":
             run(["systemctl", "restart", service], check=False)
-    print(color("项目更新完成。", GREEN))
-    print(color("请重新执行 sudo vm 以载入最新代码。", CYAN))
+    print(color("请退出后重新执行 sudo vm 以载入最新代码。", CYAN))
     raise SystemExit(0)
 
 
