@@ -1080,14 +1080,17 @@ def temp_open_for_new_agent() -> None:
     if not confirm("确认临时开放？"):
         return
 
-    # 移除 DROP
+    # 移除 DROP（兼容旧版无 ! -i lo 的规则和新版有 ! -i lo 的规则）
     dropped = False
-    while subprocess.run(
+    for drop_rule in (
+        ["iptables", "-C", "INPUT", "-p", "tcp", "--dport", port, "!", "-i", "lo", "-j", "DROP"],
         ["iptables", "-C", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"],
-        check=False, capture_output=True,
-    ).returncode == 0:
-        run(["iptables", "-D", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"], check=False)
-        dropped = True
+    ):
+        while subprocess.run(drop_rule, check=False, capture_output=True).returncode == 0:
+            del_rule = drop_rule[:]
+            del_rule[1] = "-D"
+            run(del_rule, check=False)
+            dropped = True
 
     if not dropped:
         print(color(f"端口 {port} 当前没有 DROP 规则，无需临时开放。", YELLOW))
@@ -1100,7 +1103,6 @@ def temp_open_for_new_agent() -> None:
     for i in range(seconds, 0, -5):
         m, s = divmod(i, 60)
         print(f"\r  剩余 {m}:{s:02d}（按回车关闭）...", end="", flush=True)
-        # 非阻塞检测回车
         ready, _, _ = select.select([sys.stdin], [], [], 5)
         if ready:
             sys.stdin.readline()
@@ -1108,8 +1110,8 @@ def temp_open_for_new_agent() -> None:
             break
     print()
 
-    # 重新加上 DROP
-    run(["iptables", "-A", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"], check=False)
+    # 重新加上 DROP（排除本地回路）
+    run(["iptables", "-A", "INPUT", "-p", "tcp", "--dport", port, "!", "-i", "lo", "-j", "DROP"], check=False)
     save_firewall()
     print(color("DROP 规则已恢复。新 Agent IP 如已出现在列表中，请选择该主机 → 允许访问。", GREEN))
     pause()

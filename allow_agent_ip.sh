@@ -31,7 +31,7 @@ if command -v iptables >/dev/null 2>&1; then
     ok "已放行 $AGENT_IP → TCP ${AGENT_PORT}"
   fi
 
-  if iptables -C INPUT -p tcp --dport "$AGENT_PORT" -j DROP 2>/dev/null; then
+  if iptables -C INPUT -p tcp --dport "$AGENT_PORT" ! -i lo -j DROP 2>/dev/null; then
     ok "DROP 规则已存在（阻止其他 IP）"
   else
     printf "\n${BOLD}${YELLOW}╔══════════════════════════════════════════╗\n║  ⚠  即将阻止所有其他 IP 访问端口 %-5s ║\n╚══════════════════════════════════════════╝${RESET}\n\n" "$AGENT_PORT"
@@ -40,10 +40,10 @@ if command -v iptables >/dev/null 2>&1; then
     printf "  ${YELLOW}如有其他远程 VPS 未放行，它们将立即断连。${RESET}\n\n"
     read -r -p "  确认添加 DROP 规则？[y/N] " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-      iptables -A INPUT -p tcp --dport "$AGENT_PORT" -j DROP
-      ok "已阻止其他 IP 访问 TCP ${AGENT_PORT}"
+      iptables -A INPUT -p tcp --dport "$AGENT_PORT" ! -i lo -j DROP
+      ok "已阻止外部 IP 访问（本地回路不受限） TCP ${AGENT_PORT}"
     else
-      info "已跳过 DROP。稍后手动添加：sudo iptables -A INPUT -p tcp --dport ${AGENT_PORT} -j DROP"
+      info "已跳过 DROP。稍后手动添加：sudo iptables -A INPUT -p tcp --dport ${AGENT_PORT} ! -i lo -j DROP"
     fi
   fi
 
