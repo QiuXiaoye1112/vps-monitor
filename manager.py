@@ -1190,8 +1190,9 @@ def main() -> int:
                     ("2", "查看运行状态"),
                     ("3", "查看 token"),
                     ("4", "监控主机"),
-                    ("5", "更新程序"),
-                    ("6", "高级设置"),
+                    ("5", "添加新主机"),
+                    ("6", "更新程序"),
+                    ("7", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1199,9 +1200,10 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
                     ("3", "监控主机"),
-                    ("4", "删除中心 VPS 本机监控"),
-                    ("5", "更新程序"),
-                    ("6", "高级设置"),
+                    ("4", "添加新主机"),
+                    ("5", "删除中心 VPS 本机监控"),
+                    ("6", "更新程序"),
+                    ("7", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1225,8 +1227,10 @@ def main() -> int:
             elif selected == "4":
                 monitored_hosts_menu()
             elif selected == "5":
-                quick_update()
+                temp_open_for_new_agent()
             elif selected == "6":
+                quick_update()
+            elif selected == "7":
                 advanced_menu()
             else:
                 return 0
@@ -1239,10 +1243,12 @@ def main() -> int:
             elif selected == "3":
                 monitored_hosts_menu()
             elif selected == "4":
-                remove_agent()
+                temp_open_for_new_agent()
             elif selected == "5":
-                quick_update()
+                remove_agent()
             elif selected == "6":
+                quick_update()
+            elif selected == "7":
                 advanced_menu()
             else:
                 return 0
