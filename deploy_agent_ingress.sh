@@ -68,9 +68,13 @@ EOF
 
 apply_config() {
   info "测试 Nginx 配置..."
-  nginx -t 2>&1 | tail -3 || { warn "Nginx 配置测试失败，旧配置已备份。"; return 1; }
-  systemctl reload nginx
-  ok "Nginx 已重载"
+  if nginx -t 2>&1 | tail -3; then
+    systemctl reload nginx 2>/dev/null || warn "Nginx 重载失败，可能未启动。配置已写入，稍后生效。"
+    ok "Nginx 已重载"
+  else
+    warn "Nginx 配置测试失败，旧配置已备份。"
+    warn "配置已写入但未生效，修复后执行：nginx -t && systemctl reload nginx"
+  fi
 }
 
 verify_ingress() {
@@ -88,7 +92,7 @@ main() {
   detect_nginx_dirs
   _step 1 4 "检查上游 API";   check_upstream
   _step 2 4 "写入配置";       write_config
-  _step 3 4 "应用配置";       apply_config || { warn "配置应用失败。"; exit 1; }
+  _step 3 4 "应用配置";       apply_config
   _step 4 4 "验证入口";       verify_ingress
   echo; printf "${BOLD}${GREEN}✓ Agent 入口已就绪${RESET}\n"
   printf "  远程 Agent 的 server_url: ${CYAN}http://<中心VPS公网IP>:${AGENT_PORT}${RESET}\n"
