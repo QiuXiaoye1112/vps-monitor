@@ -440,21 +440,24 @@ def agent_unit() -> str:
 
 def show_overview() -> None:
     title("系统概览")
-    api_active, api_enabled = service_state(API_SERVICE)
-    agent_active, agent_enabled = service_state(AGENT_SERVICE)
-    ok, _ = health_check(f"{api_base_url()}/api/health")
-
+    role = installation_role()
+    print(f"角色          {color('中心服务器', CYAN) if role == 'center' else color('监控节点', CYAN)}")
     print(f"项目目录      {PROJECT_DIR}")
-    print(f"中心 API      {state_badge(api_active)} / 自启 {state_badge(api_enabled)}")
-    print(f"本机 Agent    {state_badge(agent_active)} / 自启 {state_badge(agent_enabled)}")
-    print(f"API 健康检查  {color('正常', GREEN) if ok else color('不可用', RED)}")
-    print(f"中心配置      {'已创建' if SERVER_ENV.exists() else '未创建'}")
-    print(f"Agent 配置    {'已创建' if AGENT_CONFIG.exists() else '未创建'}")
 
-    env = read_env(SERVER_ENV)
-    db_path = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
-    if db_path.exists():
-        print(f"数据库        {db_path} ({db_path.stat().st_size / 1024 / 1024:.2f} MB)")
+    if role == "center":
+        api_active, api_enabled = service_state(API_SERVICE)
+        ok, _ = health_check(f"{api_base_url()}/api/health")
+        print(f"中心 API      {state_badge(api_active)} / 自启 {state_badge(api_enabled)}")
+        print(f"API 健康检查  {color('正常', GREEN) if ok else color('不可用', RED)}")
+        print(f"中心配置      {'已创建' if SERVER_ENV.exists() else '未创建'}")
+        env = read_env(SERVER_ENV)
+        db_path = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
+        if db_path.exists():
+            print(f"数据库        {db_path} ({db_path.stat().st_size / 1024 / 1024:.2f} MB)")
+
+    agent_active, agent_enabled = service_state(AGENT_SERVICE)
+    print(f"本机 Agent    {state_badge(agent_active)} / 自启 {state_badge(agent_enabled)}")
+    print(f"Agent 配置    {'已创建' if AGENT_CONFIG.exists() else '未创建'}")
     pause()
 
 
