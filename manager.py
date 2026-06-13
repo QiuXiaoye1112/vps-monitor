@@ -817,34 +817,22 @@ def full_uninstall() -> None:
 
 def update_project() -> None:
     if not (PROJECT_DIR / ".git").exists():
-        print(color("当前目录不是 Git 仓库，无法在线更新。", YELLOW))
+        print(color("无法更新：非 Git 安装。", YELLOW))
         return
 
-    # 当前版本
-    before = subprocess.run(
-        ["git", "-C", str(PROJECT_DIR), "rev-parse", "--short", "HEAD"],
-        capture_output=True, text=True, check=False,
-    ).stdout.strip() or "unknown"
-    print(f"当前版本：{before}")
-
-    # 远端 URL
-    remote = subprocess.run(
-        ["git", "-C", str(PROJECT_DIR), "remote", "get-url", "origin"],
-        capture_output=True, text=True, check=False,
-    ).stdout.strip()
-    print(f"远端仓库：{remote}")
-
-    print(color("正在拉取更新...", CYAN))
+    print(color("正在检查更新...", CYAN))
     fetch = subprocess.run(
         ["git", "-C", str(PROJECT_DIR), "fetch", "origin"],
         capture_output=True, text=True, check=False,
     )
     if fetch.returncode != 0:
-        print(color(f"更新失败：无法连接远端仓库。", RED))
-        if fetch.stderr:
-            print(fetch.stderr.strip())
+        print(color("更新失败：无法连接 GitHub。", RED))
         return
 
+    before = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "rev-parse", "--short", "HEAD"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
     after = subprocess.run(
         ["git", "-C", str(PROJECT_DIR), "rev-parse", "--short", "origin/master"],
         capture_output=True, text=True, check=False,
@@ -856,21 +844,21 @@ def update_project() -> None:
 
     subprocess.run(
         ["git", "-C", str(PROJECT_DIR), "reset", "--hard", "origin/master"],
-        check=False,
+        capture_output=True, check=False,
     )
-    print(color(f"已更新：{before} → {after}", GREEN))
+    print(color("更新完成。", GREEN))
 
     try:
         if VENV_DIR.exists():
             requirement = "requirements.txt" if SERVER_ENV.exists() else "requirements-agent.txt"
             ensure_venv(requirement)
     except Exception:
-        print(color("依赖更新失败，但代码已更新。", YELLOW))
+        pass
     for service in (API_SERVICE, AGENT_SERVICE):
         active, _ = service_state(service)
         if active == "active":
             run(["systemctl", "restart", service], check=False)
-    print(color("请重新执行 sudo vm 载入最新代码。", CYAN))
+    print(color("请退出后重新执行 sudo vm。", CYAN))
     raise SystemExit(0)
 
 
