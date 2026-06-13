@@ -603,22 +603,107 @@ def run_diagnostics() -> None:
         print(f"[{mark}] {label}: {detail}")
 
 
+def installation_role() -> str:
+    if SERVER_ENV.exists():
+        return "center"
+    if AGENT_CONFIG.exists():
+        return "agent"
+    return "new"
+
+
+def quick_logs() -> None:
+    role = installation_role()
+    if role == "center":
+        selected = choose("查看日志", [("1", "中心 API"), ("2", "本机 Agent")])
+        if selected is None:
+            return
+        service = API_SERVICE if selected == "1" else AGENT_SERVICE
+    elif role == "agent":
+        service = AGENT_SERVICE
+    else:
+        print(color("当前还没有安装服务。", YELLOW))
+        pause()
+        return
+    run(["journalctl", "-u", service, "-n", "80", "--no-pager"], check=False)
+    pause()
+
+
+def quick_update() -> None:
+    title("更新 VPS Monitor")
+    if not require_root():
+        return
+    try:
+        update_project()
+    except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
+        print(color(f"更新失败：{exc}", RED))
+    pause()
+
+
+def advanced_menu() -> None:
+    while True:
+        title("高级设置")
+        selected = choose(
+            "只有需要自定义时才使用这里",
+            [
+                ("1", "重新部署中心面板"),
+                ("2", "重新配置本机或远程 Agent"),
+                ("3", "服务启停与实时日志"),
+                ("4", "Agent 入口、防火墙与 HTTPS"),
+                ("5", "备份、依赖与综合诊断"),
+            ],
+        )
+        if selected is None:
+            return
+        if selected == "1":
+            install_panel()
+        elif selected == "2":
+            configure_agent(local=SERVER_ENV.exists())
+        elif selected == "3":
+            service_menu()
+        elif selected == "4":
+            ingress_menu()
+        else:
+            maintenance_menu()
+
+
 def main() -> int:
     while True:
+        role = installation_role()
         title("主菜单")
         api, _ = service_state(API_SERVICE)
         agent, _ = service_state(AGENT_SERVICE)
-        print(f"中心 API {state_badge(api)}  |  Agent {state_badge(agent)}")
+        if role == "new":
+            print("检测结果：尚未配置")
+            selected = choose(
+                "这台 VPS 用来做什么？",
+                [
+                    ("1", "作为中心服务器（打开监控网页）"),
+                    ("2", "作为监控节点（接入已有中心）"),
+                    ("3", "高级设置"),
+                    ("0", "退出"),
+                ],
+                allow_back=False,
+            )
+            if selected == "1":
+                install_panel()
+            elif selected == "2":
+                configure_agent(local=False)
+            elif selected == "3":
+                advanced_menu()
+            else:
+                return 0
+            continue
+
+        role_name = "中心服务器" if role == "center" else "监控节点"
+        relevant_state = api if role == "center" else agent
+        print(f"检测结果：{role_name}  |  服务 {state_badge(relevant_state)}")
         selected = choose(
-            "选择功能",
+            "常用操作",
             [
-                ("1", "系统概览"),
-                ("2", "部署中心面板"),
-                ("3", "配置中心 VPS 自监控"),
-                ("4", "部署远程 VPS Agent"),
-                ("5", "服务管理与日志"),
-                ("6", "Agent 入口与防火墙"),
-                ("7", "维护、更新与诊断"),
+                ("1", "查看运行状态"),
+                ("2", "查看最近日志"),
+                ("3", "更新程序"),
+                ("4", "高级设置"),
                 ("0", "退出"),
             ],
             allow_back=False,
@@ -626,18 +711,12 @@ def main() -> int:
         if selected == "1":
             show_overview()
         elif selected == "2":
-            install_panel()
+            quick_logs()
         elif selected == "3":
-            configure_agent(local=True)
+            quick_update()
         elif selected == "4":
-            configure_agent(local=False)
-        elif selected == "5":
-            service_menu()
-        elif selected == "6":
-            ingress_menu()
-        elif selected == "7":
-            maintenance_menu()
-        elif selected == "0":
+            advanced_menu()
+        else:
             return 0
 
 
