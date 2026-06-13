@@ -164,6 +164,8 @@ enable_https() {
   fi
   if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>&1 | tail -5; then
     ok "HTTPS 证书已启用：https://${DOMAIN}"; https_ok=true
+    systemctl enable --now certbot.timer 2>/dev/null || true
+    detail "证书自动续期已启用"
   else
     warn "证书申请失败（80 端口公网不可达或 DNS 未生效？）"
     warn "HTTP 仍然可用：http://${DOMAIN}"; detail "稍后手动：sudo certbot --nginx -d ${DOMAIN}"; https_ok=false

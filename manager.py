@@ -306,6 +306,8 @@ def enable_https(domain: str) -> bool:
         ],
         check=False,
     )
+    if result.returncode == 0 and command_exists("systemctl"):
+        subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
     return result.returncode == 0
 
 
@@ -736,6 +738,10 @@ def enable_https_for_domain() -> None:
         )
         if result.returncode == 0:
             print(color(f"HTTPS 已启用：https://{domain}", GREEN))
+            # 确保自动续期
+            if command_exists("systemctl"):
+                subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
+                print(color("已启用证书自动续期，无需手动操作。", DIM))
         else:
             print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
     except Exception as e:
