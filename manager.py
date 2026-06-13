@@ -274,6 +274,32 @@ def panel_nginx_config(domain: str) -> str:
     )
 
 
+def is_ip_address(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def enable_https(domain: str) -> bool:
+    ensure_apt_packages(["certbot", "python3-certbot-nginx"])
+    result = run(
+        [
+            "certbot",
+            "--nginx",
+            "-d",
+            domain,
+            "--non-interactive",
+            "--agree-tos",
+            "--register-unsafely-without-email",
+            "--redirect",
+        ],
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def install_launcher() -> None:
     launcher = textwrap.dedent(
         f"""\
@@ -461,9 +487,15 @@ def install_panel() -> None:
         ingress_env = os.environ.copy()
         ingress_env["AGENT_PORT"] = "8080"
         run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
+        https_enabled = False
+        if not is_ip_address(domain):
+            print("\n检测到域名，正在自动申请 SSL 证书...")
+            https_enabled = enable_https(domain)
         ok, detail = health_check("http://127.0.0.1:8000/api/health", timeout=5)
         print(color("\n中心面板部署完成。", GREEN))
-        print(f"访问地址：http://{domain}")
+        print(f"访问地址：{'https' if https_enabled else 'http'}://{domain}")
+        if not is_ip_address(domain) and not https_enabled:
+            print(color("SSL 申请失败，请确认域名已解析到本机且公网 80 端口可访问。当前可先使用 HTTP。", YELLOW))
         print(f"健康检查：{'正常' if ok else '失败 - ' + detail}")
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
@@ -611,8 +643,10 @@ def ingress_menu() -> None:
                 run(["netfilter-persistent", "save"])
             elif selected == "5":
                 domain = ask("已解析到本机的域名")
-                ensure_apt_packages(["certbot", "python3-certbot-nginx"])
-                run(["certbot", "--nginx", "-d", domain])
+                if enable_https(domain):
+                    print(color("HTTPS 已启用。", GREEN))
+                else:
+                    print(color("SSL 申请失败，请检查域名解析和公网 80 端口。", RED))
             elif selected == "6":
                 if confirm("确认删除 Agent 入口？"):
                     remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
