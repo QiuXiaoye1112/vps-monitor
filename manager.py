@@ -1296,14 +1296,8 @@ def monitored_hosts_menu() -> None:
         if is_local:
             print()
             print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
-            action = choose(
-                "本机操作",
-                [("1", "删除本机监控"), ("2", f"临时开放 {agent_port()}（添加新主机）")],
-            )
-            if action == "1":
+            if choose("本机操作", [("1", "删除本机监控")]) == "1":
                 remove_agent()
-            elif action == "2":
-                temp_open_for_new_agent()
             continue
         action = choose(
             "主机操作",
