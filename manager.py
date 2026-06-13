@@ -25,6 +25,7 @@ AGENT_CONFIG = Path("/etc/vps-monitor-agent.toml")
 SERVER_ENV = Path("/etc/vps-monitor.env")
 SYSTEMD_DIR = Path("/etc/systemd/system")
 LAUNCHER = Path("/usr/local/bin/vps-monitor")
+ROLE_FILE = Path("/etc/vps-monitor-role")
 API_SERVICE = "vps-monitor-api"
 AGENT_SERVICE = "vps-monitor-agent"
 
@@ -605,6 +606,12 @@ def run_diagnostics() -> None:
 
 
 def installation_role() -> str:
+    try:
+        saved_role = ROLE_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        saved_role = ""
+    if saved_role in {"center", "agent"}:
+        return saved_role
     if SERVER_ENV.exists():
         return "center"
     if AGENT_CONFIG.exists():
