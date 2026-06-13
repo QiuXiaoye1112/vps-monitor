@@ -276,6 +276,15 @@ def remove_firewall_port_rules(port: str) -> int:
     return removed
 
 
+def nginx_value(path: Path, directive: str) -> str:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(rf"^\s*{re.escape(directive)}\s+([^;]+);", content, re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
 def ensure_apt_packages(packages: list[str]) -> None:
     def installed(package: str) -> bool:
         if not command_exists("dpkg-query"):
@@ -683,9 +692,16 @@ def full_uninstall() -> None:
     title("完整卸载")
     if not require_root():
         return
-    print(color("将删除服务、配置、Nginx 入口和快捷命令。", RED))
+    print(color("将删除服务、配置、数据库、备份、Nginx 入口、项目目录和快捷命令。", RED))
     if not confirm("确认完整卸载 VPS Monitor？"):
         return
+    env = read_env(SERVER_ENV)
+    db = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
+    panel_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
+    ingress_site = Path("/etc/nginx/sites-available/vps-monitor-agent.conf")
+    domain = nginx_value(panel_site, "server_name")
+    listen_value = nginx_value(ingress_site, "listen")
+    ingress_port = listen_value.split()[0] if listen_value else "8080"
     remove_service(AGENT_SERVICE)
     remove_service(API_SERVICE)
     for path in (
@@ -702,8 +718,16 @@ def full_uninstall() -> None:
     if command_exists("nginx"):
         run(["nginx", "-t"], check=False)
         run(["systemctl", "reload", "nginx"], check=False)
-    if confirm("同时永久删除项目目录和数据库？"):
-        remove_path(PROJECT_DIR)
+    if command_exists("iptables") and ingress_port.isdigit():
+        remove_firewall_port_rules(ingress_port)
+    if command_exists("netfilter-persistent"):
+        run(["netfilter-persistent", "save"], check=False)
+    if command_exists("certbot") and domain and domain != "_":
+        run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
+    for backup in db.parent.glob(f"{db.name}.bak.*"):
+        remove_path(backup)
+    remove_path(db)
+    remove_path(PROJECT_DIR)
     print(color("VPS Monitor 已卸载。", GREEN))
     raise SystemExit(0)
 
