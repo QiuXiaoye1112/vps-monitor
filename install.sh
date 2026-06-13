@@ -202,8 +202,10 @@ EOF
 main() {
   rerun_as_root
   install_dependencies
+  local needs_setup=0
   if [[ ! -e "$INSTALL_DIR" ]]; then
     choose_role
+    needs_setup=1
   fi
   set +e
   install_or_update
@@ -211,15 +213,15 @@ main() {
   set -e
   if [[ "$install_result" -eq 10 ]]; then
     choose_role
+    needs_setup=1
     install_or_update
   elif [[ "$install_result" -ne 0 ]]; then
     fail "安装或更新失败。"
   fi
-  choose_role
   [[ -f "$INSTALL_DIR/manager.py" ]] || fail "安装包缺少 manager.py，请检查仓库地址或分支。"
   install_entrypoint
   info "安装完成，正在打开终端管理面板..."
-  if [[ -n "$SETUP_ROLE" ]]; then
+  if [[ "$needs_setup" -eq 1 && -n "$SETUP_ROLE" ]]; then
     exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE"
   fi
   exec python3 "$INSTALL_DIR/manager.py"
