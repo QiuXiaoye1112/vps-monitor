@@ -7,6 +7,7 @@ import ipaddress
 import os
 import re
 import secrets
+import shlex
 import shutil
 import socket
 import subprocess
@@ -194,6 +195,37 @@ def write_text_secure(path: Path, content: str, mode: int = 0o600) -> None:
     path.chmod(mode)
 
 
+def remove_path(path: Path) -> None:
+    try:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+    except FileNotFoundError:
+        pass
+
+
+def panel_nginx_config(domain: str) -> str:
+    return textwrap.dedent(
+        f"""\
+        server {{
+            listen 80;
+            server_name {domain};
+            client_max_body_size 1m;
+
+            location / {{
+                proxy_pass http://127.0.0.1:8000;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }}
+        }}
+        """
+    )
+
+
 def install_launcher() -> None:
     launcher = textwrap.dedent(
         f"""\
@@ -205,9 +237,23 @@ def install_launcher() -> None:
 
 
 def shlex_quote(value: str) -> str:
-    import shlex
-
     return shlex.quote(value)
+
+
+def remove_firewall_port_rules(port: str) -> int:
+    result = subprocess.run(
+        ["iptables", "-S", "INPUT"], capture_output=True, text=True, check=False
+    )
+    removed = 0
+    for line in result.stdout.splitlines():
+        if f"--dport {port}" not in line:
+            continue
+        parts = shlex.split(line)
+        if len(parts) < 2 or parts[0] != "-A" or parts[1] != "INPUT":
+            continue
+        run(["iptables", "-D", *parts[1:]], check=False)
+        removed += 1
+    return removed
 
 
 def ensure_apt_packages(packages: list[str]) -> None:
@@ -344,25 +390,7 @@ def install_panel() -> None:
         write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
         nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
         nginx_link = Path("/etc/nginx/sites-enabled/vps-monitor.conf")
-        nginx_config = textwrap.dedent(
-            f"""\
-            server {{
-                listen 80;
-                server_name {domain};
-                client_max_body_size 1m;
-
-                location / {{
-                    proxy_pass http://127.0.0.1:8000;
-                    proxy_http_version 1.1;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                }}
-            }}
-            """
-        )
-        write_text_secure(nginx_site, nginx_config, 0o644)
+        write_text_secure(nginx_site, panel_nginx_config(domain), 0o644)
         nginx_link.parent.mkdir(parents=True, exist_ok=True)
         if nginx_link.is_symlink() or nginx_link.exists():
             nginx_link.unlink()
@@ -489,6 +517,10 @@ def ingress_menu() -> None:
                 ("3", "查看 8080 防火墙规则"),
                 ("4", "保存当前防火墙规则"),
                 ("5", "申请 Dashboard HTTPS 证书"),
+                ("6", "删除 8080 Agent 入口"),
+                ("7", "删除一台 Agent IP 白名单"),
+                ("8", "删除 Agent 端口全部防火墙规则"),
+                ("9", "删除 HTTPS 证书并恢复 HTTP"),
             ],
         )
         if selected is None:
@@ -514,10 +546,46 @@ def ingress_menu() -> None:
                 if not command_exists("netfilter-persistent"):
                     run(["apt-get", "install", "-y", "iptables-persistent"])
                 run(["netfilter-persistent", "save"])
-            else:
+            elif selected == "5":
                 domain = ask("已解析到本机的域名")
                 ensure_apt_packages(["certbot", "python3-certbot-nginx"])
                 run(["certbot", "--nginx", "-d", domain])
+            elif selected == "6":
+                if confirm("确认删除 Agent 入口？"):
+                    remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
+                    remove_path(Path("/etc/nginx/sites-available/vps-monitor-agent.conf"))
+                    run(["nginx", "-t"])
+                    run(["systemctl", "reload", "nginx"])
+                    print(color("Agent 入口已删除。", GREEN))
+            elif selected == "7":
+                agent_ip = ask("要删除的 Agent 公网 IP")
+                ipaddress.ip_address(agent_ip)
+                port = ask("Agent 入口端口", "8080")
+                while subprocess.run(
+                    ["iptables", "-C", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"],
+                    check=False,
+                    capture_output=True,
+                ).returncode == 0:
+                    run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"])
+                print(color("IP 白名单已删除。", GREEN))
+            elif selected == "8":
+                port = ask("Agent 入口端口", "8080")
+                if confirm(f"确认删除 TCP {port} 的全部 iptables 规则？"):
+                    removed = remove_firewall_port_rules(port)
+                    print(color(f"已删除 {removed} 条防火墙规则。", GREEN))
+            else:
+                domain = ask("要删除证书的域名")
+                if confirm(f"确认删除 {domain} 的 HTTPS 并恢复 HTTP？"):
+                    if command_exists("certbot"):
+                        run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
+                    write_text_secure(
+                        Path("/etc/nginx/sites-available/vps-monitor.conf"),
+                        panel_nginx_config(domain),
+                        0o644,
+                    )
+                    run(["nginx", "-t"])
+                    run(["systemctl", "reload", "nginx"])
+                    print(color("HTTPS 已删除，面板已恢复 HTTP。", GREEN))
         except (OSError, ValueError, subprocess.CalledProcessError, RuntimeError) as exc:
             print(color(f"操作失败：{exc}", RED))
         pause()
@@ -532,6 +600,92 @@ def backup_database() -> None:
     target = db.with_name(f"{db.name}.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
     shutil.copy2(db, target)
     print(color(f"数据库已备份到 {target}", GREEN))
+
+
+def remove_service(name: str) -> None:
+    if command_exists("systemctl"):
+        run(["systemctl", "disable", "--now", name], check=False)
+    remove_path(SYSTEMD_DIR / f"{name}.service")
+    if command_exists("systemctl"):
+        run(["systemctl", "daemon-reload"], check=False)
+
+
+def remove_agent() -> None:
+    title("删除 Agent")
+    if not require_root() or not confirm("确认停止并删除 Agent 服务和配置？"):
+        return
+    remove_service(AGENT_SERVICE)
+    remove_path(AGENT_CONFIG)
+    if installation_role() == "agent":
+        remove_path(ROLE_FILE)
+    print(color("Agent 已删除。", GREEN))
+    pause()
+
+
+def remove_panel() -> None:
+    title("删除中心面板")
+    if not require_root() or not confirm("确认停止并删除中心 API 和 Nginx 面板配置？"):
+        return
+    env = read_env(SERVER_ENV)
+    db = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
+    remove_service(API_SERVICE)
+    remove_path(Path("/etc/nginx/sites-enabled/vps-monitor.conf"))
+    remove_path(Path("/etc/nginx/sites-available/vps-monitor.conf"))
+    remove_path(SERVER_ENV)
+    if command_exists("nginx"):
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+    if db.exists() and confirm("同时永久删除监控数据库？"):
+        remove_path(db)
+    if AGENT_CONFIG.exists():
+        write_text_secure(ROLE_FILE, "agent\n")
+    else:
+        remove_path(ROLE_FILE)
+    print(color("中心面板已删除。", GREEN))
+    pause()
+
+
+def delete_backups() -> None:
+    env = read_env(SERVER_ENV)
+    db = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
+    backups = list(db.parent.glob(f"{db.name}.bak.*"))
+    if not backups:
+        print(color("没有找到数据库备份。", YELLOW))
+        return
+    print(f"找到 {len(backups)} 个备份。")
+    if confirm("确认永久删除全部备份？"):
+        for backup in backups:
+            remove_path(backup)
+        print(color("数据库备份已删除。", GREEN))
+
+
+def full_uninstall() -> None:
+    title("完整卸载")
+    if not require_root():
+        return
+    print(color("将删除服务、配置、Nginx 入口和快捷命令。", RED))
+    if not confirm("确认完整卸载 VPS Monitor？"):
+        return
+    remove_service(AGENT_SERVICE)
+    remove_service(API_SERVICE)
+    for path in (
+        AGENT_CONFIG,
+        SERVER_ENV,
+        ROLE_FILE,
+        LAUNCHER,
+        Path("/etc/nginx/sites-enabled/vps-monitor.conf"),
+        Path("/etc/nginx/sites-available/vps-monitor.conf"),
+        Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"),
+        Path("/etc/nginx/sites-available/vps-monitor-agent.conf"),
+    ):
+        remove_path(path)
+    if command_exists("nginx"):
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+    if confirm("同时永久删除项目目录和数据库？"):
+        remove_path(PROJECT_DIR)
+    print(color("VPS Monitor 已卸载。", GREEN))
+    raise SystemExit(0)
 
 
 def update_project() -> None:
@@ -649,29 +803,65 @@ def quick_update() -> None:
 
 def advanced_menu() -> None:
     while True:
+        role = installation_role()
         title("高级设置")
-        selected = choose(
-            "只有需要自定义时才使用这里",
+        options = (
             [
                 ("1", "重新部署中心面板"),
-                ("2", "重新配置本机或远程 Agent"),
+                ("2", "重新配置本机 Agent"),
                 ("3", "服务启停与实时日志"),
                 ("4", "Agent 入口、防火墙与 HTTPS"),
                 ("5", "备份、依赖与综合诊断"),
-            ],
+                ("6", "删除本机 Agent"),
+                ("7", "删除中心面板"),
+                ("8", "删除数据库备份"),
+                ("9", "完整卸载"),
+            ]
+            if role == "center"
+            else [
+                ("1", "重新配置 Agent"),
+                ("2", "服务启停与实时日志"),
+                ("3", "重新安装依赖与综合诊断"),
+                ("4", "删除 Agent"),
+                ("5", "完整卸载"),
+            ]
         )
+        selected = choose("只有需要自定义时才使用这里", options)
         if selected is None:
             return
-        if selected == "1":
-            install_panel()
-        elif selected == "2":
-            configure_agent(local=SERVER_ENV.exists())
-        elif selected == "3":
-            service_menu()
-        elif selected == "4":
-            ingress_menu()
+        if role == "center":
+            if selected == "1":
+                install_panel()
+            elif selected == "2":
+                configure_agent(local=True)
+            elif selected == "3":
+                service_menu()
+            elif selected == "4":
+                ingress_menu()
+            elif selected == "5":
+                maintenance_menu()
+            elif selected == "6":
+                remove_agent()
+            elif selected == "7":
+                remove_panel()
+                return
+            elif selected == "8":
+                delete_backups()
+                pause()
+            else:
+                full_uninstall()
         else:
-            maintenance_menu()
+            if selected == "1":
+                configure_agent(local=False)
+            elif selected == "2":
+                service_menu()
+            elif selected == "3":
+                maintenance_menu()
+            elif selected == "4":
+                remove_agent()
+                return
+            else:
+                full_uninstall()
 
 
 def first_setup(role: str) -> None:
