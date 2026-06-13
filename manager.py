@@ -1105,6 +1105,58 @@ def temp_open_for_new_agent() -> None:
     pause()
 
 
+def firewall_rules_menu() -> None:
+    while True:
+        title(f"防火墙规则（端口 {agent_port()}）")
+        port = agent_port()
+        result = subprocess.run(
+            ["iptables", "-S", "INPUT"], capture_output=True, text=True, check=False,
+        )
+        lines = [l for l in result.stdout.splitlines() if f"--dport {port}" in l]
+        if not lines:
+            print(f"端口 {port} 暂无防火墙规则。")
+            pause()
+            return
+
+        print(f"端口 {port} 当前规则：\n")
+        options: list[tuple[str, str]] = []
+        for i, line in enumerate(lines, 1):
+            tag = color("允许", GREEN) if "ACCEPT" in line else color("拦截", RED)
+            # 提取 IP
+            import re
+            ip_match = re.search(r'-s\s+(\S+)', line)
+            ip = ip_match.group(1) if ip_match else "所有 IP"
+            label = f"{tag} | {ip}"
+            options.append((str(i), label))
+            print(f"  {color(str(i), CYAN)}. {label}")
+            print(f"     {color(line, DIM)}")
+        print()
+
+        action = choose(
+            "操作",
+            [("1", "删除一条规则"), ("2", f"临时开放 {port}（添加新主机）")],
+        )
+        if action is None:
+            return
+        if action == "2":
+            temp_open_for_new_agent()
+            continue
+
+        # 删除规则
+        selected = choose("选择要删除的规则", options)
+        if selected is None:
+            continue
+        idx = int(selected) - 1
+        line = lines[idx]
+        parts = shlex.split(line)
+        if parts[0] == "-A":
+            parts[0] = "-D"
+            subprocess.run(["iptables", *parts[1:]], check=False)
+            print(color("规则已删除。", GREEN))
+        if command_exists("netfilter-persistent"):
+            run(["netfilter-persistent", "save"], check=False)
+
+
 def monitored_hosts_menu() -> None:
     while True:
         title("监控主机")
@@ -1233,10 +1285,11 @@ def main() -> int:
                     ("3", "查看 token"),
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
-                    ("6", "更新程序"),
-                    ("7", "重新部署中心面板"),
-                    ("8", "删除中心面板"),
-                    ("9", "完整卸载"),
+                    ("6", "防火墙规则"),
+                    ("7", "更新程序"),
+                    ("8", "重新部署中心面板"),
+                    ("9", "删除中心面板"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1245,10 +1298,11 @@ def main() -> int:
                     ("2", "查看 token"),
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
-                    ("5", "更新程序"),
-                    ("6", "重新部署中心面板"),
-                    ("7", "删除中心面板"),
-                    ("8", "完整卸载"),
+                    ("5", "防火墙规则"),
+                    ("6", "更新程序"),
+                    ("7", "重新部署中心面板"),
+                    ("8", "删除中心面板"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1276,13 +1330,15 @@ def main() -> int:
             elif selected == "5":
                 temp_open_for_new_agent()
             elif selected == "6":
-                quick_update()
+                firewall_rules_menu()
             elif selected == "7":
-                install_panel()
+                quick_update()
             elif selected == "8":
+                install_panel()
+            elif selected == "9":
                 remove_panel()
                 return 0
-            elif selected == "9":
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1297,13 +1353,15 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                quick_update()
+                firewall_rules_menu()
             elif selected == "6":
-                install_panel()
+                quick_update()
             elif selected == "7":
+                install_panel()
+            elif selected == "8":
                 remove_panel()
                 return 0
-            elif selected == "8":
+            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
