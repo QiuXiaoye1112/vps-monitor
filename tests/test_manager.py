@@ -37,6 +37,16 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(manager.server_url("1.2.3.4", 8080), "http://1.2.3.4:8080")
         self.assertEqual(manager.server_url("https://monitor.example.com", 443), "https://monitor.example.com:443")
 
+    def test_nginx_value_reads_exact_directive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "site.conf"
+            path.write_text(
+                "server {\n  listen 8080;\n  server_name monitor.example.com;\n}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(manager.nginx_value(path, "listen"), "8080")
+            self.assertEqual(manager.nginx_value(path, "server_name"), "monitor.example.com")
+
     @mock.patch("manager.run")
     @mock.patch("manager.subprocess.run")
     def test_remove_firewall_rules_only_matches_port(self, subprocess_run, command_run) -> None:
