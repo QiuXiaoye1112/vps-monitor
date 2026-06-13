@@ -170,9 +170,14 @@ main() {
   [[ -f "$INSTALL_DIR/manager.py" ]] || fail "安装包缺少 manager.py"
   install_entrypoint
 
-  echo; printf "${BOLD}${GREEN}✓ 安装完成！${RESET}\n"; echo "  管理命令：${CYAN}sudo vm${RESET}"; echo
-  info "正在打开管理面板..."
+  echo
+  printf "${BOLD}${GREEN}╔══════════════════════════════════════════╗\n║          ✓  安装完成！                   ║\n╚══════════════════════════════════════════╝${RESET}\n\n"
+  printf "  管理命令 ：${CYAN}sudo vm${RESET}\n"
+  printf "  项目目录 ：${CYAN}%s${RESET}\n" "$INSTALL_DIR"
+  echo
   if [[ "$needs_setup" -eq 1 && -n "$SETUP_ROLE" ]]; then
+    printf "  ${BOLD}按回车进入初始化配置...${RESET}\n"
+    read -r
     exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE"
   fi
   exec python3 "$INSTALL_DIR/manager.py"
