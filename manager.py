@@ -1237,13 +1237,10 @@ def firewall_rules_menu() -> None:
 
         action = choose(
             "操作",
-            [("1", "删除一条规则"), ("2", f"临时开放 {port}（添加新主机）")],
+            [("1", "删除一条规则")],
         )
         if action is None:
             return
-        if action == "2":
-            temp_open_for_new_agent()
-            continue
 
         # 删除规则
         selected = choose("选择要删除的规则", options)
