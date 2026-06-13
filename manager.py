@@ -703,6 +703,29 @@ def ingress_menu() -> None:
         pause()
 
 
+def disable_https() -> None:
+    title("关闭 HTTPS")
+    domain = ask("当前面板域名")
+    if not domain:
+        return
+    if not confirm(f"确认删除 {domain} 的 HTTPS 证书，恢复 HTTP？"):
+        return
+    try:
+        if command_exists("certbot"):
+            run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
+        write_text_secure(
+            Path("/etc/nginx/sites-available/vps-monitor.conf"),
+            panel_nginx_config(domain),
+            0o644,
+        )
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+        print(color("HTTPS 已关闭，已恢复 HTTP。", GREEN))
+    except Exception as e:
+        print(color(f"操作失败：{e}", RED))
+    pause()
+
+
 def backup_database() -> None:
     env = read_env(SERVER_ENV)
     db = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
@@ -1287,8 +1310,9 @@ def main() -> int:
                     ("5", "添加新主机"),
                     ("6", "更新程序"),
                     ("7", "重新部署中心面板"),
-                    ("8", "删除中心面板"),
-                    ("9", "完整卸载"),
+                    ("8", "关闭 HTTPS 恢复 HTTP"),
+                    ("9", "删除中心面板"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1299,8 +1323,9 @@ def main() -> int:
                     ("4", "添加新主机"),
                     ("5", "更新程序"),
                     ("6", "重新部署中心面板"),
-                    ("7", "删除中心面板"),
-                    ("8", "完整卸载"),
+                    ("7", "关闭 HTTPS 恢复 HTTP"),
+                    ("8", "删除中心面板"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1332,9 +1357,11 @@ def main() -> int:
             elif selected == "7":
                 install_panel()
             elif selected == "8":
+                disable_https()
+            elif selected == "9":
                 remove_panel()
                 return 0
-            elif selected == "9":
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1353,9 +1380,11 @@ def main() -> int:
             elif selected == "6":
                 install_panel()
             elif selected == "7":
+                disable_https()
+            elif selected == "8":
                 remove_panel()
                 return 0
-            elif selected == "8":
+            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
