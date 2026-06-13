@@ -26,10 +26,16 @@ VENV_DIR = PROJECT_DIR / ".venv"
 AGENT_CONFIG = Path("/etc/vps-monitor-agent.toml")
 SERVER_ENV = Path("/etc/vps-monitor.env")
 SYSTEMD_DIR = Path("/etc/systemd/system")
-LAUNCHER = Path("/usr/local/bin/vps-monitor")
+LAUNCHER = Path("/usr/local/bin/vm")
 ROLE_FILE = Path("/etc/vps-monitor-role")
 API_SERVICE = "vps-monitor-api"
 AGENT_SERVICE = "vps-monitor-agent"
+
+
+def api_base_url() -> str:
+    host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
+    port = os.getenv("VPS_MONITOR_API_PORT", "8000")
+    return f"http://{host}:{port}"
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -140,7 +146,7 @@ def choose(prompt: str, options: list[tuple[str, str]], allow_back: bool = True)
 def require_root() -> bool:
     if os.geteuid() == 0:
         return True
-    print(color("此操作需要 root 权限。请退出后使用 sudo vps-monitor 启动。", RED))
+    print(color("此操作需要 root 权限。请退出后使用 sudo vm 启动。", RED))
     pause()
     return False
 
@@ -262,7 +268,7 @@ def panel_nginx_config(domain: str) -> str:
             client_max_body_size 1m;
 
             location / {{
-                proxy_pass http://127.0.0.1:8000;
+                proxy_pass {api_base_url()};
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
@@ -380,6 +386,8 @@ def ensure_venv(requirements: str) -> None:
 
 
 def api_unit() -> str:
+    host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
+    port = os.getenv("VPS_MONITOR_API_PORT", "8000")
     return textwrap.dedent(
         f"""\
         [Unit]
@@ -391,7 +399,7 @@ def api_unit() -> str:
         Type=simple
         WorkingDirectory={PROJECT_DIR}
         EnvironmentFile={SERVER_ENV}
-        ExecStart={VENV_DIR}/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8000
+        ExecStart={VENV_DIR}/bin/python -m uvicorn server:app --host {host} --port {port}
         Restart=always
         RestartSec=5
 
@@ -428,7 +436,7 @@ def show_overview() -> None:
     title("系统概览")
     api_active, api_enabled = service_state(API_SERVICE)
     agent_active, agent_enabled = service_state(AGENT_SERVICE)
-    ok, _ = health_check("http://127.0.0.1:8000/api/health")
+    ok, _ = health_check(f"{api_base_url()}/api/health")
 
     print(f"项目目录      {PROJECT_DIR}")
     print(f"中心 API      {state_badge(api_active)} / 自启 {state_badge(api_enabled)}")
@@ -467,9 +475,11 @@ def install_panel() -> None:
     try:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
+        host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
+        port = os.getenv("VPS_MONITOR_API_PORT", "8000")
         write_text_secure(
             SERVER_ENV,
-            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\n",
+            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\n",
         )
         write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
         nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
@@ -482,7 +492,8 @@ def install_panel() -> None:
         install_launcher()
         run(["nginx", "-t"])
         run(["systemctl", "daemon-reload"])
-        run(["systemctl", "enable", "--now", API_SERVICE, "nginx"])
+        run(["systemctl", "enable", API_SERVICE, "nginx"])
+        run(["systemctl", "restart", API_SERVICE])
         run(["systemctl", "reload", "nginx"])
         ingress_env = os.environ.copy()
         ingress_env["AGENT_PORT"] = "8080"
@@ -491,7 +502,7 @@ def install_panel() -> None:
         if not is_ip_address(domain):
             print("\n检测到域名，正在自动申请 SSL 证书...")
             https_enabled = enable_https(domain)
-        ok, detail = health_check("http://127.0.0.1:8000/api/health", timeout=5)
+        ok, detail = health_check(f"{api_base_url()}/api/health", timeout=5)
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：{'https' if https_enabled else 'http'}://{domain}")
         if not is_ip_address(domain) and not https_enabled:
@@ -860,7 +871,7 @@ def run_diagnostics() -> None:
         active, enabled = service_state(service)
         checks.append((f"{service} 运行状态", active == "active", active))
         checks.append((f"{service} 开机自启", enabled == "enabled", enabled))
-    ok, detail = health_check("http://127.0.0.1:8000/api/health")
+    ok, detail = health_check(f"{api_base_url()}/api/health")
     checks.append(("本机 API 健康检查", ok, detail))
     checks.append(("中心环境配置", SERVER_ENV.exists(), str(SERVER_ENV)))
     checks.append(("Agent 配置", AGENT_CONFIG.exists(), str(AGENT_CONFIG)))
@@ -914,7 +925,7 @@ def quick_update() -> None:
 
 
 def monitored_nodes() -> list[dict[str, Any]]:
-    with urllib.request.urlopen("http://127.0.0.1:8000/api/nodes", timeout=3) as response:
+    with urllib.request.urlopen(f"{api_base_url()}/api/nodes", timeout=3) as response:
         data = json.load(response)
     nodes = data.get("nodes", [])
     return nodes if isinstance(nodes, list) else []

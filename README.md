@@ -9,7 +9,7 @@ bash <(curl -fsSL -H "Accept: application/vnd.github.raw+json" -H "X-GitHub-Api-
 安装完成后再次打开管理面板：
 
 ```bash
-sudo vps-monitor
+sudo vm
 ```
 
 删除新旧版本：

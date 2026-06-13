@@ -3,76 +3,71 @@ set -euo pipefail
 
 INSTALL_DIR="${VPS_MONITOR_DIR:-/opt/vps-monitor}"
 
-info() {
-  printf '\033[36m[VPS Monitor]\033[0m %s\n' "$*"
-}
+RED='\033[31m'; GREEN='\033[32m'; CYAN='\033[36m'; RESET='\033[0m'
+
+info() { printf "${CYAN}[VPS Monitor]${RESET} %s\n" "$*"; }
+ok()   { printf "${GREEN}[OK]${RESET} %s\n" "$*"; }
+fail() { printf "${RED}[错误]${RESET} %s\n" "$*" >&2; exit 1; }
 
 rerun_as_root() {
-  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-    return
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then return; fi
+  command -v sudo >/dev/null 2>&1 || fail "请使用 root 账号运行。"
+  local temp_script; temp_script="$(mktemp)"
+  if [[ -f "${BASH_SOURCE[0]}" ]]; then
+    cat "${BASH_SOURCE[0]}" > "$temp_script"
+  else
+    local raw_url="https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh"
+    curl -fsSL --max-time 30 "$raw_url" -o "$temp_script" || { rm -f "$temp_script"; fail "无法重新获取脚本。下载后运行：curl -fsSL $raw_url -o uninstall.sh && sudo bash uninstall.sh"; }
   fi
-  if ! command -v sudo >/dev/null 2>&1; then
-    printf '\033[31m[错误]\033[0m 请使用 root 账号运行。\n' >&2
-    exit 1
-  fi
-  local temp_script
-  temp_script="$(mktemp)"
-  cat "${BASH_SOURCE[0]}" > "$temp_script"
   chmod 700 "$temp_script"
   sudo env VPS_MONITOR_DIR="$INSTALL_DIR" bash "$temp_script"
-  rm -f "$temp_script"
-  exit 0
+  rm -f "$temp_script"; exit 0
 }
 
 remove_service() {
   local service="$1"
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl disable --now "$service" >/dev/null 2>&1 || true
-  fi
+  command -v systemctl >/dev/null 2>&1 && systemctl disable --now "$service" >/dev/null 2>&1 || true
   rm -f "/etc/systemd/system/$service.service"
 }
 
 remove_firewall_rules() {
   command -v iptables >/dev/null 2>&1 || return
-  local rules line
-  rules="$(iptables -S INPUT 2>/dev/null || true)"
+  local rules line removed=0; rules="$(iptables -S INPUT 2>/dev/null || true)"
   while IFS= read -r line; do
     [[ "$line" == *"--dport 8080"* ]] || continue
-    # Rules come from iptables itself, preserving the exact arguments is required for deletion.
     read -r -a parts <<< "$line"
     [[ "${parts[0]:-}" == "-A" && "${parts[1]:-}" == "INPUT" ]] || continue
-    parts[0]="-D"
-    iptables "${parts[@]}" >/dev/null 2>&1 || true
+    parts[0]="-D"; iptables "${parts[@]}" >/dev/null 2>&1 || true; ((removed++))
   done <<< "$rules"
-  if command -v netfilter-persistent >/dev/null 2>&1; then
-    netfilter-persistent save >/dev/null 2>&1 || true
-  fi
+  [[ $removed -gt 0 ]] && info "已移除 $removed 条 8080 防火墙规则"
+  command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
 }
 
 remove_certificates() {
   command -v certbot >/dev/null 2>&1 || return
-  local site="/etc/nginx/sites-available/vps-monitor.conf"
-  [[ -f "$site" ]] || return
-  local domain
-  domain="$(sed -nE 's/^[[:space:]]*server_name[[:space:]]+([^;]+);.*/\1/p' "$site" | head -n 1)"
-  [[ -n "$domain" && "$domain" != "_" ]] || return
-  certbot delete --cert-name "$domain" --non-interactive >/dev/null 2>&1 || true
+  local domain=""
+  for site in /etc/nginx/sites-available/vps-monitor.conf /etc/nginx/conf.d/vps-monitor.conf; do
+    if [[ -f "$site" ]]; then
+      domain="$(sed -nE 's/^[[:space:]]*server_name[[:space:]]+([^;]+);.*/\1/p' "$site" | head -n 1)"
+      [[ -n "$domain" && "$domain" != "_" ]] && break
+    fi
+  done
+  [[ -n "$domain" && "$domain" != "_" ]] && { certbot delete --cert-name "$domain" --non-interactive >/dev/null 2>&1 || true; info "已删除域名 $domain 的 SSL 证书"; }
 }
 
 remove_databases() {
   local db_path="$INSTALL_DIR/vps_monitor.db"
   if [[ -f /etc/vps-monitor.env ]]; then
-    local configured
-    configured="$(sed -n 's/^VPS_MONITOR_DB=//p' /etc/vps-monitor.env | tail -n 1)"
+    local configured; configured="$(sed -n 's/^VPS_MONITOR_DB=//p' /etc/vps-monitor.env | tail -n 1)"
     [[ -n "$configured" ]] && db_path="$configured"
   fi
-  rm -f "$db_path" "$db_path".bak.*
-  rm -f "$INSTALL_DIR/nodes.db" "$INSTALL_DIR"/*.sqlite "$INSTALL_DIR"/*.sqlite3
+  [[ -n "$db_path" && "$db_path" == *vps_monitor* ]] && { rm -f "$db_path" "$db_path".bak.*; info "已删除数据库：$db_path"; }
+  rm -f "$INSTALL_DIR/nodes.db" "$INSTALL_DIR/vps_monitor.sqlite" "$INSTALL_DIR/vps_monitor.sqlite3"
 }
 
 main() {
   rerun_as_root
-  info "正在清理新旧版本 VPS Monitor..."
+  info "正在卸载 VPS Monitor..."
 
   remove_service vps-monitor-api
   remove_service vps-monitor-agent
@@ -81,24 +76,19 @@ main() {
   remove_firewall_rules
   remove_databases
 
-  rm -f /etc/vps-monitor.env
-  rm -f /etc/vps-monitor-agent.toml
-  rm -f /etc/vps-monitor-role
-  rm -f /usr/local/bin/vps-monitor
-  rm -f /etc/nginx/sites-enabled/vps-monitor.conf
-  rm -f /etc/nginx/sites-available/vps-monitor.conf
-  rm -f /etc/nginx/sites-enabled/vps-monitor-agent.conf
-  rm -f /etc/nginx/sites-available/vps-monitor-agent.conf
-  rm -rf "$INSTALL_DIR"
+  rm -f /etc/vps-monitor.env /etc/vps-monitor-agent.toml /etc/vps-monitor-role
+  rm -f /usr/local/bin/vps-monitor /usr/local/bin/vm
 
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload >/dev/null 2>&1 || true
-  fi
-  if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
-    systemctl reload nginx >/dev/null 2>&1 || true
-  fi
+  for pattern in "sites-available/vps-monitor*.conf" "sites-enabled/vps-monitor*.conf" "conf.d/vps-monitor*.conf"; do
+    rm -f /etc/nginx/$pattern /etc/nginx/$pattern.bak.* 2>/dev/null || true
+  done
 
-  info "VPS Monitor 新旧版本已完整删除。"
+  [[ -d "$INSTALL_DIR" ]] && { rm -rf "$INSTALL_DIR"; info "已删除项目目录：$INSTALL_DIR"; }
+
+  command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload >/dev/null 2>&1 || true
+  command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
+
+  ok "VPS Monitor 已完整卸载。"
 }
 
 main "$@"

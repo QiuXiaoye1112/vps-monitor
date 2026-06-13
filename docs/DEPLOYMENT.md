@@ -4,339 +4,172 @@
 
 ## 1. 准备条件
 
-你需要：
+- 一台中心 VPS + 一台或多台被监控 VPS
+- 域名（可选，没有域名直接使用 IP）
+- Python 3.8+
 
-- 一台中心 VPS
-- 一台或多台被监控 VPS
-- 一个域名，例如 `monitor.example.com`；没有域名也可以直接使用中心 VPS 公网 IP
-- Python 3
-- Nginx
-- Git
-- 一个随机 token
-
-角色区别：
-
-- 中心 VPS：运行 FastAPI、SQLite、Dashboard、Nginx
+角色：
+- 中心 VPS：FastAPI + SQLite + Dashboard + Nginx
 - 被监控 VPS：只运行 `agent.py`
 - 中心 VPS 也可以监控自己
 
-本项目部署方式固定为 Nginx 对外访问：
+架构：
+- `:80/443` → Nginx → `127.0.0.1:8000`（Dashboard）
+- `:8080` → Nginx → `127.0.0.1:8000`（Agent 入口，仅 `/api/`）
 
-- 浏览器访问 Nginx 的 `80/443`
-- 远程 Agent 访问 Nginx 的 `8080`
-- FastAPI 只监听 `127.0.0.1:8000`
-- 不推荐把 `8000` 直接暴露到公网
+## 2. 一键安装（推荐）
 
-地址用途：
-
-- `127.0.0.1:8000`：中心 VPS 本机 API
-- `http://中心VPS公网IP`：没有域名时浏览器访问 Dashboard
-- `https://monitor.example.com`：有域名和 HTTPS 时浏览器访问 Dashboard
-- `http://中心VPS公网IP:8080`：远程 VPS Agent 上报
-
-生成 token：
+中心 VPS 执行：
 
 ```bash
-openssl rand -hex 24
+bash <(curl -fsSL -H "Accept: application/vnd.github.raw+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/QiuXiaoye1112/vps-monitor/contents/install.sh?ref=master")
 ```
 
-## 2. 中心 VPS 部署
+安装后管理：`sudo vm`
 
-以下命令都在中心 VPS 执行。
-
-安装依赖。这里直接安装完整依赖，不需要先判断系统里有没有：
+## 3. 中心 VPS 手动部署
 
 ```bash
-sudo apt-get update
-```
+# 安装依赖
+sudo apt-get update && sudo apt-get install -y git python3 python3-venv python3-pip nginx curl sqlite3
 
-```bash
-sudo apt-get install -y git python3 python3-venv python3-pip nginx curl sqlite3
-```
-
-clone 项目：
-
-```bash
+# clone 项目（deploy_panel.sh 也会自动 clone，可跳过）
 git clone https://github.com/QiuXiaoye1112/vps-monitor.git /opt/vps-monitor
-```
-
-进入目录：
-
-```bash
 cd /opt/vps-monitor
-```
 
-运行部署脚本。有域名就填域名：
+# 部署（域名自动 HTTPS，IP 走 HTTP）
+sudo bash deploy_panel.sh monitor.example.com $(openssl rand -hex 24)
+# 或
+sudo bash deploy_panel.sh 1.2.3.4 $(openssl rand -hex 24)
 
-```bash
-sudo bash deploy_panel.sh monitor.example.com change-this-token
-```
-
-没有域名就填中心 VPS 公网 IP：
-
-```bash
-sudo bash deploy_panel.sh 1.2.3.4 change-this-token
-```
-
-检查服务：
-
-```bash
+# 检查
 systemctl status vps-monitor-api
-```
-
-检查 API：
-
-```bash
 curl http://127.0.0.1:8000/api/health
 ```
 
-访问 Dashboard。没有域名时：
+访问：`https://monitor.example.com` 或 `http://1.2.3.4`
 
-```text
-http://1.2.3.4
-```
+## 4. HTTPS
 
-有域名时：
-
-```text
-http://monitor.example.com
-```
-
-## 3. HTTPS 配置
-
-以下命令都在中心 VPS 执行。
-
-HTTPS 需要域名。如果你暂时没有域名，跳过本节，直接使用 `http://中心VPS公网IP` 访问 Dashboard。
-
-安装 certbot：
+域名部署时 `deploy_panel.sh` 自动申请 Let's Encrypt 证书。
+如失败可手动：
 
 ```bash
 sudo apt-get install -y certbot python3-certbot-nginx
-```
-
-申请证书：
-
-```bash
 sudo certbot --nginx -d monitor.example.com
 ```
 
-选择重定向后，HTTP 会自动跳转 HTTPS。
+## 5. 本机 Agent 配置
 
-如果使用 Cloudflare 小黄云：
+推荐使用管理面板：`sudo vm` → 安装中心 VPS 本机监控
 
-- SSL/TLS 推荐 `Full` 或 `Full strict`
-- 不推荐 `Flexible`
-
-Dashboard 可以走 Cloudflare；远程 Agent 默认建议走 `http://中心VPS公网IP:8080`。
-
-## 4. 中心 VPS 自监控
-
-以下命令都在中心 VPS 执行。
-
-中心 VPS 自己不需要绕域名、Cloudflare、HTTPS，直接使用本机 FastAPI：
-
-```toml
-server_url = "http://127.0.0.1:8000"
-```
-
-创建配置：
+或手动：
 
 ```bash
 sudo nano /etc/vps-monitor-agent.toml
 ```
-
-示例：
 
 ```toml
 server_url = "http://127.0.0.1:8000"
 node_id = "center"
-token = "change-this-token"
+token = "你部署面板时设置的 token"
 interval = 1
-
 name = "中心 VPS"
 os_type = "Linux"
-
 disk_paths = ["/"]
 ```
 
-测试上报：
-
 ```bash
 cd /opt/vps-monitor
-```
-
-```bash
-. .venv/bin/activate
-```
-
-```bash
-python agent.py --config /etc/vps-monitor-agent.toml --once
-```
-
-安装为 systemd：
-
-```bash
+.venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once  # 测试
 sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
+sudo systemctl daemon-reload && sudo systemctl enable --now vps-monitor-agent
 ```
 
-```bash
-sudo systemctl daemon-reload
-```
+## 6. 远程 VPS Agent
+
+推荐：`sudo vm` → 作为监控节点
+
+或手动：
 
 ```bash
-sudo systemctl enable --now vps-monitor-agent
-```
-
-## 5. 远程 VPS Agent 部署
-
-以下命令都在被监控 VPS 执行。
-
-安装依赖：
-
-```bash
-sudo apt-get update
-```
-
-```bash
-sudo apt-get install -y git python3 python3-venv python3-pip
-```
-
-clone 项目：
-
-```bash
+sudo apt-get update && sudo apt-get install -y git python3 python3-venv python3-pip
 git clone https://github.com/QiuXiaoye1112/vps-monitor.git /opt/vps-monitor
-```
-
-进入目录：
-
-```bash
 cd /opt/vps-monitor
-```
+python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements-agent.txt
 
-创建虚拟环境：
-
-```bash
-python3 -m venv .venv
-```
-
-进入虚拟环境：
-
-```bash
-. .venv/bin/activate
-```
-
-安装 Agent 依赖：
-
-```bash
-pip install -r requirements-agent.txt
-```
-
-创建配置：
-
-```bash
 sudo nano /etc/vps-monitor-agent.toml
 ```
-
-推荐配置：
 
 ```toml
 server_url = "http://中心VPS公网IP:8080"
 node_id = "node-01"
-token = "change-this-token"
+token = "你部署面板时设置的 token"
 interval = 1
-
-name = "Example Node 01"
+name = "Example Node"
 os_type = "Linux"
-
 disk_paths = ["/"]
 ```
 
-测试：
-
 ```bash
-python agent.py --config /etc/vps-monitor-agent.toml --once
-```
-
-安装 systemd：
-
-```bash
+.venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once  # 测试
 sudo cp vps-monitor-agent.service /etc/systemd/system/vps-monitor-agent.service
-```
-
-```bash
-sudo systemctl daemon-reload
-```
-
-```bash
-sudo systemctl enable --now vps-monitor-agent
-```
-
-查看日志：
-
-```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now vps-monitor-agent
 journalctl -u vps-monitor-agent -f
 ```
 
-## 6. Agent 专用 8080 入口
+## 7. Agent 入口（8080）
 
-以下命令都在中心 VPS 执行。
-
-为什么需要 8080：
-
-- Dashboard 走 HTTPS + Cloudflare
-- Agent 上报走中心 VPS IP:8080
-- 绕开 Cloudflare 规则和 HTTPS 反代问题
-- `8080` 只开放 `/api/`
-- 其他路径返回 `404`
-
-开启入口：
+中心 VPS：
 
 ```bash
-cd /opt/vps-monitor
+sudo bash /opt/vps-monitor/deploy_agent_ingress.sh
+# 自定义端口：sudo AGENT_PORT=9090 bash /opt/vps-monitor/deploy_agent_ingress.sh
 ```
+
+验证：
 
 ```bash
-sudo bash deploy_agent_ingress.sh
+curl http://127.0.0.1:8080/api/health   # → {"status":"ok"}
+curl -i http://127.0.0.1:8080/          # → 404
 ```
 
-检查 `/api/`：
+## 8. IP 白名单
+
+中心 VPS（支持 iptables 和 firewalld）：
 
 ```bash
-curl http://127.0.0.1:8080/api/health
+sudo bash /opt/vps-monitor/allow_agent_ip.sh 远程VPS_IP
 ```
 
-检查根路径返回 404：
-
-```bash
-curl -i http://127.0.0.1:8080/
-```
-
-## 7. 8080 IP 限制
-
-以下命令都在中心 VPS 执行。
-
-先在远程 VPS 获取公网 IP：
-
-```bash
-curl -4 ifconfig.me
-```
-
-在中心 VPS 放行这个 IP：
+手动 iptables：
 
 ```bash
 sudo iptables -I INPUT -p tcp -s 远程VPS_IP --dport 8080 -j ACCEPT
-```
-
-拒绝其他 IP：
-
-```bash
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 ```
 
-也可以使用项目脚本：
+持久化：规则重启后丢失，稳定后
 
 ```bash
-sudo bash allow_agent_ip.sh 远程VPS_IP
+sudo apt install -y iptables-persistent && sudo netfilter-persistent save
 ```
 
-注意：iptables 规则重启后会丢。确认稳定后再考虑持久化，不要默认自动安装 `iptables-persistent`。
+## 9. 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `API_HOST` | `127.0.0.1` | FastAPI 监听地址 |
+| `API_PORT` | `8000` | FastAPI 监听端口 |
+| `AGENT_PORT` | `8080` | Agent 入口端口 |
+| `APP_DIR` | `/opt/vps-monitor` | 项目目录 |
+
+所有脚本通过同名环境变量控制，写入 `/etc/vps-monitor.env` 后 systemd 自动读取。
+
+## 10. 卸载
+
+```bash
+sudo vm → 高级设置 → 完整卸载
+# 或
+bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh)
+```
