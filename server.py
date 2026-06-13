@@ -106,12 +106,6 @@ DASHBOARD_HTML = """<!doctype html>
       font-weight: 730;
       overflow-wrap: anywhere;
     }
-    .node-id {
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 3px;
-      overflow-wrap: anywhere;
-    }
     .status {
       flex: 0 0 auto;
       border-radius: 999px;
@@ -182,7 +176,6 @@ DASHBOARD_HTML = """<!doctype html>
       .card { padding: 12px; }
       .card-head { align-items: center; margin-bottom: 10px; }
       .name { font-size: 19px; line-height: 1.15; }
-      .node-id { display: none; }
       .status { padding: 3px 8px; font-size: 12px; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
       .metric { padding: 8px; border-radius: 7px; }
@@ -295,18 +288,13 @@ DASHBOARD_HTML = """<!doctype html>
 
         const head = document.createElement("div");
         head.className = "card-head";
-        const title = document.createElement("div");
         const name = document.createElement("div");
         name.className = "name";
         name.textContent = node.name || node.id;
-        const nodeId = document.createElement("div");
-        nodeId.className = "node-id";
-        nodeId.textContent = node.id;
-        title.append(name, nodeId);
         const status = document.createElement("div");
         status.className = `status ${node.status === "online" ? "online" : "offline"}`;
         status.textContent = node.status === "online" ? "online" : "offline";
-        head.append(title, status);
+        head.append(name, status);
 
         const metrics = document.createElement("div");
         metrics.className = "metrics";
