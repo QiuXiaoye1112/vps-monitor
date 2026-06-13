@@ -1222,28 +1222,18 @@ def firewall_rules_menu() -> None:
             return
 
         print(f"端口 {port} 当前规则：\n")
-        options: list[tuple[str, str]] = []
+        import re
+        delete_options: list[tuple[str, str]] = []
         for i, line in enumerate(lines, 1):
             tag = color("允许", GREEN) if "ACCEPT" in line else color("拦截", RED)
-            # 提取 IP
-            import re
             ip_match = re.search(r'-s\s+(\S+)', line)
             ip = ip_match.group(1) if ip_match else "所有 IP"
-            label = f"{tag} | {ip}"
-            options.append((str(i), label))
-            print(f"  {color(str(i), CYAN)}. {label}")
+            print(f"  {tag} | {ip}")
             print(f"     {color(line, DIM)}")
+            delete_options.append((str(i), f"删除这条规则（{tag} | {ip}）"))
         print()
 
-        action = choose(
-            "操作",
-            [("1", "删除一条规则")],
-        )
-        if action is None:
-            return
-
-        # 删除规则
-        selected = choose("选择要删除的规则", options)
+        selected = choose("选择要删除的规则（或 0 返回）", delete_options)
         if selected is None:
             continue
         idx = int(selected) - 1
