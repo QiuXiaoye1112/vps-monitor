@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_URL="${VPS_MONITOR_REPO:-https://github.com/QiuXiaoye1112/vps-monitor.git}"
 INSTALL_DIR="${VPS_MONITOR_DIR:-/opt/vps-monitor}"
 BRANCH="${VPS_MONITOR_BRANCH:-}"
+SETUP_ROLE="${VPS_MONITOR_SETUP_ROLE:-}"
 
 info() {
   printf '\033[36m[VPS Monitor]\033[0m %s\n' "$*"
@@ -29,9 +30,34 @@ rerun_as_root() {
     VPS_MONITOR_REPO="$REPO_URL" \
     VPS_MONITOR_DIR="$INSTALL_DIR" \
     VPS_MONITOR_BRANCH="$BRANCH" \
+    VPS_MONITOR_SETUP_ROLE="$SETUP_ROLE" \
     bash "$temp_script"
   rm -f "$temp_script"
   exit 0
+}
+
+choose_role() {
+  if [[ -f /etc/vps-monitor.env || -f /etc/vps-monitor-agent.toml ]]; then
+    SETUP_ROLE=""
+    return
+  fi
+  if [[ "$SETUP_ROLE" == "center" || "$SETUP_ROLE" == "agent" ]]; then
+    return
+  fi
+
+  printf '\n请选择这台 VPS 的用途：\n\n'
+  printf '  1. 中心 VPS（安装监控面板并监控本机）\n'
+  printf '  2. 远程 VPS（接入已有中心 VPS）\n'
+  printf '  0. 退出\n\n'
+  while true; do
+    read -r -p "请选择 [1/2/0]: " choice
+    case "$choice" in
+      1) SETUP_ROLE="center"; return ;;
+      2) SETUP_ROLE="agent"; return ;;
+      0) exit 0 ;;
+      *) printf '请输入 1、2 或 0。\n' ;;
+    esac
+  done
 }
 
 install_dependencies() {
@@ -86,11 +112,15 @@ EOF
 
 main() {
   rerun_as_root
+  choose_role
   install_dependencies
   install_or_update
   [[ -f "$INSTALL_DIR/manager.py" ]] || fail "安装包缺少 manager.py，请检查仓库地址或分支。"
   install_entrypoint
   info "安装完成，正在打开终端管理面板..."
+  if [[ -n "$SETUP_ROLE" ]]; then
+    exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE"
+  fi
   exec python3 "$INSTALL_DIR/manager.py"
 }
 
