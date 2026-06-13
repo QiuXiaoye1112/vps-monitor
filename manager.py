@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import ipaddress
+import json
 import os
 import re
 import secrets
@@ -330,8 +331,10 @@ def ensure_apt_packages(packages: list[str]) -> None:
     if not command_exists("apt-get"):
         raise RuntimeError(f"缺少依赖：{', '.join(missing)}；当前系统不支持 apt-get 自动安装")
     print(f"需要安装系统依赖：{', '.join(packages)}")
-    run(["apt-get", "update"])
-    run(["apt-get", "install", "-y", *packages])
+    package_env = os.environ.copy()
+    package_env["DEBIAN_FRONTEND"] = "noninteractive"
+    run(["apt-get", "update"], env=package_env)
+    run(["apt-get", "install", "-y", *packages], env=package_env)
 
 
 def ensure_venv(requirements: str) -> None:
@@ -379,6 +382,7 @@ def agent_unit() -> str:
         Description=VPS Monitor Agent
         After=network-online.target
         Wants=network-online.target
+        StartLimitIntervalSec=0
 
         [Service]
         Type=simple
@@ -454,6 +458,9 @@ def install_panel() -> None:
         run(["systemctl", "daemon-reload"])
         run(["systemctl", "enable", "--now", API_SERVICE, "nginx"])
         run(["systemctl", "reload", "nginx"])
+        ingress_env = os.environ.copy()
+        ingress_env["AGENT_PORT"] = "8080"
+        run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
         ok, detail = health_check("http://127.0.0.1:8000/api/health", timeout=5)
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：http://{domain}")
@@ -517,7 +524,7 @@ def configure_agent(local: bool) -> None:
             print(color("测试上报失败，服务仍会安装并启动，请稍后查看 Agent 日志。", YELLOW))
         run(["systemctl", "enable", "--now", AGENT_SERVICE])
         run(["systemctl", "restart", AGENT_SERVICE])
-        print(color("\nAgent 已配置并启动。", GREEN))
+        print(color("\nAgent 已配置并启动，已启用开机自启和异常自动重启。", GREEN))
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\nAgent 部署失败：{exc}", RED))
     pause()
@@ -872,6 +879,108 @@ def quick_update() -> None:
     pause()
 
 
+def monitored_nodes() -> list[dict[str, Any]]:
+    with urllib.request.urlopen("http://127.0.0.1:8000/api/nodes", timeout=3) as response:
+        data = json.load(response)
+    nodes = data.get("nodes", [])
+    return nodes if isinstance(nodes, list) else []
+
+
+def firewall_allows(ip: str, port: int = 8080) -> bool:
+    if not command_exists("iptables") or not ip:
+        return False
+    return subprocess.run(
+        ["iptables", "-C", "INPUT", "-p", "tcp", "-s", ip, "--dport", str(port), "-j", "ACCEPT"],
+        check=False,
+        capture_output=True,
+    ).returncode == 0
+
+
+def save_firewall() -> None:
+    ensure_apt_packages(["iptables", "iptables-persistent"])
+    run(["netfilter-persistent", "save"])
+
+
+def allow_node_firewall(node: dict[str, Any]) -> None:
+    ip = str(node.get("ip") or "")
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        print(color("该主机还没有有效来源 IP，请等待它成功上报后重试。", RED))
+        pause()
+        return
+    if address.is_loopback:
+        print(color("本机节点不需要设置远程防火墙。", YELLOW))
+        pause()
+        return
+    if not require_root():
+        return
+    ingress_env = os.environ.copy()
+    ingress_env["AGENT_PORT"] = "8080"
+    run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
+    ensure_apt_packages(["iptables"])
+    run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), str(address)], env=ingress_env)
+    save_firewall()
+    print(color(f"已允许 {address} 访问 8080，并保存防火墙规则。", GREEN))
+    pause()
+
+
+def remove_node_firewall(node: dict[str, Any]) -> None:
+    ip = str(node.get("ip") or "")
+    try:
+        address = str(ipaddress.ip_address(ip))
+    except ValueError:
+        print(color("该主机没有有效来源 IP。", RED))
+        pause()
+        return
+    if not require_root():
+        return
+    while firewall_allows(address):
+        run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", "8080", "-j", "ACCEPT"])
+    if command_exists("netfilter-persistent"):
+        run(["netfilter-persistent", "save"])
+    print(color(f"已移除 {address} 的防火墙放行规则。", GREEN))
+    pause()
+
+
+def monitored_hosts_menu() -> None:
+    while True:
+        title("监控主机")
+        try:
+            nodes = monitored_nodes()
+        except (OSError, ValueError, urllib.error.URLError) as exc:
+            print(color(f"无法读取主机列表：{exc}", RED))
+            pause()
+            return
+        if not nodes:
+            print("暂时没有主机上报。")
+            pause()
+            return
+        options: list[tuple[str, str]] = []
+        for index, node in enumerate(nodes, start=1):
+            ip = str(node.get("ip") or "等待上报")
+            allowed = "已放行" if firewall_allows(ip) else "未放行"
+            label = f"{node.get('name') or node.get('id')} | {node.get('status', 'unknown')} | {ip} | {allowed}"
+            options.append((str(index), label))
+        selected = choose("选择一台主机", options)
+        if selected is None:
+            return
+        node = nodes[int(selected) - 1]
+        title("主机详情")
+        print(f"名称：{node.get('name') or '-'}")
+        print(f"节点 ID：{node.get('id') or '-'}")
+        print(f"状态：{node.get('status') or '-'}")
+        print(f"来源 IP：{node.get('ip') or '-'}")
+        action = choose(
+            "防火墙操作",
+            [("1", "允许该主机访问 8080 并保存"), ("2", "移除该主机放行规则并保存")],
+        )
+        if action == "1":
+            allow_node_firewall(node)
+        elif action == "2":
+            remove_node_firewall(node)
+
+
 def advanced_menu() -> None:
     while True:
         role = installation_role()
@@ -981,8 +1090,9 @@ def main() -> int:
                     ("2", "查看运行状态"),
                     ("3", "查看最近日志"),
                     ("4", "查看 token"),
-                    ("5", "更新程序"),
-                    ("6", "高级设置"),
+                    ("5", "监控主机"),
+                    ("6", "更新程序"),
+                    ("7", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -990,9 +1100,10 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看最近日志"),
                     ("3", "查看 token"),
-                    ("4", "删除中心 VPS 本机监控"),
-                    ("5", "更新程序"),
-                    ("6", "高级设置"),
+                    ("4", "监控主机"),
+                    ("5", "删除中心 VPS 本机监控"),
+                    ("6", "更新程序"),
+                    ("7", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1017,8 +1128,10 @@ def main() -> int:
             elif selected == "4":
                 show_token()
             elif selected == "5":
-                quick_update()
+                monitored_hosts_menu()
             elif selected == "6":
+                quick_update()
+            elif selected == "7":
                 advanced_menu()
             else:
                 return 0
@@ -1031,10 +1144,12 @@ def main() -> int:
             elif selected == "3":
                 show_token()
             elif selected == "4":
-                remove_agent()
+                monitored_hosts_menu()
             elif selected == "5":
-                quick_update()
+                remove_agent()
             elif selected == "6":
+                quick_update()
+            elif selected == "7":
                 advanced_menu()
             else:
                 return 0
