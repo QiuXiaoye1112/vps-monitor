@@ -63,7 +63,7 @@ choose_role() {
   fi
 
   printf '\n请选择这台 VPS 的用途：\n\n'
-  printf '  1. 中心 VPS（安装监控面板并监控本机）\n'
+  printf '  1. 中心 VPS（安装监控面板）\n'
   printf '  2. 远程 VPS（接入已有中心 VPS）\n'
   printf '  0. 退出\n\n'
   while true; do
