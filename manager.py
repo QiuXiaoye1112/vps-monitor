@@ -839,6 +839,8 @@ def update_project() -> None:
         if active == "active":
             run(["systemctl", "restart", service], check=False)
     print(color("项目更新完成。", GREEN))
+    print(color("请重新执行 sudo vm 以载入最新代码。", CYAN))
+    raise SystemExit(0)
 
 
 def maintenance_menu() -> None:
