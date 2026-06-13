@@ -1285,11 +1285,10 @@ def main() -> int:
                     ("3", "查看 token"),
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
-                    ("6", "防火墙规则"),
-                    ("7", "更新程序"),
-                    ("8", "重新部署中心面板"),
-                    ("9", "删除中心面板"),
-                    ("10", "完整卸载"),
+                    ("6", "更新程序"),
+                    ("7", "重新部署中心面板"),
+                    ("8", "删除中心面板"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1298,11 +1297,10 @@ def main() -> int:
                     ("2", "查看 token"),
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
-                    ("5", "防火墙规则"),
-                    ("6", "更新程序"),
-                    ("7", "重新部署中心面板"),
-                    ("8", "删除中心面板"),
-                    ("9", "完整卸载"),
+                    ("5", "更新程序"),
+                    ("6", "重新部署中心面板"),
+                    ("7", "删除中心面板"),
+                    ("8", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1330,15 +1328,13 @@ def main() -> int:
             elif selected == "5":
                 temp_open_for_new_agent()
             elif selected == "6":
-                firewall_rules_menu()
-            elif selected == "7":
                 quick_update()
-            elif selected == "8":
+            elif selected == "7":
                 install_panel()
-            elif selected == "9":
+            elif selected == "8":
                 remove_panel()
                 return 0
-            elif selected == "10":
+            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
@@ -1353,15 +1349,13 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                firewall_rules_menu()
-            elif selected == "6":
                 quick_update()
-            elif selected == "7":
+            elif selected == "6":
                 install_panel()
-            elif selected == "8":
+            elif selected == "7":
                 remove_panel()
                 return 0
-            elif selected == "9":
+            elif selected == "8":
                 full_uninstall()
             else:
                 return 0
