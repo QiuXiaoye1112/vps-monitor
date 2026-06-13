@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -412,6 +413,24 @@ def require_token(token: str | None = Depends(token_from_request)) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid monitor token")
 
 
+def request_client_ip(request: Request) -> str:
+    candidates: list[str] = []
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        candidates.append(forwarded.split(",", 1)[0].strip())
+    real_ip = request.headers.get("x-real-ip", "").strip()
+    if real_ip:
+        candidates.append(real_ip)
+    if request.client:
+        candidates.append(request.client.host)
+    for candidate in candidates:
+        try:
+            return str(ipaddress.ip_address(candidate))
+        except ValueError:
+            continue
+    return ""
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     storage.init_db()
@@ -428,8 +447,12 @@ def dashboard() -> HTMLResponse:
 
 
 @app.post("/api/nodes/register", dependencies=[Depends(require_token)])
-def register_node(payload: NodePayload) -> dict[str, Any]:
-    return {"node": storage.create_or_update_node(payload.model_dump())}
+def register_node(payload: NodePayload, request: Request) -> dict[str, Any]:
+    data = payload.model_dump()
+    observed_ip = request_client_ip(request)
+    if observed_ip:
+        data["ip"] = observed_ip
+    return {"node": storage.create_or_update_node(data)}
 
 
 @app.put("/api/nodes/{node_id}", dependencies=[Depends(require_token)])
