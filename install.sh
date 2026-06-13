@@ -5,6 +5,7 @@ REPO_URL="${VPS_MONITOR_REPO:-https://github.com/QiuXiaoye1112/vps-monitor.git}"
 INSTALL_DIR="${VPS_MONITOR_DIR:-/opt/vps-monitor}"
 BRANCH="${VPS_MONITOR_BRANCH:-}"
 SETUP_ROLE="${VPS_MONITOR_SETUP_ROLE:-}"
+ROLE_FILE="/etc/vps-monitor-role"
 
 info() {
   printf '\033[36m[VPS Monitor]\033[0m %s\n' "$*"
@@ -37,7 +38,23 @@ rerun_as_root() {
 }
 
 choose_role() {
-  if [[ -f /etc/vps-monitor.env || -f /etc/vps-monitor-agent.toml ]]; then
+  if [[ -f "$ROLE_FILE" ]]; then
+    local saved_role
+    saved_role="$(tr -d '[:space:]' < "$ROLE_FILE")"
+    if [[ "$saved_role" == "center" || "$saved_role" == "agent" ]]; then
+      SETUP_ROLE=""
+      return
+    fi
+  fi
+  if [[ -f /etc/vps-monitor.env ]]; then
+    printf 'center\n' > "$ROLE_FILE"
+    chmod 600 "$ROLE_FILE"
+    SETUP_ROLE=""
+    return
+  fi
+  if [[ -f /etc/vps-monitor-agent.toml ]]; then
+    printf 'agent\n' > "$ROLE_FILE"
+    chmod 600 "$ROLE_FILE"
     SETUP_ROLE=""
     return
   fi
@@ -52,8 +69,8 @@ choose_role() {
   while true; do
     read -r -p "请选择 [1/2/0]: " choice
     case "$choice" in
-      1) SETUP_ROLE="center"; return ;;
-      2) SETUP_ROLE="agent"; return ;;
+      1) SETUP_ROLE="center"; printf 'center\n' > "$ROLE_FILE"; chmod 600 "$ROLE_FILE"; return ;;
+      2) SETUP_ROLE="agent"; printf 'agent\n' > "$ROLE_FILE"; chmod 600 "$ROLE_FILE"; return ;;
       0) exit 0 ;;
       *) printf '请输入 1、2 或 0。\n' ;;
     esac
