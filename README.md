@@ -11,9 +11,3 @@ bash <(curl -fsSL -H "Accept: application/vnd.github.raw+json" -H "X-GitHub-Api-
 ```bash
 sudo vm
 ```
-
-删除新旧版本：
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh)
-```
