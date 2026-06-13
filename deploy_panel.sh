@@ -60,7 +60,7 @@ detect_nginx_dirs() {
   fi
 }
 
-backup_if_exists() { local p="$1"; [[ -f "$p" ]] && cp "$p" "${p}.bak.$(date +%Y%m%d%H%M%S)" && detail "已备份 $p"; }
+backup_if_exists() { local p="$1"; [[ -f "$p" ]] && cp "$p" "${p}.bak.$(date +%Y%m%d%H%M%S)" && detail "已备份 $p"; true; }
 
 install_system_deps() {
   local missing=()
