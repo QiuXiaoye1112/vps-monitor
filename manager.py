@@ -982,6 +982,56 @@ def remove_node_firewall(node: dict[str, Any]) -> None:
     pause()
 
 
+def remove_remote_node(node: dict[str, Any]) -> None:
+    if not require_root():
+        return
+    node_id = node.get("id", "")
+    name = node.get("name") or node_id
+    ip = str(node.get("ip") or "")
+    title("删除主机")
+    print(f"名称：{name}")
+    print(f"节点 ID：{node_id}")
+    print(f"来源 IP：{ip}")
+    print()
+    if not confirm(f"确认删除 {name}？这会移除防火墙规则、数据库记录和所有历史指标。"):
+        return
+
+    # 移除防火墙规则
+    try:
+        address = str(ipaddress.ip_address(ip))
+        if not address.startswith("127."):
+            while firewall_allows(address):
+                run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", "8080", "-j", "ACCEPT"], check=False)
+            if command_exists("netfilter-persistent"):
+                run(["netfilter-persistent", "save"], check=False)
+            print(color("防火墙规则已移除。", GREEN))
+    except ValueError:
+        pass
+
+    # 从数据库删除
+    try:
+        token = read_env(SERVER_ENV).get("VPS_MONITOR_TOKEN", "")
+        req = urllib.request.Request(
+            f"{api_base_url()}/api/nodes/{node_id}?token={token}",
+            method="DELETE",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                print(color(f"主机 {name} 已从数据库删除。", GREEN))
+            else:
+                print(color(f"删除失败：HTTP {resp.status}", RED))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print(color("该主机在数据库中不存在，可能已被删除。", YELLOW))
+        else:
+            print(color(f"删除失败：HTTP {e.code}", RED))
+    except Exception as e:
+        print(color(f"删除失败：{e}", RED))
+
+    print(color(f"主机 {name} 已删除。远程 VPS 上的 Agent 如需停用，请到该 VPS 执行：sudo vm → 高级设置 → 删除 Agent", DIM))
+    pause()
+
+
 def temp_open_for_new_agent() -> None:
     if not require_root():
         return
@@ -1072,11 +1122,12 @@ def monitored_hosts_menu() -> None:
                 temp_open_for_new_agent()
             continue
         action = choose(
-            "防火墙操作",
+            "主机操作",
             [
                 ("1", "允许该主机访问 8080 并保存"),
                 ("2", "移除该主机放行规则并保存"),
                 ("3", "临时开放 8080（60秒，添加新机器用）"),
+                ("4", "删除该主机（防火墙规则+数据）"),
             ],
         )
         if action == "1":
@@ -1085,6 +1136,8 @@ def monitored_hosts_menu() -> None:
             remove_node_firewall(node)
         elif action == "3":
             temp_open_for_new_agent()
+        elif action == "4":
+            remove_remote_node(node)
 
 
 def advanced_menu() -> None:

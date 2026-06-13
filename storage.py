@@ -336,6 +336,13 @@ def get_metric(metric_id: int) -> dict[str, Any] | None:
     return metric_from_row(row)
 
 
+def delete_node(node_id: str) -> bool:
+    with closing(connect()) as conn:
+        cursor = conn.execute("DELETE FROM nodes WHERE id = ?", (node_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+
 def history_for_node(node_id: str, window: str) -> list[dict[str, Any]]:
     seconds_by_window = {"5m": 5 * 60, "1h": 60 * 60, "24h": 24 * 60 * 60}
     seconds = seconds_by_window.get(window, seconds_by_window["5m"])

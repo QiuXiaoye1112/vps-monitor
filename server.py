@@ -475,6 +475,13 @@ def get_node(node_id: str) -> dict[str, Any]:
     return {"node": node}
 
 
+@app.delete("/api/nodes/{node_id}", dependencies=[Depends(require_token)])
+def delete_node(node_id: str) -> dict[str, Any]:
+    if not storage.delete_node(node_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="node not found")
+    return {"status": "deleted", "node_id": node_id}
+
+
 @app.post("/api/metrics", dependencies=[Depends(require_token)])
 def report_metrics(payload: MetricPayload) -> dict[str, Any]:
     return {"metric": storage.insert_metric(payload.model_dump())}
