@@ -32,14 +32,15 @@ remove_service() {
 
 remove_firewall_rules() {
   command -v iptables >/dev/null 2>&1 || return
+  local port="${AGENT_PORT:-8080}"
   local rules line removed=0; rules="$(iptables -S INPUT 2>/dev/null || true)"
   while IFS= read -r line; do
-    [[ "$line" == *"--dport 8080"* ]] || continue
+    [[ "$line" == *"--dport ${port}"* ]] || continue
     read -r -a parts <<< "$line"
     [[ "${parts[0]:-}" == "-A" && "${parts[1]:-}" == "INPUT" ]] || continue
     parts[0]="-D"; iptables "${parts[@]}" >/dev/null 2>&1 || true; ((removed++))
   done <<< "$rules"
-  [[ $removed -gt 0 ]] && info "已移除 $removed 条 8080 防火墙规则"
+  [[ $removed -gt 0 ]] && info "已移除 $removed 条 ${port} 防火墙规则"
   command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
 }
 

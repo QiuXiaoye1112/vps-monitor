@@ -37,6 +37,10 @@ def api_base_url() -> str:
     port = os.getenv("VPS_MONITOR_API_PORT", "8000")
     return f"http://{host}:{port}"
 
+
+def agent_port() -> str:
+    return os.getenv("VPS_MONITOR_AGENT_PORT", "8080")
+
 RESET = "\033[0m"
 BOLD = "\033[1m"
 CYAN = "\033[36m"
@@ -496,7 +500,7 @@ def install_panel() -> None:
         run(["systemctl", "restart", API_SERVICE])
         run(["systemctl", "reload", "nginx"])
         ingress_env = os.environ.copy()
-        ingress_env["AGENT_PORT"] = "8080"
+        ingress_env["AGENT_PORT"] = agent_port()
         run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
         https_enabled = False
         if not is_ip_address(domain):
@@ -525,7 +529,7 @@ def configure_agent(local: bool) -> None:
         center_url = f"http://127.0.0.1:{port}"
     else:
         host = ask_ip("中心 VPS IP")
-        port = ask_port("Agent 接入端口", 8080)
+        port = int(ask_port("Agent 接入端口", int(agent_port())))
         center_url = server_url(host, port)
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
@@ -618,12 +622,12 @@ def ingress_menu() -> None:
         selected = choose(
             "安全操作",
             [
-                ("1", "开启或更新 8080 Agent 入口"),
+                ("1", f"开启或更新 {agent_port()} Agent 入口"),
                 ("2", "允许一台 Agent IP"),
-                ("3", "查看 8080 防火墙规则"),
+                ("3", f"查看 {agent_port()} 防火墙规则"),
                 ("4", "保存当前防火墙规则"),
                 ("5", "申请 Dashboard HTTPS 证书"),
-                ("6", "删除 8080 Agent 入口"),
+                ("6", f"删除 {agent_port()} Agent 入口"),
                 ("7", "删除一台 Agent IP 白名单"),
                 ("8", "删除 Agent 端口全部防火墙规则"),
                 ("9", "删除 HTTPS 证书并恢复 HTTP"),
@@ -635,14 +639,14 @@ def ingress_menu() -> None:
             continue
         try:
             if selected == "1":
-                port = ask("Agent 入口端口", "8080")
+                port = ask("Agent 入口端口", agent_port())
                 env = os.environ.copy()
                 env["AGENT_PORT"] = port
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
             elif selected == "2":
                 agent_ip = ask("Agent 公网 IP")
                 ipaddress.ip_address(agent_ip)
-                port = ask("Agent 入口端口", "8080")
+                port = ask("Agent 入口端口", agent_port())
                 env = os.environ.copy()
                 env["AGENT_PORT"] = port
                 run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), agent_ip], env=env)
@@ -668,7 +672,7 @@ def ingress_menu() -> None:
             elif selected == "7":
                 agent_ip = ask("要删除的 Agent 公网 IP")
                 ipaddress.ip_address(agent_ip)
-                port = ask("Agent 入口端口", "8080")
+                port = ask("Agent 入口端口", agent_port())
                 while subprocess.run(
                     ["iptables", "-C", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"],
                     check=False,
@@ -677,7 +681,7 @@ def ingress_menu() -> None:
                     run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"])
                 print(color("IP 白名单已删除。", GREEN))
             elif selected == "8":
-                port = ask("Agent 入口端口", "8080")
+                port = ask("Agent 入口端口", agent_port())
                 if confirm(f"确认删除 TCP {port} 的全部 iptables 规则？"):
                     removed = remove_firewall_port_rules(port)
                     print(color(f"已删除 {removed} 条防火墙规则。", GREEN))
@@ -780,7 +784,7 @@ def full_uninstall() -> None:
     ingress_site = Path("/etc/nginx/sites-available/vps-monitor-agent.conf")
     domain = nginx_value(panel_site, "server_name")
     listen_value = nginx_value(ingress_site, "listen")
-    ingress_port = listen_value.split()[0] if listen_value else "8080"
+    ingress_port = listen_value.split()[0] if listen_value else agent_port()
     remove_service(AGENT_SERVICE)
     remove_service(API_SERVICE)
     for path in (
@@ -922,7 +926,9 @@ def monitored_nodes() -> list[dict[str, Any]]:
     return nodes if isinstance(nodes, list) else []
 
 
-def firewall_allows(ip: str, port: int = 8080) -> bool:
+def firewall_allows(ip: str, port: int | None = None) -> bool:
+    if port is None:
+        port = int(agent_port())
     if not command_exists("iptables") or not ip:
         return False
     return subprocess.run(
@@ -952,12 +958,12 @@ def allow_node_firewall(node: dict[str, Any]) -> None:
     if not require_root():
         return
     ingress_env = os.environ.copy()
-    ingress_env["AGENT_PORT"] = "8080"
+    ingress_env["AGENT_PORT"] = agent_port()
     run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
     ensure_apt_packages(["iptables"])
     run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), str(address)], env=ingress_env)
     save_firewall()
-    print(color(f"已允许 {address} 访问 8080，并保存防火墙规则。", GREEN))
+    print(color(f"已允许 {address} 访问 {agent_port()}，并保存防火墙规则。", GREEN))
     pause()
 
 
@@ -972,7 +978,7 @@ def remove_node_firewall(node: dict[str, Any]) -> None:
     if not require_root():
         return
     while firewall_allows(address):
-        run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", "8080", "-j", "ACCEPT"])
+        run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", agent_port(), "-j", "ACCEPT"])
     if command_exists("netfilter-persistent"):
         run(["netfilter-persistent", "save"])
     print(color(f"已移除 {address} 的防火墙放行规则。", GREEN))
@@ -998,7 +1004,7 @@ def remove_remote_node(node: dict[str, Any]) -> None:
         address = str(ipaddress.ip_address(ip))
         if not address.startswith("127."):
             while firewall_allows(address):
-                run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", "8080", "-j", "ACCEPT"], check=False)
+                run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", address, "--dport", agent_port(), "-j", "ACCEPT"], check=False)
             if command_exists("netfilter-persistent"):
                 run(["netfilter-persistent", "save"], check=False)
             print(color("防火墙规则已移除。", GREEN))
@@ -1032,8 +1038,8 @@ def remove_remote_node(node: dict[str, Any]) -> None:
 def temp_open_for_new_agent() -> None:
     if not require_root():
         return
-    title("临时开放 8080")
-    port = ask("Agent 入口端口", "8080")
+    title(f"临时开放 {agent_port()}")
+    port = ask("Agent 入口端口", agent_port())
     seconds = 300
     print()
     print(color(f"即将临时移除 TCP {port} 的 DROP 规则，持续 5 分钟。", YELLOW))
@@ -1112,7 +1118,7 @@ def monitored_hosts_menu() -> None:
             print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
             action = choose(
                 "本机操作",
-                [("1", "删除本机监控"), ("2", "临时开放 8080（添加新主机）")],
+                [("1", "删除本机监控"), ("2", f"临时开放 {agent_port()}（添加新主机）")],
             )
             if action == "1":
                 remove_agent()
@@ -1122,7 +1128,7 @@ def monitored_hosts_menu() -> None:
         action = choose(
             "主机操作",
             [
-                ("1", "允许该主机访问 8080 并保存"),
+                ("1", f"允许该主机访问 {agent_port()} 并保存"),
                 ("2", "移除该主机放行规则并保存"),
                 ("3", "删除该主机（防火墙规则+数据）"),
             ],

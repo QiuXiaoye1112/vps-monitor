@@ -52,9 +52,9 @@ remove_legacy_install() {
   rm -f "$db_path" "$db_path".bak.*
 
   if command -v iptables >/dev/null 2>&1; then
-    local rules line; rules="$(iptables -S INPUT 2>/dev/null || true)"
+    local port="${AGENT_PORT:-8080}"; local rules line; rules="$(iptables -S INPUT 2>/dev/null || true)"
     while IFS= read -r line; do
-      [[ "$line" == *"--dport 8080"* ]] || continue
+      [[ "$line" == *"--dport ${port}"* ]] || continue
       read -r -a parts <<< "$line"
       [[ "${parts[0]:-}" == "-A" && "${parts[1]:-}" == "INPUT" ]] || continue
       parts[0]="-D"; iptables "${parts[@]}" >/dev/null 2>&1 || true
