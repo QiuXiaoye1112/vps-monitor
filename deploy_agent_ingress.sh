@@ -79,9 +79,9 @@ apply_config() {
 
 verify_ingress() {
   info "验证入口..."
-  local hs; hs=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${AGENT_PORT}/api/health" 2>/dev/null || echo "000")
-  [[ "$hs" == "200" ]] && ok "/api/health → 200 ✓" || warn "/api/health → ${hs}（预期 200）"
-  local rs; rs=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${AGENT_PORT}/" 2>/dev/null || echo "000")
+  local hs; hs=$(curl -s --connect-timeout 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:${AGENT_PORT}/api/health" 2>/dev/null || echo "000")
+  [[ "$hs" == "200" ]] && ok "/api/health → 200 ✓" || warn "/api/health → ${hs}（预期 200，如为 000 可能是防火墙拦截了 127.0.0.1）"
+  local rs; rs=$(curl -s --connect-timeout 3 -o /dev/null -w "%{http_code}" "http://127.0.0.1:${AGENT_PORT}/" 2>/dev/null || echo "000")
   [[ "$rs" == "404" ]] && ok "/ → 404 ✓" || warn "/ → ${rs}（预期 404）"
 }
 
