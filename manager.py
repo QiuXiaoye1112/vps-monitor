@@ -907,23 +907,6 @@ def installation_role() -> str:
     return "new"
 
 
-def quick_logs() -> None:
-    role = installation_role()
-    if role == "center":
-        selected = choose("查看日志", [("1", "中心 API"), ("2", "本机 Agent")])
-        if selected is None:
-            return
-        service = API_SERVICE if selected == "1" else AGENT_SERVICE
-    elif role == "agent":
-        service = AGENT_SERVICE
-    else:
-        print(color("当前还没有安装服务。", YELLOW))
-        pause()
-        return
-    run(["journalctl", "-u", service, "-n", "80", "--no-pager"], check=False)
-    pause()
-
-
 def quick_update() -> None:
     title("更新 VPS Monitor")
     if not require_root():
@@ -1205,31 +1188,28 @@ def main() -> int:
                 [
                     ("1", "安装中心 VPS 本机监控"),
                     ("2", "查看运行状态"),
-                    ("3", "查看最近日志"),
-                    ("4", "查看 token"),
-                    ("5", "监控主机"),
-                    ("6", "更新程序"),
-                    ("7", "高级设置"),
+                    ("3", "查看 token"),
+                    ("4", "监控主机"),
+                    ("5", "更新程序"),
+                    ("6", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
                 else [
                     ("1", "查看运行状态"),
-                    ("2", "查看最近日志"),
-                    ("3", "查看 token"),
-                    ("4", "监控主机"),
-                    ("5", "删除中心 VPS 本机监控"),
-                    ("6", "更新程序"),
-                    ("7", "高级设置"),
+                    ("2", "查看 token"),
+                    ("3", "监控主机"),
+                    ("4", "删除中心 VPS 本机监控"),
+                    ("5", "更新程序"),
+                    ("6", "高级设置"),
                     ("0", "退出"),
                 ]
                 if role == "center"
                 else [
                     ("1", "查看运行状态"),
-                    ("2", "查看最近日志"),
-                    ("3", "查看 token"),
-                    ("4", "更新程序"),
-                    ("5", "高级设置"),
+                    ("2", "查看 token"),
+                    ("3", "更新程序"),
+                    ("4", "高级设置"),
                     ("0", "退出"),
                 ]
             ),
@@ -1241,14 +1221,12 @@ def main() -> int:
             elif selected == "2":
                 show_overview()
             elif selected == "3":
-                quick_logs()
-            elif selected == "4":
                 show_token()
-            elif selected == "5":
+            elif selected == "4":
                 monitored_hosts_menu()
-            elif selected == "6":
+            elif selected == "5":
                 quick_update()
-            elif selected == "7":
+            elif selected == "6":
                 advanced_menu()
             else:
                 return 0
@@ -1257,16 +1235,14 @@ def main() -> int:
             if selected == "1":
                 show_overview()
             elif selected == "2":
-                quick_logs()
-            elif selected == "3":
                 show_token()
-            elif selected == "4":
+            elif selected == "3":
                 monitored_hosts_menu()
-            elif selected == "5":
+            elif selected == "4":
                 remove_agent()
-            elif selected == "6":
+            elif selected == "5":
                 quick_update()
-            elif selected == "7":
+            elif selected == "6":
                 advanced_menu()
             else:
                 return 0
@@ -1274,12 +1250,10 @@ def main() -> int:
         if selected == "1":
             show_overview()
         elif selected == "2":
-            quick_logs()
-        elif selected == "3":
             show_token()
-        elif selected == "4":
+        elif selected == "3":
             quick_update()
-        elif selected == "5":
+        elif selected == "4":
             advanced_menu()
         else:
             return 0
