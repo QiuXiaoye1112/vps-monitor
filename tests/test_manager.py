@@ -37,6 +37,11 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(manager.server_url("1.2.3.4", 8080), "http://1.2.3.4:8080")
         self.assertEqual(manager.server_url("2001:db8::1", 8080), "http://[2001:db8::1]:8080")
 
+    def test_is_ip_address_distinguishes_domain(self) -> None:
+        self.assertTrue(manager.is_ip_address("38.65.91.128"))
+        self.assertTrue(manager.is_ip_address("2001:db8::1"))
+        self.assertFalse(manager.is_ip_address("monitor.example.com"))
+
     def test_agent_token_reads_toml_value(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "agent.toml"
