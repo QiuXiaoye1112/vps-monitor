@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import manager
 
@@ -31,6 +32,23 @@ class ManagerTests(unittest.TestCase):
         ok, detail = manager.health_check("not-a-url")
         self.assertFalse(ok)
         self.assertTrue(detail)
+
+    @mock.patch("manager.run")
+    @mock.patch("manager.subprocess.run")
+    def test_remove_firewall_rules_only_matches_port(self, subprocess_run, command_run) -> None:
+        subprocess_run.return_value = mock.Mock(
+            stdout=(
+                "-A INPUT -p tcp --dport 22 -j ACCEPT\n"
+                "-A INPUT -p tcp -s 1.2.3.4 --dport 8080 -j ACCEPT\n"
+                "-A INPUT -p tcp --dport 8080 -j DROP\n"
+            )
+        )
+        removed = manager.remove_firewall_port_rules("8080")
+        self.assertEqual(removed, 2)
+        self.assertEqual(command_run.call_count, 2)
+        for call in command_run.call_args_list:
+            self.assertIn("8080", call.args[0])
+            self.assertNotIn("22", call.args[0])
 
 
 if __name__ == "__main__":
