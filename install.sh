@@ -154,6 +154,20 @@ install_dependencies() {
   fi
 }
 
+fresh_install() {
+  rm -rf "$INSTALL_DIR"
+  if [[ -e "$INSTALL_DIR" ]]; then
+    fail "无法删除旧目录 $INSTALL_DIR，请检查文件权限或占用情况。"
+  fi
+  info "正在下载 VPS Monitor 最新版..."
+  mkdir -p "$(dirname "$INSTALL_DIR")"
+  if [[ -n "$BRANCH" ]]; then
+    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+  else
+    git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+  fi
+}
+
 install_or_update() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain)" ]]; then
@@ -182,13 +196,7 @@ install_or_update() {
     exit 0
   fi
 
-  info "正在下载 VPS Monitor..."
-  mkdir -p "$(dirname "$INSTALL_DIR")"
-  if [[ -n "$BRANCH" ]]; then
-    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
-  else
-    git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
-  fi
+  fresh_install
 }
 
 install_entrypoint() {
@@ -214,7 +222,7 @@ main() {
   if [[ "$install_result" -eq 10 ]]; then
     choose_role
     needs_setup=1
-    install_or_update
+    fresh_install
   elif [[ "$install_result" -ne 0 ]]; then
     fail "安装或更新失败。"
   fi
