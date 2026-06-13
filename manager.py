@@ -819,15 +819,47 @@ def update_project() -> None:
     if not (PROJECT_DIR / ".git").exists():
         print(color("当前目录不是 Git 仓库，无法在线更新。", YELLOW))
         return
-    print(color("正在从 GitHub 拉取更新...", CYAN))
-    try:
-        # 忽略本地改动，强制同步远端 master
-        run(["git", "fetch", "origin"], check=False)
-        run(["git", "reset", "--hard", "origin/master"], check=False)
-    except Exception:
-        print(color("更新失败：网络错误或 Git 异常。", RED))
-        print(color(f"手动更新：cd {PROJECT_DIR} && git fetch origin && git reset --hard origin/master", DIM))
+
+    # 当前版本
+    before = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "rev-parse", "--short", "HEAD"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip() or "unknown"
+    print(f"当前版本：{before}")
+
+    # 远端 URL
+    remote = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "remote", "get-url", "origin"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
+    print(f"远端仓库：{remote}")
+
+    print(color("正在拉取更新...", CYAN))
+    fetch = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "fetch", "origin"],
+        capture_output=True, text=True, check=False,
+    )
+    if fetch.returncode != 0:
+        print(color(f"更新失败：无法连接远端仓库。", RED))
+        if fetch.stderr:
+            print(fetch.stderr.strip())
         return
+
+    after = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "rev-parse", "--short", "origin/master"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
+
+    if before == after:
+        print(color("已是最新版本。", GREEN))
+        return
+
+    subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "reset", "--hard", "origin/master"],
+        check=False,
+    )
+    print(color(f"已更新：{before} → {after}", GREEN))
+
     try:
         if VENV_DIR.exists():
             requirement = "requirements.txt" if SERVER_ENV.exists() else "requirements-agent.txt"
@@ -838,7 +870,7 @@ def update_project() -> None:
         active, _ = service_state(service)
         if active == "active":
             run(["systemctl", "restart", service], check=False)
-    print(color("更新完成！请重新执行 sudo vm 载入最新代码。", GREEN))
+    print(color("请重新执行 sudo vm 载入最新代码。", CYAN))
     raise SystemExit(0)
 
 
