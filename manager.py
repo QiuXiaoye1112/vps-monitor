@@ -477,7 +477,15 @@ def install_panel() -> None:
         print(color("token 不能包含空格或换行。", RED))
         pause()
         return
-    print(color("正在清理旧防火墙和 Agent 入口...", CYAN))
+    print(color("正在清空旧配置...", CYAN))
+    # 停服务
+    for svc in (API_SERVICE, AGENT_SERVICE):
+        if command_exists("systemctl"):
+            subprocess.run(["systemctl", "disable", "--now", svc], check=False, capture_output=True)
+        remove_path(SYSTEMD_DIR / f"{svc}.service")
+        if command_exists("systemctl"):
+            subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
+    # 清防火墙
     if command_exists("iptables"):
         port = agent_port()
         rules = subprocess.run(["iptables", "-S", "INPUT"], capture_output=True, text=True, check=False).stdout
@@ -486,11 +494,21 @@ def install_panel() -> None:
                 parts = shlex.split(line)
                 if parts[0] == "-A":
                     subprocess.run(["iptables", "-D", *parts[1:]], check=False, capture_output=True)
-    for p in ["/etc/nginx/sites-available/vps-monitor-agent.conf", "/etc/nginx/sites-enabled/vps-monitor-agent.conf",
-              "/etc/nginx/conf.d/vps-monitor-agent.conf"]:
+    # 清 Nginx
+    for p in ["/etc/nginx/sites-available/vps-monitor.conf", "/etc/nginx/sites-enabled/vps-monitor.conf",
+              "/etc/nginx/sites-available/vps-monitor-agent.conf", "/etc/nginx/sites-enabled/vps-monitor-agent.conf",
+              "/etc/nginx/conf.d/vps-monitor.conf", "/etc/nginx/conf.d/vps-monitor-agent.conf"]:
         remove_path(Path(p))
+    # 清配置和数据库
+    env = read_env(SERVER_ENV)
+    db = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
+    remove_path(db)
+    for backup in db.parent.glob(f"{db.name}.bak.*"):
+        remove_path(backup)
+    remove_path(SERVER_ENV)
+    remove_path(AGENT_CONFIG)
+    print(color("已清理干净，开始全新部署。", GREEN))
     print()
-    print("即将安装 Python、Nginx、API 服务并写入中心配置。")
     try:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
