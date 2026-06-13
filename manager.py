@@ -1172,44 +1172,18 @@ def monitored_hosts_menu() -> None:
 
 def advanced_menu() -> None:
     while True:
-        role = installation_role()
         title("高级设置")
-        options = (
-            [
-                ("1", "重新部署中心面板"),
-                ("2", "服务启停与实时日志"),
-                ("3", "备份、依赖与综合诊断"),
-                ("4", "删除中心面板"),
-                ("5", "完整卸载"),
-            ]
-            if role == "center"
-            else [
-                ("1", "服务启停与实时日志"),
-                ("2", "重新安装依赖与综合诊断"),
-            ]
-        )
+        options = [
+            ("1", "服务启停与实时日志"),
+            ("2", "重新安装依赖与综合诊断"),
+        ]
         selected = choose("只有需要自定义时才使用这里", options)
         if selected is None:
             return
-        if role == "center":
-            if selected == "1":
-                install_panel()
-            elif selected == "2":
-                service_menu()
-            elif selected == "3":
-                maintenance_menu()
-            elif selected == "4":
-                remove_panel()
-                return
-            else:
-                full_uninstall()
-        else:
-            if selected == "1":
-                service_menu()
-            elif selected == "2":
-                maintenance_menu()
-            else:
-                return
+        if selected == "1":
+            service_menu()
+        elif selected == "2":
+            maintenance_menu()
 
 
 def first_setup(role: str) -> None:
@@ -1260,7 +1234,9 @@ def main() -> int:
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
                     ("6", "更新程序"),
-                    ("7", "高级设置"),
+                    ("7", "重新部署中心面板"),
+                    ("8", "删除中心面板"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1270,7 +1246,9 @@ def main() -> int:
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
                     ("5", "更新程序"),
-                    ("6", "高级设置"),
+                    ("6", "重新部署中心面板"),
+                    ("7", "删除中心面板"),
+                    ("8", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1300,7 +1278,12 @@ def main() -> int:
             elif selected == "6":
                 quick_update()
             elif selected == "7":
-                advanced_menu()
+                install_panel()
+            elif selected == "8":
+                remove_panel()
+                return 0
+            elif selected == "9":
+                full_uninstall()
             else:
                 return 0
             continue
@@ -1316,7 +1299,12 @@ def main() -> int:
             elif selected == "5":
                 quick_update()
             elif selected == "6":
-                advanced_menu()
+                install_panel()
+            elif selected == "7":
+                remove_panel()
+                return 0
+            elif selected == "8":
+                full_uninstall()
             else:
                 return 0
             continue
