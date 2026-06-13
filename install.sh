@@ -7,10 +7,11 @@ BRANCH="${VPS_MONITOR_BRANCH:-}"
 SETUP_ROLE="${VPS_MONITOR_SETUP_ROLE:-}"
 ROLE_FILE="/etc/vps-monitor-role"
 
-BOLD='\033[1m'; DIM='\033[2m'; RED='\033[31m'; GREEN='\033[32m'; CYAN='\033[36m'; RESET='\033[0m'
+BOLD='\033[1m'; DIM='\033[2m'; RED='\033[31m'; GREEN='\033[32m'; YELLOW='\033[33m'; CYAN='\033[36m'; RESET='\033[0m'
 
 info() { printf "${CYAN}[VPS Monitor]${RESET} %s\n" "$*"; }
 ok()   { printf "  ${GREEN}✓${RESET} %s\n" "$*"; }
+warn() { printf "  ${YELLOW:-}⚠${RESET} %s\n" "$*" >&2; }
 fail() { printf "\n${RED}✗${RESET} %s\n" "$*" >&2; exit 1; }
 
 rerun_as_root() {
@@ -96,8 +97,11 @@ choose_role() {
 }
 
 install_dependencies() {
-  local need_install=false
-  for cmd in git python3 curl; do command -v "$cmd" >/dev/null 2>&1 || need_install=true; done
+  local need_install=false missing_pkgs=()
+  for cmd in git python3 curl; do
+    if command -v "$cmd" >/dev/null 2>&1; then continue; fi
+    need_install=true; missing_pkgs+=("$cmd")
+  done
   if command -v python3 >/dev/null 2>&1; then
     local ver; ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null) || ver="0.0"
     local major="${ver%%.*}"; local minor="${ver#*.}"
@@ -105,16 +109,25 @@ install_dependencies() {
       need_install=true
     fi
   fi
-  $need_install || return
+
+  if $need_install; then
+    info "缺少基础依赖，正在安装..."
+  else
+    info "基础依赖已就绪"; return
+  fi
 
   if command -v apt-get >/dev/null 2>&1; then
-    info "正在安装基础依赖..."; apt-get update; apt-get install -y git python3 python3-venv python3-pip ca-certificates curl
+    apt-get update -qq 2>/dev/null || { warn "apt-get update 失败，继续尝试安装..."; }
+    apt-get install -y -qq git python3 python3-venv python3-pip ca-certificates curl 2>&1 | tail -3 || fail "apt-get install 失败，请手动安装 git python3 curl 后重试。"
+    ok "依赖安装完成"
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y git python3 python3-pip ca-certificates curl
+    dnf install -y git python3 python3-pip ca-certificates curl 2>&1 | tail -3 || fail "dnf install 失败。"
+    ok "依赖安装完成"
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y git python3 python3-pip ca-certificates curl
+    yum install -y git python3 python3-pip ca-certificates curl 2>&1 | tail -3 || fail "yum install 失败。"
+    ok "依赖安装完成"
   else
-    fail "暂不支持当前包管理器，请先安装 git 和 python3。"
+    fail "不支持当前包管理器。请手动安装：git python3 curl"
   fi
 }
 
@@ -157,18 +170,26 @@ EOF
 }
 
 main() {
-  printf "${BOLD}${CYAN}╔══════════════════════════════════════════╗\n║        VPS Monitor · 一键安装             ║\n╚══════════════════════════════════════════╝${RESET}\n\n"
-  rerun_as_root; install_dependencies
+  printf "${BOLD}${CYAN}╔══════════════════════════════════════════╗\n║        VPS Monitor · 一键安装             ║\n╚══════════════════════════════════════════╝${RESET}\n"
+  rerun_as_root
+
+  echo; info "步骤 1/4：检查基础依赖"
+  install_dependencies
 
   local needs_setup=0
-  if [[ ! -e "$INSTALL_DIR" ]]; then choose_role; needs_setup=1; fi
+  echo; info "步骤 2/4：选择安装角色"
+  if [[ ! -e "$INSTALL_DIR" ]]; then choose_role; needs_setup=1
+  else info "已安装，跳过角色选择"; fi
 
+  echo; info "步骤 3/4：下载/更新项目"
   set +e; install_or_update; local install_result=$?; set -e
   if [[ "$install_result" -eq 10 ]]; then choose_role; needs_setup=1; fresh_install
   elif [[ "$install_result" -ne 0 ]]; then fail "安装或更新失败。"; fi
 
   [[ -f "$INSTALL_DIR/manager.py" ]] || fail "安装包缺少 manager.py"
-  install_entrypoint
+
+  echo; info "步骤 4/4：安装管理命令"
+  install_entrypoint; ok "sudo vm 已就绪"
 
   echo
   printf "${BOLD}${GREEN}╔══════════════════════════════════════════╗\n║          ✓  安装完成！                   ║\n╚══════════════════════════════════════════╝${RESET}\n\n"
