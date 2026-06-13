@@ -1055,18 +1055,33 @@ def monitored_hosts_menu() -> None:
         options: list[tuple[str, str]] = []
         for index, node in enumerate(nodes, start=1):
             ip = str(node.get("ip") or "等待上报")
-            allowed = "已放行" if firewall_allows(ip) else "未放行"
-            label = f"{node.get('name') or node.get('id')} | {node.get('status', 'unknown')} | {ip} | {allowed}"
+            try:
+                is_local = ipaddress.ip_address(ip).is_loopback
+            except ValueError:
+                is_local = False
+            tag = color("本机", DIM) if is_local else ("已放行" if firewall_allows(ip) else "未放行")
+            label = f"{node.get('name') or node.get('id')} | {node.get('status', 'unknown')} | {ip} | {tag}"
             options.append((str(index), label))
         selected = choose("选择一台主机", options)
         if selected is None:
             return
         node = nodes[int(selected) - 1]
+        ip = str(node.get("ip") or "-")
+        try:
+            is_local = ipaddress.ip_address(ip).is_loopback
+        except ValueError:
+            is_local = False
         title("主机详情")
         print(f"名称：{node.get('name') or '-'}")
         print(f"节点 ID：{node.get('id') or '-'}")
         print(f"状态：{node.get('status') or '-'}")
-        print(f"来源 IP：{node.get('ip') or '-'}")
+        print(f"来源 IP：{ip}")
+        if is_local:
+            print()
+            print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
+            print(color("只有远程 VPS 才需要开放 8080 并设置白名单。", DIM))
+            pause()
+            continue
         action = choose(
             "防火墙操作",
             [
