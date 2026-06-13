@@ -33,6 +33,10 @@ class ManagerTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(detail)
 
+    def test_server_url_adds_scheme_and_port(self) -> None:
+        self.assertEqual(manager.server_url("1.2.3.4", 8080), "http://1.2.3.4:8080")
+        self.assertEqual(manager.server_url("https://monitor.example.com", 443), "https://monitor.example.com:443")
+
     @mock.patch("manager.run")
     @mock.patch("manager.subprocess.run")
     def test_remove_firewall_rules_only_matches_port(self, subprocess_run, command_run) -> None:
