@@ -37,6 +37,58 @@ rerun_as_root() {
   exit 0
 }
 
+is_legacy_install() {
+  [[ -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" ]] && return 0
+  [[ -d "$INSTALL_DIR/.git" && ! -f "$INSTALL_DIR/manager.py" ]] && return 0
+  [[ -f /etc/systemd/system/vps-monitor-dashboard.service ]] && return 0
+  return 1
+}
+
+remove_legacy_install() {
+  info "检测到旧版本，正在完整删除后安装最新版..."
+
+  local db_path="$INSTALL_DIR/vps_monitor.db"
+  if [[ -f /etc/vps-monitor.env ]]; then
+    local configured_db
+    configured_db="$(sed -n 's/^VPS_MONITOR_DB=//p' /etc/vps-monitor.env | tail -n 1)"
+    [[ -n "$configured_db" ]] && db_path="$configured_db"
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable --now vps-monitor-api vps-monitor-agent vps-monitor-dashboard >/dev/null 2>&1 || true
+  fi
+  rm -f /etc/systemd/system/vps-monitor-api.service
+  rm -f /etc/systemd/system/vps-monitor-agent.service
+  rm -f /etc/systemd/system/vps-monitor-dashboard.service
+  rm -f /etc/vps-monitor.env /etc/vps-monitor-agent.toml "$ROLE_FILE"
+  rm -f /usr/local/bin/vps-monitor
+  rm -f /etc/nginx/sites-enabled/vps-monitor.conf
+  rm -f /etc/nginx/sites-available/vps-monitor.conf
+  rm -f /etc/nginx/sites-enabled/vps-monitor-agent.conf
+  rm -f /etc/nginx/sites-available/vps-monitor-agent.conf
+  rm -f "$db_path" "$db_path".bak.*
+
+  if command -v iptables >/dev/null 2>&1; then
+    local rules line
+    rules="$(iptables -S INPUT 2>/dev/null || true)"
+    while IFS= read -r line; do
+      [[ "$line" == *"--dport 8080"* ]] || continue
+      read -r -a parts <<< "$line"
+      [[ "${parts[0]:-}" == "-A" && "${parts[1]:-}" == "INPUT" ]] || continue
+      parts[0]="-D"
+      iptables "${parts[@]}" >/dev/null 2>&1 || true
+    done <<< "$rules"
+  fi
+
+  rm -rf "$INSTALL_DIR"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+  if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1 || true
+  fi
+}
+
 choose_role() {
   if [[ -f "$ROLE_FILE" ]]; then
     local saved_role
@@ -129,6 +181,9 @@ EOF
 
 main() {
   rerun_as_root
+  if is_legacy_install; then
+    remove_legacy_install
+  fi
   choose_role
   install_dependencies
   install_or_update
