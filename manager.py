@@ -999,6 +999,46 @@ def remove_node_firewall(node: dict[str, Any]) -> None:
     pause()
 
 
+def temp_open_for_new_agent() -> None:
+    if not require_root():
+        return
+    title("临时开放 8080")
+    port = ask("Agent 入口端口", "8080")
+    seconds = 60
+    print()
+    print(color(f"即将临时移除 TCP {port} 的 DROP 规则，持续 {seconds} 秒。", YELLOW))
+    print(color("在此期间新 Agent 可以上报，刷新列表即可看到新 IP。", CYAN))
+    print()
+    if not confirm("确认临时开放？"):
+        return
+
+    # 移除 DROP
+    dropped = False
+    while subprocess.run(
+        ["iptables", "-C", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"],
+        check=False, capture_output=True,
+    ).returncode == 0:
+        run(["iptables", "-D", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"], check=False)
+        dropped = True
+
+    if not dropped:
+        print(color(f"端口 {port} 当前没有 DROP 规则，无需临时开放。", YELLOW))
+        pause()
+        return
+
+    print(color(f"已开放，请在 {seconds} 秒内启动新 Agent...", GREEN))
+    for i in range(seconds, 0, -5):
+        print(f"\r  剩余 {i:2d} 秒...", end="", flush=True)
+        time.sleep(5)
+    print()
+
+    # 重新加上 DROP
+    run(["iptables", "-A", "INPUT", "-p", "tcp", "--dport", port, "-j", "DROP"], check=False)
+    save_firewall()
+    print(color("DROP 规则已恢复。新 Agent IP 如已出现在列表中，请选择该主机 → 允许访问。", GREEN))
+    pause()
+
+
 def monitored_hosts_menu() -> None:
     while True:
         title("监控主机")
@@ -1029,12 +1069,18 @@ def monitored_hosts_menu() -> None:
         print(f"来源 IP：{node.get('ip') or '-'}")
         action = choose(
             "防火墙操作",
-            [("1", "允许该主机访问 8080 并保存"), ("2", "移除该主机放行规则并保存")],
+            [
+                ("1", "允许该主机访问 8080 并保存"),
+                ("2", "移除该主机放行规则并保存"),
+                ("3", "临时开放 8080（60秒，添加新机器用）"),
+            ],
         )
         if action == "1":
             allow_node_firewall(node)
         elif action == "2":
             remove_node_firewall(node)
+        elif action == "3":
+            temp_open_for_new_agent()
 
 
 def advanced_menu() -> None:
