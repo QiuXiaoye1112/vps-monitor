@@ -30,7 +30,7 @@ rerun_as_root() {
   fi
   chmod 700 "$temp_script"
   info "需要 root 权限，正在请求 sudo..."
-  sudo env VPS_MONITOR_REPO="$REPO_URL" VPS_MONITOR_DIR="$INSTALL_DIR" VPS_MONITOR_BRANCH="$BRANCH" VPS_MONITOR_SETUP_ROLE="$SETUP_ROLE" bash "$temp_script"
+  sudo env VPS_MONITOR_REPO="$REPO_URL" VPS_MONITOR_DIR="$INSTALL_DIR" VPS_MONITOR_BRANCH="$BRANCH" VPS_MONITOR_SETUP_ROLE="$SETUP_ROLE" bash "$temp_script" < /dev/tty
   rm -f "$temp_script"; exit 0
 }
 
@@ -164,7 +164,7 @@ install_or_update() {
 install_entrypoint() {
   cat > /usr/local/bin/vm <<EOF
 #!/usr/bin/env bash
-cd "$INSTALL_DIR" && exec python3 "$INSTALL_DIR/manager.py" "\$@"
+cd "$INSTALL_DIR" && exec python3 "$INSTALL_DIR/manager.py" "\$@" < /dev/tty
 EOF
   chmod 755 /usr/local/bin/vm
 }
@@ -199,9 +199,9 @@ main() {
   if [[ "$needs_setup" -eq 1 && -n "$SETUP_ROLE" ]]; then
     printf "  ${BOLD}按回车进入初始化配置...${RESET}\n"
     read -r < /dev/tty
-    exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE"
+    exec python3 "$INSTALL_DIR/manager.py" --setup "$SETUP_ROLE" < /dev/tty
   fi
-  exec python3 "$INSTALL_DIR/manager.py"
+  exec python3 "$INSTALL_DIR/manager.py" < /dev/tty
 }
 
 main "$@"
