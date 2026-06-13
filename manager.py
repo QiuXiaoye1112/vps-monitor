@@ -703,6 +703,46 @@ def ingress_menu() -> None:
         pause()
 
 
+def https_is_on() -> bool:
+    site = Path("/etc/nginx/sites-available/vps-monitor.conf")
+    if site.exists():
+        content = site.read_text(encoding="utf-8")
+        return "listen 443" in content or "ssl_certificate" in content
+    return False
+
+
+def toggle_https() -> None:
+    if https_is_on():
+        disable_https()
+    else:
+        enable_https_for_domain()
+
+
+def enable_https_for_domain() -> None:
+    title("开启 HTTPS")
+    domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name")
+    if not domain:
+        domain = ask("面板域名")
+    if not domain:
+        return
+    if not confirm(f"为 {domain} 申请 Let's Encrypt 证书并启用 HTTPS？"):
+        return
+    try:
+        ensure_apt_packages(["certbot", "python3-certbot-nginx"])
+        result = run(
+            ["certbot", "--nginx", "-d", domain, "--non-interactive", "--agree-tos",
+             "--register-unsafely-without-email", "--redirect"],
+            check=False,
+        )
+        if result.returncode == 0:
+            print(color(f"HTTPS 已启用：https://{domain}", GREEN))
+        else:
+            print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
+    except Exception as e:
+        print(color(f"操作失败：{e}", RED))
+    pause()
+
+
 def disable_https() -> None:
     title("关闭 HTTPS")
     domain = ask("当前面板域名")
@@ -1310,7 +1350,7 @@ def main() -> int:
                     ("5", "添加新主机"),
                     ("6", "更新程序"),
                     ("7", "重新部署中心面板"),
-                    ("8", "关闭 HTTPS 恢复 HTTP"),
+                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
                     ("9", "删除中心面板"),
                     ("10", "完整卸载"),
                     ("0", "退出"),
@@ -1323,7 +1363,7 @@ def main() -> int:
                     ("4", "添加新主机"),
                     ("5", "更新程序"),
                     ("6", "重新部署中心面板"),
-                    ("7", "关闭 HTTPS 恢复 HTTP"),
+                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
                     ("8", "删除中心面板"),
                     ("9", "完整卸载"),
                     ("0", "退出"),
@@ -1357,7 +1397,7 @@ def main() -> int:
             elif selected == "7":
                 install_panel()
             elif selected == "8":
-                disable_https()
+                toggle_https()
             elif selected == "9":
                 remove_panel()
                 return 0
@@ -1380,7 +1420,7 @@ def main() -> int:
             elif selected == "6":
                 install_panel()
             elif selected == "7":
-                disable_https()
+                toggle_https()
             elif selected == "8":
                 remove_panel()
                 return 0
