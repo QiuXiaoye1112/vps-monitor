@@ -3,7 +3,7 @@
 轻量 VPS 监控面板，支持通过终端菜单完成安装、配置和维护。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/install.sh -o install.sh && sudo bash install.sh
 ```
 
 安装完成后：
