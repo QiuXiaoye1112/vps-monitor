@@ -37,13 +37,6 @@ rerun_as_root() {
   exit 0
 }
 
-is_legacy_install() {
-  [[ -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" ]] && return 0
-  [[ -d "$INSTALL_DIR/.git" && ! -f "$INSTALL_DIR/manager.py" ]] && return 0
-  [[ -f /etc/systemd/system/vps-monitor-dashboard.service ]] && return 0
-  return 1
-}
-
 remove_legacy_install() {
   info "检测到旧版本，正在完整删除后安装最新版..."
 
@@ -87,6 +80,21 @@ remove_legacy_install() {
   if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
     systemctl reload nginx >/dev/null 2>&1 || true
   fi
+}
+
+choose_reinstall() {
+  local reason="$1"
+  printf '\n自动更新无法完成：%s\n\n' "$reason"
+  printf '  1. 删除旧版本并安装最新版\n'
+  printf '  0. 退出，不做任何修改\n\n'
+  while true; do
+    read -r -p "请选择 [1/0]: " choice
+    case "$choice" in
+      1) return 0 ;;
+      0) return 1 ;;
+      *) printf '请输入 1 或 0。\n' ;;
+    esac
+  done
 }
 
 choose_role() {
@@ -149,17 +157,29 @@ install_dependencies() {
 install_or_update() {
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain)" ]]; then
-      info "检测到 $INSTALL_DIR 存在本地改动，为避免覆盖，跳过自动更新。"
-      return
+      if choose_reinstall "检测到旧目录存在本地改动"; then
+        remove_legacy_install
+        return 10
+      fi
+      exit 0
     fi
     info "正在更新已有安装..."
-    git -C "$INSTALL_DIR" fetch --all --prune
-    git -C "$INSTALL_DIR" pull --ff-only
-    return
+    if git -C "$INSTALL_DIR" fetch --all --prune && git -C "$INSTALL_DIR" pull --ff-only; then
+      return 0
+    fi
+    if choose_reinstall "Git 自动更新失败"; then
+      remove_legacy_install
+      return 10
+    fi
+    exit 0
   fi
 
   if [[ -e "$INSTALL_DIR" ]]; then
-    fail "$INSTALL_DIR 已存在但不是 Git 仓库。请备份或移走该目录后重试。"
+    if choose_reinstall "$INSTALL_DIR 不是可自动更新的 Git 安装"; then
+      remove_legacy_install
+      return 10
+    fi
+    exit 0
   fi
 
   info "正在下载 VPS Monitor..."
@@ -181,12 +201,21 @@ EOF
 
 main() {
   rerun_as_root
-  if is_legacy_install; then
-    remove_legacy_install
+  install_dependencies
+  if [[ ! -e "$INSTALL_DIR" ]]; then
+    choose_role
+  fi
+  set +e
+  install_or_update
+  local install_result=$?
+  set -e
+  if [[ "$install_result" -eq 10 ]]; then
+    choose_role
+    install_or_update
+  elif [[ "$install_result" -ne 0 ]]; then
+    fail "安装或更新失败。"
   fi
   choose_role
-  install_dependencies
-  install_or_update
   [[ -f "$INSTALL_DIR/manager.py" ]] || fail "安装包缺少 manager.py，请检查仓库地址或分支。"
   install_entrypoint
   info "安装完成，正在打开终端管理面板..."
