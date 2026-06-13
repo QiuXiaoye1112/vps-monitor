@@ -677,8 +677,6 @@ def advanced_menu() -> None:
 def first_setup(role: str) -> None:
     if role == "center":
         install_panel()
-        if SERVER_ENV.exists():
-            configure_agent(local=True)
     else:
         configure_agent(local=False)
 
@@ -716,15 +714,40 @@ def main() -> int:
         print(f"检测结果：{role_name}  |  服务 {state_badge(relevant_state)}")
         selected = choose(
             "常用操作",
-            [
-                ("1", "查看运行状态"),
-                ("2", "查看最近日志"),
-                ("3", "更新程序"),
-                ("4", "高级设置"),
-                ("0", "退出"),
-            ],
+            (
+                [
+                    ("1", "安装中心 VPS 本机监控"),
+                    ("2", "查看运行状态"),
+                    ("3", "查看最近日志"),
+                    ("4", "更新程序"),
+                    ("5", "高级设置"),
+                    ("0", "退出"),
+                ]
+                if role == "center" and not AGENT_CONFIG.exists()
+                else [
+                    ("1", "查看运行状态"),
+                    ("2", "查看最近日志"),
+                    ("3", "更新程序"),
+                    ("4", "高级设置"),
+                    ("0", "退出"),
+                ]
+            ),
             allow_back=False,
         )
+        if role == "center" and not AGENT_CONFIG.exists():
+            if selected == "1":
+                configure_agent(local=True)
+            elif selected == "2":
+                show_overview()
+            elif selected == "3":
+                quick_logs()
+            elif selected == "4":
+                quick_update()
+            elif selected == "5":
+                advanced_menu()
+            else:
+                return 0
+            continue
         if selected == "1":
             show_overview()
         elif selected == "2":
