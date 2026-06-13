@@ -68,7 +68,7 @@ EOF
 
 apply_config() {
   info "测试 Nginx 配置..."
-  if nginx -t 2>&1 | tail -3; then
+  if nginx -t >/dev/null 2>&1; then
     systemctl reload nginx 2>/dev/null || warn "Nginx 重载失败，可能未启动。配置已写入，稍后生效。"
     ok "Nginx 已重载"
   else

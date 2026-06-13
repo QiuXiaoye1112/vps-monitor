@@ -78,8 +78,8 @@ install_system_deps() {
 setup_venv() {
   [[ ! -d "$APP_DIR/.venv" ]] && { info "创建 Python 虚拟环境..."; "$PYTHON_BIN" -m venv "$APP_DIR/.venv"; }
   info "安装 Python 依赖..."
-  "$APP_DIR/.venv/bin/pip" install --upgrade pip --quiet 2>&1 | tail -1
-  "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" --quiet 2>&1 | tail -1
+  "$APP_DIR/.venv/bin/pip" install --upgrade pip -q 2>/dev/null
+  "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" -q 2>/dev/null
   ok "Python 环境就绪"
 }
 
@@ -144,7 +144,7 @@ apply_and_start() {
     rm -f "/etc/systemd/system/$LEGACY_DASHBOARD.service"; detail "已清理旧版 dashboard 服务"
   fi
   info "测试 Nginx 配置..."
-  if ! nginx -t 2>&1 | tail -3; then warn "Nginx 配置测试失败，旧配置已备份。"; return 1; fi
+  if ! nginx -t >/dev/null 2>&1; then warn "Nginx 配置测试失败，旧配置已备份。"; return 1; fi
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME" nginx 2>/dev/null || true
   systemctl restart "$SERVICE_NAME"

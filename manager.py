@@ -166,7 +166,6 @@ def run(
     capture: bool = False,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    print(color(f"\n> {' '.join(args)}", DIM))
     return subprocess.run(
         args,
         check=check,
@@ -376,13 +375,14 @@ def ensure_apt_packages(packages: list[str]) -> None:
 def ensure_venv(requirements: str) -> None:
     if not VENV_DIR.exists():
         run([sys.executable, "-m", "venv", str(VENV_DIR)])
-    run([str(VENV_DIR / "bin/python"), "-m", "pip", "install", "--upgrade", "pip"])
+    run([str(VENV_DIR / "bin/python"), "-m", "pip", "install", "--upgrade", "pip", "-q"])
     run(
         [
             str(VENV_DIR / "bin/python"),
             "-m",
             "pip",
             "install",
+            "-q",
             "-r",
             str(PROJECT_DIR / requirements),
         ]
