@@ -74,6 +74,26 @@ def confirm(prompt: str, default: bool = False) -> bool:
     return value in {"y", "yes", "是"}
 
 
+def ask_port(prompt: str, default: int) -> int:
+    while True:
+        value = ask(prompt, str(default))
+        try:
+            port = int(value)
+        except ValueError:
+            print(color("端口必须是数字。", RED))
+            continue
+        if 1 <= port <= 65535:
+            return port
+        print(color("端口必须在 1 到 65535 之间。", RED))
+
+
+def server_url(host: str, port: int) -> str:
+    host = host.strip().rstrip("/")
+    if host.startswith("http://") or host.startswith("https://"):
+        return f"{host}:{port}"
+    return f"http://{host}:{port}"
+
+
 def choose(prompt: str, options: list[tuple[str, str]], allow_back: bool = True) -> str | None:
     print(f"\n{prompt}")
     for key, label in options:
@@ -414,8 +434,13 @@ def configure_agent(local: bool) -> None:
         return
     server_values = read_env(SERVER_ENV)
     default_token = server_values.get("VPS_MONITOR_TOKEN", "") if local else ""
-    default_url = "http://127.0.0.1:8000" if local else "http://中心VPS公网IP:8080"
-    server_url = ask("中心服务地址", default_url)
+    if local:
+        port = ask_port("中心 API 端口", 8000)
+        center_url = f"http://127.0.0.1:{port}"
+    else:
+        host = ask("中心 VPS IP 或域名")
+        port = ask_port("Agent 接入端口", 8080)
+        center_url = server_url(host, port) if host else ""
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
     token = ask("通信 token", default_token, secret=True)
@@ -426,12 +451,12 @@ def configure_agent(local: bool) -> None:
         print(color("上报间隔必须是整数。", RED))
         pause()
         return
-    if not server_url or not node_id or not token:
+    if not center_url or not node_id or not token:
         print(color("服务地址、节点 ID 和 token 不能为空。", RED))
         pause()
         return
     values: dict[str, object] = {
-        "server_url": server_url,
+        "server_url": center_url,
         "node_id": node_id,
         "name": name,
         "token": token,
