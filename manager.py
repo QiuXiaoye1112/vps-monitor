@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import getpass
 import ipaddress
 import os
@@ -666,6 +667,15 @@ def advanced_menu() -> None:
             maintenance_menu()
 
 
+def first_setup(role: str) -> None:
+    if role == "center":
+        install_panel()
+        if SERVER_ENV.exists():
+            configure_agent(local=True)
+    else:
+        configure_agent(local=False)
+
+
 def main() -> int:
     while True:
         role = installation_role()
@@ -722,6 +732,11 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
+        parser = argparse.ArgumentParser(description="VPS Monitor terminal manager")
+        parser.add_argument("--setup", choices=("center", "agent"))
+        arguments = parser.parse_args()
+        if arguments.setup:
+            first_setup(arguments.setup)
         raise SystemExit(main())
     except KeyboardInterrupt:
         print("\n已退出。")
