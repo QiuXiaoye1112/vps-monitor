@@ -1034,9 +1034,9 @@ def temp_open_for_new_agent() -> None:
         return
     title("临时开放 8080")
     port = ask("Agent 入口端口", "8080")
-    seconds = 60
+    seconds = 300
     print()
-    print(color(f"即将临时移除 TCP {port} 的 DROP 规则，持续 {seconds} 秒。", YELLOW))
+    print(color(f"即将临时移除 TCP {port} 的 DROP 规则，持续 5 分钟。", YELLOW))
     print(color("在此期间新 Agent 可以上报，刷新列表即可看到新 IP。", CYAN))
     print()
     if not confirm("确认临时开放？"):
@@ -1056,9 +1056,10 @@ def temp_open_for_new_agent() -> None:
         pause()
         return
 
-    print(color(f"已开放，请在 {seconds} 秒内启动新 Agent...", GREEN))
+    print(color("已开放，请在 5 分钟内启动新 Agent...", GREEN))
     for i in range(seconds, 0, -5):
-        print(f"\r  剩余 {i:2d} 秒...", end="", flush=True)
+        m, s = divmod(i, 60)
+        print(f"\r  剩余 {m}:{s:02d}...", end="", flush=True)
         time.sleep(5)
     print()
 
