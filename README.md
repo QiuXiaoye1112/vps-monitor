@@ -7,6 +7,28 @@
 - 对外访问强制走 Nginx
 - 没有域名就用中心 VPS 公网 IP
 
+## 终端管理面板（推荐）
+
+在任意 Debian/Ubuntu VPS 上执行一条命令，安装完成后会自动打开终端管理面板：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/install.sh)
+```
+
+部署、Agent 接入、服务管理、日志、防火墙、备份和更新都可以在面板中完成。也可以在项目目录直接启动：
+
+```bash
+sudo python3 manager.py
+```
+
+安装脚本会创建快捷入口。以后只需运行：
+
+```bash
+sudo vps-monitor
+```
+
+终端面板不依赖额外 UI 框架，使用系统 Python 即可启动。原有部署脚本继续保留，便于自动化部署和故障恢复。
+
 ## 架构
 ```text
 浏览器 -> Nginx 80/443 -> FastAPI 127.0.0.1:8000 -> SQLite
