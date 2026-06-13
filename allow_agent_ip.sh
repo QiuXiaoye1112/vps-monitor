@@ -51,8 +51,19 @@ if command -v iptables >/dev/null 2>&1; then
   iptables -S INPUT 2>/dev/null | grep -- "--dport ${AGENT_PORT}" | while read -r line; do
     [[ "$line" == *ACCEPT* ]] && printf "  ${GREEN}● ACCEPT${RESET} %s\n" "$line" || { [[ "$line" == *DROP* ]] && printf "  ${RED}● DROP${RESET}   %s\n" "$line" || printf "  ${DIM}●${RESET} %s\n" "$line"; }
   done
-  echo; printf "${YELLOW}注意：${RESET}重启后规则丢失。持久化："
-  command -v netfilter-persistent >/dev/null 2>&1 && detail "sudo netfilter-persistent save" || detail "sudo apt-get install -y iptables-persistent && sudo netfilter-persistent save"
+  echo; info "持久化防火墙规则..."
+  if ! command -v netfilter-persistent >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get install -y -qq iptables-persistent 2>/dev/null || true
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf install -y -q iptables-persistent 2>/dev/null || true
+    fi
+  fi
+  if command -v netfilter-persistent >/dev/null 2>&1; then
+    netfilter-persistent save >/dev/null 2>&1 && ok "规则已持久化，重启不丢失"
+  else
+    warn "无法持久化，重启后规则丢失。手动：sudo netfilter-persistent save"
+  fi
 
 elif command -v firewall-cmd >/dev/null 2>&1; then
   local rule="rule family='ipv4' source address='$AGENT_IP' port port='$AGENT_PORT' protocol='tcp' accept"
