@@ -1381,10 +1381,11 @@ def main() -> int:
                     ("3", "查看 token"),
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
-                    ("6", "重新部署中心面板"),
-                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("8", "更新程序"),
-                    ("9", "完整卸载"),
+                    ("6", f"防火墙配置（端口 {agent_port()}）"),
+                    ("7", "重新部署中心面板"),
+                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("9", "更新程序"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1393,10 +1394,11 @@ def main() -> int:
                     ("2", "查看 token"),
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
-                    ("5", "重新部署中心面板"),
-                    ("6", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("7", "更新程序"),
-                    ("8", "完整卸载"),
+                    ("5", f"防火墙配置（端口 {agent_port()}）"),
+                    ("6", "重新部署中心面板"),
+                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("8", "更新程序"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1424,12 +1426,14 @@ def main() -> int:
             elif selected == "5":
                 temp_open_for_new_agent()
             elif selected == "6":
-                install_panel()
+                firewall_rules_menu()
             elif selected == "7":
-                toggle_https()
+                install_panel()
             elif selected == "8":
-                quick_update()
+                toggle_https()
             elif selected == "9":
+                quick_update()
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1444,12 +1448,14 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                install_panel()
+                firewall_rules_menu()
             elif selected == "6":
-                toggle_https()
+                install_panel()
             elif selected == "7":
-                quick_update()
+                toggle_https()
             elif selected == "8":
+                quick_update()
+            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
