@@ -15,14 +15,12 @@
 
 架构：
 - `:80/443` → Nginx → `127.0.0.1:8000`（Dashboard）
-- `:8080` → Nginx → `127.0.0.1:8000`（Agent 入口，仅 `/api/`）
+- Agent 入口（默认 `:8080`）→ Nginx → `127.0.0.1:8000`（仅 `/api/`，端口可配）
 
 ## 2. 一键安装（推荐）
 
-中心 VPS 执行：
-
 ```bash
-bash <(curl -fsSL -H "Accept: application/vnd.github.raw+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/QiuXiaoye1112/vps-monitor/contents/install.sh?ref=master")
+curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/install.sh | bash
 ```
 
 安装后管理：`sudo vm`
@@ -118,58 +116,46 @@ sudo systemctl daemon-reload && sudo systemctl enable --now vps-monitor-agent
 journalctl -u vps-monitor-agent -f
 ```
 
-## 7. Agent 入口（8080）
+## 7. Agent 入口
 
-中心 VPS：
+中心 VPS，开放 Agent 上报端口（默认 8080）：
 
 ```bash
 sudo bash /opt/vps-monitor/deploy_agent_ingress.sh
 # 自定义端口：sudo AGENT_PORT=9090 bash /opt/vps-monitor/deploy_agent_ingress.sh
 ```
 
-验证：
-
-```bash
-curl http://127.0.0.1:8080/api/health   # → {"status":"ok"}
-curl -i http://127.0.0.1:8080/          # → 404
-```
-
 ## 8. IP 白名单
 
-中心 VPS（支持 iptables 和 firewalld）：
+推荐通过菜单管理：`sudo vm` → 监控主机 → 选主机 → 允许访问（自动持久化）
 
-```bash
-sudo bash /opt/vps-monitor/allow_agent_ip.sh 远程VPS_IP
-```
-
-手动 iptables：
+手动（端口根据配置替换）：
 
 ```bash
 sudo iptables -I INPUT -p tcp -s 远程VPS_IP --dport 8080 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
+sudo iptables -A INPUT -p tcp --dport 8080 ! -i lo -j DROP
 ```
 
-持久化：规则重启后丢失，稳定后
+## 9. 管理命令
 
 ```bash
-sudo apt install -y iptables-persistent && sudo netfilter-persistent save
+sudo vm    # 打开管理面板
 ```
 
-## 9. 环境变量
+菜单覆盖：运行状态、token 查看、监控主机管理、添加新主机、防火墙配置、重新部署、HTTPS 开关、更新、卸载。
+
+## 10. 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `API_HOST` | `127.0.0.1` | FastAPI 监听地址 |
-| `API_PORT` | `8000` | FastAPI 监听端口 |
-| `AGENT_PORT` | `8080` | Agent 入口端口 |
-| `APP_DIR` | `/opt/vps-monitor` | 项目目录 |
+| `VPS_MONITOR_API_HOST` | `127.0.0.1` | API 监听地址 |
+| `VPS_MONITOR_API_PORT` | `8000` | API 监听端口 |
+| `VPS_MONITOR_AGENT_PORT` | `8080` | Agent 入口端口 |
 
-所有脚本通过同名环境变量控制，写入 `/etc/vps-monitor.env` 后 systemd 自动读取。
+写入 `/etc/vps-monitor.env` 持久化。
 
-## 10. 卸载
+## 11. 卸载
 
 ```bash
-sudo vm → 高级设置 → 完整卸载
-# 或
-bash <(curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/uninstall.sh)
+sudo vm → 完整卸载
 ```
