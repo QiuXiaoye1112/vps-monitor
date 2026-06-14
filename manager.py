@@ -315,7 +315,7 @@ def install_launcher() -> None:
     launcher = textwrap.dedent(
         f"""\
         #!/usr/bin/env bash
-        exec {shlex_quote(sys.executable)} {shlex_quote(str(PROJECT_DIR / 'manager.py'))} "$@"
+        cd {shlex_quote(str(PROJECT_DIR))} && exec {shlex_quote(sys.executable)} {shlex_quote(str(PROJECT_DIR / 'manager.py'))} "$@" < /dev/tty
         """
     )
     write_text_secure(LAUNCHER, launcher, 0o755)
@@ -486,8 +486,8 @@ def install_panel() -> None:
         if command_exists("systemctl"):
             subprocess.run(["systemctl", "disable", "--now", svc], check=False, capture_output=True)
         remove_path(SYSTEMD_DIR / f"{svc}.service")
-        if command_exists("systemctl"):
-            subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
+    if command_exists("systemctl"):
+        subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
     # 清防火墙
     if command_exists("iptables"):
         port = agent_port()
@@ -763,29 +763,21 @@ def enable_https_for_domain() -> None:
         return
     if not confirm(f"为 {domain} 申请 Let's Encrypt 证书并启用 HTTPS？"):
         return
-    try:
-        ensure_apt_packages(["certbot", "python3-certbot-nginx"])
-        result = run(
-            ["certbot", "--nginx", "-d", domain, "--non-interactive", "--agree-tos",
-             "--register-unsafely-without-email", "--redirect"],
-            check=False,
-        )
-        if result.returncode == 0:
-            print(color(f"HTTPS 已启用：https://{domain}", GREEN))
-            # 确保自动续期
-            if command_exists("systemctl"):
-                subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
-                print(color("已启用证书自动续期，无需手动操作。", DIM))
-        else:
-            print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
-    except Exception as e:
-        print(color(f"操作失败：{e}", RED))
+    if enable_https(domain):
+        print(color(f"HTTPS 已启用：https://{domain}", GREEN))
+        if command_exists("systemctl"):
+            subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
+            print(color("已启用证书自动续期。", DIM))
+    else:
+        print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
     pause()
 
 
 def disable_https() -> None:
     title("关闭 HTTPS")
-    domain = ask("当前面板域名")
+    domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name")
+    if not domain:
+        domain = ask("当前面板域名")
     if not domain:
         return
     if not confirm(f"确认删除 {domain} 的 HTTPS 证书，恢复 HTTP？"):
