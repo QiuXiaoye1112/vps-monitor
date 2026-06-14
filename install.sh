@@ -30,7 +30,7 @@ rerun_as_root() {
   fi
   chmod 700 "$temp_script"
   info "需要 root 权限，正在请求 sudo..."
-  sudo env VPS_MONITOR_REPO="$REPO_URL" VPS_MONITOR_DIR="$INSTALL_DIR" VPS_MONITOR_BRANCH="$BRANCH" VPS_MONITOR_SETUP_ROLE="$SETUP_ROLE" bash "$temp_script" < /dev/tty
+  sudo env VPS_MONITOR_REPO="$REPO_URL" VPS_MONITOR_DIR="$INSTALL_DIR" VPS_MONITOR_BRANCH="$BRANCH" VPS_MONITOR_SETUP_ROLE="$SETUP_ROLE" AGENT_PORT="${AGENT_PORT:-8080}" bash "$temp_script" < /dev/tty
   rm -f "$temp_script"; exit 0
 }
 

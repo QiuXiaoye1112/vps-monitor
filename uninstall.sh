@@ -20,7 +20,7 @@ rerun_as_root() {
     curl -fsSL --max-time 30 "$raw_url" -o "$temp_script" || { rm -f "$temp_script"; fail "无法重新获取脚本。下载后运行：curl -fsSL $raw_url -o uninstall.sh && sudo bash uninstall.sh"; }
   fi
   chmod 700 "$temp_script"
-  sudo env VPS_MONITOR_DIR="$INSTALL_DIR" bash "$temp_script" < /dev/tty
+  sudo env VPS_MONITOR_DIR="$INSTALL_DIR" AGENT_PORT="${AGENT_PORT:-8080}" bash "$temp_script" < /dev/tty
   rm -f "$temp_script"; exit 0
 }
 

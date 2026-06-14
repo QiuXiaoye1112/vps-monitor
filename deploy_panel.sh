@@ -68,18 +68,25 @@ install_system_deps() {
   "$PYTHON_BIN" -c "import venv" 2>/dev/null || missing+=("python3-venv")
   [[ ${#missing[@]} -eq 0 ]] && { ok "系统依赖已就绪"; return; }
   info "正在安装：${missing[*]}"
-  if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq "${missing[@]}"
-  elif command -v dnf >/dev/null 2>&1; then dnf install -y -q "${missing[@]}"
-  elif command -v yum >/dev/null 2>&1; then yum install -y -q "${missing[@]}"
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq 2>/dev/null || warn "apt update 失败，继续安装..."
+    apt-get install -y -qq "${missing[@]}" 2>/dev/null || fail "apt 安装失败，请检查网络后手动执行：apt-get install -y ${missing[*]}"
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y -q "${missing[@]}" || fail "dnf 安装失败。"
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y -q "${missing[@]}" || fail "yum 安装失败。"
   else fail "不支持的包管理器。请手动安装：${missing[*]}"; fi
   ok "系统依赖安装完成"
 }
 
 setup_venv() {
-  [[ ! -d "$APP_DIR/.venv" ]] && { info "创建 Python 虚拟环境..."; "$PYTHON_BIN" -m venv "$APP_DIR/.venv"; }
+  if [[ ! -d "$APP_DIR/.venv" ]]; then
+    info "创建 Python 虚拟环境..."
+    "$PYTHON_BIN" -m venv "$APP_DIR/.venv" || fail "创建虚拟环境失败，请确认 python3-venv 已安装。"
+  fi
   info "安装 Python 依赖..."
-  "$APP_DIR/.venv/bin/pip" install --upgrade pip -q 2>/dev/null
-  "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" -q 2>/dev/null
+  "$APP_DIR/.venv/bin/pip" install --upgrade pip -q 2>/dev/null || true
+  "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" -q 2>/dev/null || fail "pip 安装依赖失败，请检查网络连接。"
   ok "Python 环境就绪"
 }
 
