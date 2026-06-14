@@ -118,13 +118,13 @@ install_dependencies() {
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -qq 2>/dev/null || { warn "apt-get update 失败，继续尝试安装..."; }
-    apt-get install -y -qq git python3 python3-venv python3-pip ca-certificates curl 2>&1 | tail -3 || fail "apt-get install 失败，请手动安装 git python3 curl 后重试。"
+    apt-get install -y -qq git python3 python3-venv python3-pip ca-certificates curl 2>/dev/null || fail "apt-get install 失败，请手动安装 git python3 curl 后重试。"
     ok "依赖安装完成"
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y git python3 python3-pip ca-certificates curl 2>&1 | tail -3 || fail "dnf install 失败。"
+    dnf install -y git python3 python3-pip ca-certificates curl 2>/dev/null || fail "dnf install 失败。"
     ok "依赖安装完成"
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y git python3 python3-pip ca-certificates curl 2>&1 | tail -3 || fail "yum install 失败。"
+    yum install -y git python3 python3-pip ca-certificates curl 2>/dev/null || fail "yum install 失败。"
     ok "依赖安装完成"
   else
     fail "不支持当前包管理器。请手动安装：git python3 curl"
@@ -138,9 +138,9 @@ fresh_install() {
   info "仓库：$REPO_URL"
   mkdir -p "$(dirname "$INSTALL_DIR")"
   if [[ -n "$BRANCH" ]]; then
-    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 --branch "$BRANCH" -q "$REPO_URL" "$INSTALL_DIR"
   else
-    git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+    git clone --depth 1 -q "$REPO_URL" "$INSTALL_DIR"
   fi
 }
 
