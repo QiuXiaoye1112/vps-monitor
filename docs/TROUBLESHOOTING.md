@@ -1,209 +1,83 @@
 # 常见问题排查
 
-## Dashboard 能打开，但节点 offline
+## Dashboard 打不开
 
-在中心 VPS 检查 API：
+1. 确认 DNS 解析到 VPS IP
+2. VPS 上检查：`curl http://127.0.0.1:8000/api/health`
+3. 检查服务：`systemctl status vps-monitor-api`
 
-```bash
-curl http://127.0.0.1:8000/api/health
-```
+## 节点 offline
 
-在中心 VPS 查看节点数据：
-
-```bash
-curl http://127.0.0.1:8000/api/nodes
-```
-
-在被监控 VPS 查看 Agent 状态：
+在对应节点检查 Agent：
 
 ```bash
 systemctl status vps-monitor-agent
-```
-
-在被监控 VPS 查看 Agent 日志：
-
-```bash
 journalctl -u vps-monitor-agent -f
 ```
 
-手动上报一次：
+手动测试上报：
 
 ```bash
-python /opt/vps-monitor/agent.py --config /etc/vps-monitor-agent.toml --once
+/opt/vps-monitor/.venv/bin/python /opt/vps-monitor/agent.py --config /etc/vps-monitor-agent.toml --once
 ```
 
-在中心 VPS 检查 8080 放行规则：
+检查 token 是否与中心一致：
 
 ```bash
-sudo iptables -S INPUT | grep -- '--dport 8080'
+cat /etc/vps-monitor-agent.toml | grep token
+sudo cat /etc/vps-monitor.env | grep TOKEN
 ```
 
-## Agent 日志 404
+## Agent 401
 
-通常是 `server_url` 写错了，或者远程 Agent 打到了 Dashboard 域名的非 API 入口。
-
-查看配置：
-
-```bash
-cat /etc/vps-monitor-agent.toml
-```
-
-远程 VPS 推荐：
-
-```toml
-server_url = "http://中心VPS公网IP:8080"
-```
-
-测试 8080 API：
-
-```bash
-curl -i http://中心VPS公网IP:8080/api/health
-```
-
-在中心 VPS 测试根路径应返回 404：
-
-```bash
-curl -i http://127.0.0.1:8080/
-```
-
-## Agent 日志 401
-
-`401` 表示 token 不一致。
-
-在中心 VPS 查看 token：
-
-```bash
-sudo cat /etc/vps-monitor.env
-```
-
-在被监控 VPS 查看 token：
-
-```bash
-sudo cat /etc/vps-monitor-agent.toml
-```
-
-改完 token 后重启 Agent：
+token 不一致。确保中心和 Agent 的 token 相同。改完后重启 Agent：
 
 ```bash
 sudo systemctl restart vps-monitor-agent
 ```
 
-## HTTPS 后 Agent 无法上报
+## Agent 404 / 无法连接
 
-远程 Agent 不建议默认走 HTTPS 域名。
-
-查看配置：
-
-```bash
-cat /etc/vps-monitor-agent.toml
-```
-
-推荐改成：
+检查 `server_url` 是否正确。远程 Agent 应使用：
 
 ```toml
 server_url = "http://中心VPS公网IP:8080"
 ```
 
-测试：
+而不是域名（域名可能走了 HTTPS/CDN）。
+
+测试连通性：
 
 ```bash
 curl -i http://中心VPS公网IP:8080/api/health
 ```
 
-重启 Agent：
+## 验证入口卡住
+
+旧 iptables DROP 规则拦截了本地回路。手动删除后重新放行：
 
 ```bash
-sudo systemctl restart vps-monitor-agent
+iptables -D INPUT -p tcp --dport 8080 -j DROP
 ```
 
-## Cloudflare 小黄云异常
+然后用菜单重新配置白名单：`sudo vm` → 监控主机 → 选主机 → 允许访问。
 
-Dashboard 可以通过 Cloudflare 访问，但 SSL/TLS 不建议用 Flexible。
+## 更新不生效
 
-检查 Cloudflare SSL/TLS：
+更新是写到磁盘的，需要退出 `sudo vm` 再重新打开。
 
-```text
-SSL/TLS -> Overview -> Full 或 Full strict
-```
-
-在中心 VPS 检查 Nginx：
+如果更新本身失败（网络问题），手动执行：
 
 ```bash
-nginx -t
+cd /opt/vps-monitor && git fetch origin && git reset --hard origin/master
 ```
 
-检查 HTTPS：
+## 节点 ID 冲突
 
-```bash
-curl -I https://monitor.example.com
-```
-
-如果 Agent 通过域名上报异常，把 Agent 改回中心 VPS 公网 IP 的 8080：
-
-```toml
-server_url = "http://中心VPS公网IP:8080"
-```
-
-## 同一个节点名字来回跳
-
-这是两台机器用了同一个 `node_id`。
-
-在中心 VPS 查看节点：
-
-```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "SELECT id,name,last_seen_at FROM nodes;"
-```
-
-在每台 VPS 查看自己的 `node_id`：
+两台机器用了相同的 `node_id`：
 
 ```bash
 grep node_id /etc/vps-monitor-agent.toml
 ```
 
-每台 VPS 必须使用不同 `node_id`。改完重启 Agent：
-
-```bash
-sudo systemctl restart vps-monitor-agent
-```
-
-## 出现脏节点
-
-脏节点通常是测试时留下的旧 `node_id`。
-
-查看节点：
-
-```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "SELECT id,name,last_seen_at FROM nodes;"
-```
-
-只保留指定节点：
-
-```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM nodes WHERE id NOT IN ('node-01','node-02');"
-```
-
-清理旧指标：
-
-```bash
-sqlite3 /opt/vps-monitor/vps_monitor.db "DELETE FROM metrics WHERE node_id NOT IN ('node-01','node-02');"
-```
-
-## git pull 后本地修改丢失
-
-先看本地改动：
-
-```bash
-git status
-```
-
-如果确认服务器上的本地改动不要了，强制同步 GitHub：
-
-```bash
-git fetch --all
-```
-
-```bash
-git reset --hard origin/master
-```
-
-注意：这会丢弃 `/opt/vps-monitor` 目录里的本地代码改动。正常部署时，配置文件在 `/etc/vps-monitor-agent.toml` 和 `/etc/vps-monitor.env`，不会被这条命令覆盖。
+每台必须不同。改完重启 Agent。
