@@ -45,7 +45,7 @@ check_project() {
   command -v git >/dev/null 2>&1 || fail "git 未安装且项目目录 $APP_DIR 不存在。"
   info "正在自动 clone 项目..."
   mkdir -p "$(dirname "$APP_DIR")"
-  git clone --depth 1 "$REPO_URL" "$APP_DIR" 2>&1 | tail -3 || fail "clone 失败。git clone $REPO_URL $APP_DIR"
+  git clone --depth 1 "$REPO_URL" "$APP_DIR" 2>/dev/null || fail "clone 失败，请检查网络。手动：git clone $REPO_URL $APP_DIR"
   ok "项目已 clone 到 $APP_DIR"
 }
 
@@ -152,10 +152,10 @@ apply_and_start() {
   fi
   info "测试 Nginx 配置..."
   if ! nginx -t >/dev/null 2>&1; then warn "Nginx 配置测试失败，旧配置已备份。"; return 1; fi
-  systemctl daemon-reload
+  systemctl daemon-reload 2>/dev/null
   systemctl enable "$SERVICE_NAME" nginx 2>/dev/null || true
-  systemctl restart "$SERVICE_NAME"
-  systemctl reload nginx
+  systemctl restart "$SERVICE_NAME" 2>/dev/null
+  systemctl reload nginx 2>/dev/null
   ok "服务已启动"
 }
 
@@ -164,12 +164,12 @@ enable_https() {
   info "检测到域名，正在申请 HTTPS 证书..."
   if ! command -v certbot >/dev/null 2>&1; then
     detail "安装 certbot..."
-    { command -v apt-get >/dev/null 2>&1 && apt-get install -y -qq certbot python3-certbot-nginx 2>&1 | tail -1; } || \
-    { command -v dnf >/dev/null 2>&1 && dnf install -y -q certbot python3-certbot-nginx 2>&1 | tail -1; } || \
-    { command -v yum >/dev/null 2>&1 && yum install -y -q certbot python3-certbot-nginx 2>&1 | tail -1; } || \
+    { command -v apt-get >/dev/null 2>&1 && apt-get install -y -qq certbot python3-certbot-nginx 2>/dev/null; } || \
+    { command -v dnf >/dev/null 2>&1 && dnf install -y -q certbot python3-certbot-nginx 2>/dev/null; } || \
+    { command -v yum >/dev/null 2>&1 && yum install -y -q certbot python3-certbot-nginx 2>/dev/null; } || \
     { warn "无法自动安装 certbot，跳过 HTTPS"; https_ok=false; return; }
   fi
-  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>&1 | tail -5; then
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>/dev/null; then
     ok "HTTPS 证书已启用：https://${DOMAIN}"; https_ok=true
     systemctl enable --now certbot.timer 2>/dev/null || true
     detail "证书自动续期已启用"
