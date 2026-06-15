@@ -580,8 +580,23 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
     server_values = read_env(SERVER_ENV)
     default_token = server_values.get("VPS_MONITOR_TOKEN", "") if local else ""
     if local:
-        port = int(server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or 8000)
+        current_port = int(server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or 8000)
+        port = ask_port("本机上报端口", current_port)
         center_url = f"http://127.0.0.1:{port}"
+        if port != current_port and SERVER_ENV.exists():
+            server_values["VPS_MONITOR_API_PORT"] = str(port)
+            os.environ["VPS_MONITOR_API_PORT"] = str(port)
+            new_env = "".join(f"{k}={v}\n" for k, v in server_values.items() if k.startswith("VPS_MONITOR_"))
+            write_text_secure(SERVER_ENV, new_env)
+            write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
+            nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
+            if nginx_site.exists():
+                domain = nginx_value(nginx_site, "server_name") or "_"
+                write_text_secure(nginx_site, panel_nginx_config(domain), 0o644)
+                run(["nginx", "-t"], check=False)
+                run(["systemctl", "reload", "nginx"], check=False)
+            run(["systemctl", "daemon-reload"], check=False)
+            run(["systemctl", "restart", API_SERVICE], check=False)
     elif install:
         host = ask_ip("中心 VPS IP")
         port = ask_port("Agent 接入端口", int(agent_port()))
