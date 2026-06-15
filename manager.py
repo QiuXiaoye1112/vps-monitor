@@ -775,6 +775,10 @@ def ingress_menu() -> None:
                 env["AGENT_PORT"] = str(port)
                 env["API_PORT"] = str(api_port)
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
+                if port != old:
+                    remove_firewall_port_rules(str(old))
+                    save_firewall()
+                    print(color(f"已清理旧端口 {old} 的防火墙规则。", GREEN))
             elif selected == "2":
                 run(["iptables", "-S", "INPUT"], check=False)
             else:
