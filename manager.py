@@ -539,17 +539,10 @@ def install_panel() -> None:
         ingress_env = os.environ.copy()
         ingress_env["AGENT_PORT"] = agent_port()
         run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
-        https_enabled = False
-        if not is_ip_address(domain):
-            print("\n检测到域名，正在自动申请 SSL 证书...")
-            https_enabled = enable_https(domain)
-        ok, detail = health_check(f"{api_base_url()}/api/health", timeout=5)
         print(color("\n中心面板部署完成。", GREEN))
-        print(f"访问地址：{'https' if https_enabled else 'http'}://{domain}")
-        if not is_ip_address(domain) and not https_enabled:
-            print(color("SSL 申请失败，请确认域名已解析到本机且公网 80 端口可访问。当前可先使用 HTTP。", YELLOW))
-        if not ok:
-            print(color("API 启动中，稍后刷新页面即可。", DIM))
+        print(f"访问地址：http://{domain}")
+        if not is_ip_address(domain):
+            print(color("如需 HTTPS：sudo vm → 开启 HTTPS", DIM))
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\n部署失败：{exc}", RED))
@@ -768,18 +761,22 @@ def enable_https_for_domain() -> None:
     if selected is None:
         return
     if selected == "2":
-        domain = ask("新域名")
-        if not domain:
+        new_domain = ask("新域名")
+        if not new_domain:
             return
+        # 删旧证书
+        if command_exists("certbot"):
+            run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
         # 更新 nginx 配置的域名
         write_text_secure(
             Path("/etc/nginx/sites-available/vps-monitor.conf"),
-            panel_nginx_config(domain),
+            panel_nginx_config(new_domain),
             0o644,
         )
         run(["nginx", "-t"], check=False)
         run(["systemctl", "reload", "nginx"], check=False)
-        print(color(f"域名已更新为 {domain}。", GREEN))
+        print(color(f"域名已从 {domain} 更换为 {new_domain}，旧证书已删除。", GREEN))
+        domain = new_domain
     if not confirm(f"为 {domain} 申请 Let's Encrypt 证书？"):
         return
     if enable_https(domain):

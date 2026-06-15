@@ -200,12 +200,10 @@ print_preflight() {
 }
 
 print_result() {
-  local proto; ${https_ok:-false} && proto="https" || proto="http"
   echo; printf "${BOLD}${GREEN}╔══════════════════════════════════════════╗\n║          ✓  部署完成！                   ║\n╚══════════════════════════════════════════╝${RESET}\n\n"
-  printf "${BOLD}访问地址：${RESET}\n  Dashboard  ${CYAN}%s://%s${RESET}\n  API        ${CYAN}http://%s:%s${RESET}\n  Token      ${DIM}%s${RESET}\n" "$proto" "$DOMAIN" "$API_HOST" "$API_PORT" "$TOKEN"
+  printf "${BOLD}访问地址：${RESET}\n  Dashboard  ${CYAN}http://%s${RESET}\n  API        ${CYAN}http://%s:%s${RESET}\n  Token      ${DIM}%s${RESET}\n" "$DOMAIN" "$API_HOST" "$API_PORT" "$TOKEN"
   echo; printf "${BOLD}管理命令：${RESET} ${CYAN}sudo vm${RESET}\n"
-  if ! ${https_ok:-false} && $is_domain; then echo; warn "HTTPS 未启用，稍后：sudo certbot --nginx -d ${DOMAIN}"; fi
-  echo; printf "${BOLD}下一步：${RESET}\n  1 浏览器打开 ${CYAN}%s://%s${RESET}\n  2 开放 Agent 入口：${DIM}sudo bash %s/deploy_agent_ingress.sh${RESET}\n\n" "$proto" "$DOMAIN" "$APP_DIR"
+  echo; printf "${BOLD}下一步：${RESET}\n  1 浏览器打开 ${CYAN}http://%s${RESET}\n  2 如需 HTTPS：${DIM}sudo vm → 开启 HTTPS${RESET}\n  3 开放 Agent 入口：${DIM}sudo bash %s/deploy_agent_ingress.sh${RESET}\n\n" "$DOMAIN" "$APP_DIR"
 }
 
 main() {
@@ -223,7 +221,6 @@ main() {
   if ! apply_and_start; then
     warn "服务启动遇到问题，配置已备份。"; warn "journalctl -u $SERVICE_NAME -n 50"; exit 1
   fi
-  _step "申请 HTTPS 证书";    enable_https
   print_result
 }
 
