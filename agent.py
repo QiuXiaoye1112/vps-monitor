@@ -112,12 +112,24 @@ def report_once(
     config: dict[str, Any],
     previous_net: dict[str, float] | None,
     cpu_percent: float | None = None,
+    monthly_baseline: dict[str, int] | None = None,
 ) -> dict[str, float]:
     metrics, current_net = collect_metrics(
         disk_paths=config["disk_paths"],
         previous_net=previous_net,
         cpu_percent=cpu_percent,
     )
+    # 月度流量
+    month_key = time.strftime("%Y-%m")
+    if monthly_baseline is None or monthly_baseline.get("key") != month_key:
+        monthly_baseline = {
+            "key": month_key,
+            "sent": current_net["bytes_sent"],
+            "recv": current_net["bytes_recv"],
+        }
+    metrics["net_tx_month"] = max(0, int(current_net["bytes_sent"] - monthly_baseline["sent"]))
+    metrics["net_rx_month"] = max(0, int(current_net["bytes_recv"] - monthly_baseline["recv"]))
+
     payload = {"node_id": config["node_id"], **metrics}
     response = requests.post(
         api_url(config, "/api/metrics"),
@@ -126,11 +138,12 @@ def report_once(
         timeout=request_timeout(config),
     )
     response.raise_for_status()
-    return current_net
+    return current_net, monthly_baseline
 
 
 def run_agent(config: dict[str, Any], once: bool = False) -> int:
     previous_net: dict[str, float] | None = None
+    monthly_baseline: dict[str, Any] | None = None
     register_after = 0.0
     next_report_at = time.monotonic()
     cpu_sampler = None if once else CpuSampler(float(config["interval"]))
@@ -149,7 +162,7 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 register_after = started_at + 300
             cpu_percent = cpu_sampler.current() if cpu_sampler else None
             report_started_at = time.monotonic()
-            previous_net = report_once(config, previous_net, cpu_percent=cpu_percent)
+            previous_net, monthly_baseline = report_once(config, previous_net, cpu_percent=cpu_percent, monthly_baseline=monthly_baseline)
             elapsed_ms = int((time.monotonic() - report_started_at) * 1000)
             print(f"reported metrics in {elapsed_ms}ms", flush=True)
             if once:

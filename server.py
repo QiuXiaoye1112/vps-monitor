@@ -377,6 +377,8 @@ class MetricPayload(BaseModel):
     net_download_bps: float
     net_bytes_sent: int
     net_bytes_recv: int
+    net_tx_month: int = 0
+    net_rx_month: int = 0
     uptime_seconds: float | None = None
     load_1: float | None = None
     load_5: float | None = None
