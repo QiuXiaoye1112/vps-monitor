@@ -2,4 +2,5 @@ psutil>=5.9
 requests>=2.31
 fastapi>=0.110
 uvicorn>=0.27
+tomli>=2.0; python_version < "3.11"
 eval-type-backport>=0.2; python_version < "3.10"

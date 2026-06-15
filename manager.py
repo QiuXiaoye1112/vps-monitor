@@ -312,10 +312,11 @@ def enable_https(domain: str) -> bool:
 
 
 def install_launcher() -> None:
+    venv_python = str(VENV_DIR / "bin" / "python")
     launcher = textwrap.dedent(
         f"""\
         #!/usr/bin/env bash
-        cd {shlex_quote(str(PROJECT_DIR))} && exec {shlex_quote(sys.executable)} {shlex_quote(str(PROJECT_DIR / 'manager.py'))} "$@" < /dev/tty
+        cd {shlex_quote(str(PROJECT_DIR))} && exec {shlex_quote(venv_python)} {shlex_quote(str(PROJECT_DIR / 'manager.py'))} "$@" < /dev/tty
         """
     )
     write_text_secure(LAUNCHER, launcher, 0o755)

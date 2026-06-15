@@ -164,7 +164,7 @@ install_or_update() {
 install_entrypoint() {
   cat > /usr/local/bin/vm <<EOF
 #!/usr/bin/env bash
-cd "$INSTALL_DIR" && exec python3 "$INSTALL_DIR/manager.py" "\$@" < /dev/tty
+cd "$INSTALL_DIR" && exec "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/manager.py" "\$@" < /dev/tty
 EOF
   chmod 755 /usr/local/bin/vm
 }
