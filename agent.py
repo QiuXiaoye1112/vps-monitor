@@ -127,14 +127,17 @@ def report_once(
     if passed:
         month_key = time.strftime("%Y-%m")
     else:
-        # 还没到重置日/时，算上个月
         prev = time.localtime(time.time() - 86400 * (now.tm_mday + 1))
         month_key = time.strftime("%Y-%m", prev)
     if monthly_baseline is None or monthly_baseline.get("key") != month_key:
+        # 新月份：扣除用户自定义的已用流量（GB），调整基线
+        offset_gb = float(os.getenv("VPS_MONITOR_TRAFFIC_OFFSET_GB", "0"))
+        offset_bytes = int(offset_gb * 1073741824)
+        # 把 offset 均分到收发
         monthly_baseline = {
             "key": month_key,
-            "sent": current_net["bytes_sent"],
-            "recv": current_net["bytes_recv"],
+            "sent": current_net["bytes_sent"] - offset_bytes // 2,
+            "recv": current_net["bytes_recv"] - offset_bytes // 2,
         }
     metrics["net_tx_month"] = max(0, int(current_net["bytes_sent"] - monthly_baseline["sent"]))
     metrics["net_rx_month"] = max(0, int(current_net["bytes_recv"] - monthly_baseline["recv"]))

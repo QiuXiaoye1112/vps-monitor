@@ -1059,13 +1059,14 @@ def edit_node_info() -> None:
         print(f"  节点 ID：{config.get('node_id', '-')}")
         print(f"  流量重置：每月 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_DAY', '1')} 号 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_HOUR', '0')}:00")
         print(f"  月流量上限：{os.getenv('VPS_MONITOR_TRAFFIC_LIMIT_GB', '0')} GB")
+        print(f"  当前已用：{os.getenv('VPS_MONITOR_TRAFFIC_OFFSET_GB', '0')} GB")
         print(f"  上报间隔：{config.get('interval', '1')} 秒")
         print()
         selected = choose("选择要修改的项", [
             ("1", "显示名称"), ("2", "节点 ID"), ("3", "流量重置时间"),
-            ("4", "月流量上限"), ("5", "上报间隔"), ("6", "保存并退出"),
+            ("4", "月流量上限"), ("5", "当前已用流量"), ("6", "上报间隔"), ("7", "保存并退出"),
         ])
-        if selected is None or selected == "6":
+        if selected is None or selected == "7":
             break
         if selected == "1":
             val = ask("显示名称", config.get("name", ""))
@@ -1082,6 +1083,9 @@ def edit_node_info() -> None:
             val = ask("月流量上限（GB，0=不限制）", os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
             if val: os.environ["VPS_MONITOR_TRAFFIC_LIMIT_GB"] = val
         elif selected == "5":
+            val = ask("当前已用流量（GB）", os.getenv("VPS_MONITOR_TRAFFIC_OFFSET_GB", "0"))
+            if val: os.environ["VPS_MONITOR_TRAFFIC_OFFSET_GB"] = val
+        elif selected == "6":
             val = ask("上报间隔（秒）", str(config.get("interval", "1")))
             if val and val.isdigit(): config["interval"] = int(val)
 
@@ -1102,7 +1106,7 @@ def edit_node_info() -> None:
     write_text_secure(AGENT_CONFIG, content)
     env_path = SERVER_ENV
     env_lines = env_path.read_text().splitlines() if env_path.exists() else []
-    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB"):
+    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB", "VPS_MONITOR_TRAFFIC_OFFSET_GB"):
         val = os.getenv(key, "")
         found = False
         for i, line in enumerate(env_lines):
