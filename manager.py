@@ -35,8 +35,9 @@ AGENT_SERVICE = "vps-monitor-agent"
 
 
 def api_base_url() -> str:
-    host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
-    port = os.getenv("VPS_MONITOR_API_PORT", "8000")
+    env = read_env(SERVER_ENV)
+    host = env.get("VPS_MONITOR_API_HOST") or os.getenv("VPS_MONITOR_API_HOST") or "127.0.0.1"
+    port = env.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or "8000"
     return f"http://{host}:{port}"
 
 
