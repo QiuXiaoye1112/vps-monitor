@@ -1023,6 +1023,18 @@ def installation_role() -> str:
     return "new"
 
 
+def restart_services() -> None:
+    title("重启服务")
+    for svc in (API_SERVICE, AGENT_SERVICE):
+        active, _ = service_state(svc)
+        if active == "active":
+            run(["systemctl", "restart", svc], check=False)
+            print(color(f"{svc} 已重启。", GREEN))
+        else:
+            print(f"{svc} 未运行，跳过。")
+    pause()
+
+
 def quick_update() -> None:
     title("更新 VPS Monitor")
     if not require_root():
@@ -1364,7 +1376,8 @@ def main() -> int:
                     ("7", "重新部署中心面板"),
                     ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
                     ("9", "更新程序"),
-                    ("10", "完整卸载"),
+                    ("10", "重启服务"),
+                    ("11", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1377,7 +1390,8 @@ def main() -> int:
                     ("6", "重新部署中心面板"),
                     ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
                     ("8", "更新程序"),
-                    ("9", "完整卸载"),
+                    ("9", "重启服务"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1387,7 +1401,8 @@ def main() -> int:
                     ("3", "重新配置 Agent"),
                     ("4", "删除 Agent"),
                     ("5", "更新程序"),
-                    ("6", "完整卸载"),
+                    ("6", "重启服务"),
+                    ("7", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1413,6 +1428,8 @@ def main() -> int:
             elif selected == "9":
                 quick_update()
             elif selected == "10":
+                restart_services()
+            elif selected == "11":
                 full_uninstall()
             else:
                 return 0
@@ -1435,6 +1452,8 @@ def main() -> int:
             elif selected == "8":
                 quick_update()
             elif selected == "9":
+                restart_services()
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1450,6 +1469,8 @@ def main() -> int:
         elif selected == "5":
             quick_update()
         elif selected == "6":
+            restart_services()
+        elif selected == "7":
             full_uninstall()
         else:
             return 0
