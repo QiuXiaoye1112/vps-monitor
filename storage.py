@@ -223,7 +223,7 @@ def status_from_last_seen(last_seen_at: str | None) -> str:
     seen = parse_datetime(last_seen_at)
     if seen is None:
         return "offline"
-    return "online" if utc_now() - seen <= timedelta(seconds=OFFLINE_AFTER_SECONDS) else "offline"
+    return "online" if utc_now() - seen < timedelta(seconds=OFFLINE_AFTER_SECONDS) else "offline"
 
 
 def decode_json(value: str | None, default: Any) -> Any:
