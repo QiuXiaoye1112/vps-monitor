@@ -309,7 +309,12 @@ DASHBOARD_HTML = """<!doctype html>
 
         const lastSeen = document.createElement("div");
         lastSeen.className = "last-seen";
-        lastSeen.textContent = `最后上报：${fmtAge(node.last_seen_at, serverNow)} · ${fmtTime(node.last_seen_at)}`;
+        let bootInfo = "";
+        if (metric.uptime_seconds) {
+          const bootTime = new Date(new Date(serverNow).getTime() - metric.uptime_seconds * 1000);
+          bootInfo = ` · 上次启动：${fmtTime(bootTime.toISOString())}`;
+        }
+        lastSeen.textContent = `最后上报：${fmtAge(node.last_seen_at, serverNow)}${bootInfo}`;
         card.append(head, metrics, lastSeen);
         content.append(card);
       }
