@@ -224,7 +224,6 @@ main() {
     warn "服务启动遇到问题，配置已备份。"; warn "journalctl -u $SERVICE_NAME -n 50"; exit 1
   fi
   _step "申请 HTTPS 证书";    enable_https
-  wait_for_api || true
   print_result
 }
 
