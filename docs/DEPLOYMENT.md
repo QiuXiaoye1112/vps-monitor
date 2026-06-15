@@ -75,6 +75,10 @@ interval = 1
 name = "中心 VPS"
 os_type = "Linux"
 disk_paths = ["/"]
+traffic_reset_day = 0
+traffic_reset_hour = 0
+traffic_limit_gb = 0
+traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
 
 ```bash
@@ -107,7 +111,13 @@ interval = 1
 name = "Example Node"
 os_type = "Linux"
 disk_paths = ["/"]
+traffic_reset_day = 0
+traffic_reset_hour = 4
+traffic_limit_gb = 0
+traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
+
+流量账期配置保存在每台 Agent 自己的 TOML 中，因此不同主机可以使用不同的重置日和小时。`traffic_reset_day = 0` 表示持续累计、不自动重置；`traffic_limit_gb = 0` 表示无上限，面板显示已使用流量和固定满格进度条，但不显示百分比。如果不设置重置时间但设置了流量上限，面板仍会显示累计占用、额度百分比和进度条，但不会按月清零。
 
 ```bash
 .venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once  # 测试
@@ -151,6 +161,8 @@ sudo vm    # 打开管理面板
 | `VPS_MONITOR_API_HOST` | `127.0.0.1` | API 监听地址 |
 | `VPS_MONITOR_API_PORT` | `8000` | API 监听端口 |
 | `VPS_MONITOR_AGENT_PORT` | `8080` | Agent 入口端口 |
+| `VPS_MONITOR_METRIC_RETENTION_DAYS` | `2` | 原始指标保留天数，`0` 表示不自动清理 |
+| `VPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS` | `3600` | 指标清理检查间隔 |
 
 写入 `/etc/vps-monitor.env` 持久化。
 

@@ -62,5 +62,7 @@ cd /opt/vps-monitor && git fetch origin && git reset --hard origin/master
 | VPS_MONITOR_AGENT_PORT | 8080 | Agent 入口端口 |
 | VPS_MONITOR_API_HOST | 127.0.0.1 | API 监听地址 |
 | VPS_MONITOR_API_PORT | 8000 | API 监听端口 |
+| VPS_MONITOR_METRIC_RETENTION_DAYS | 2 | 原始指标保留天数，0 表示不清理 |
+| VPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS | 3600 | 指标清理检查间隔 |
 
 持久化到 `/etc/vps-monitor.env` 后 systemd 自动读取。

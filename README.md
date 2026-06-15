@@ -11,3 +11,11 @@ curl -fsSL https://raw.githubusercontent.com/QiuXiaoye1112/vps-monitor/master/in
 ```bash
 sudo vm
 ```
+
+## 开发验证
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+```

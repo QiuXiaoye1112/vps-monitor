@@ -8,6 +8,8 @@ Agent 写入接口需要 token，通过 Header 传递：
 Authorization: Bearer <token>
 ```
 
+也支持 `X-Monitor-Token` Header。为避免 token 出现在代理和访问日志中，不支持 URL 查询参数传递。
+
 生成 token：
 
 ```bash

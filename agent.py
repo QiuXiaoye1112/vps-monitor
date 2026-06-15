@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import calendar
+import json
 import os
 import platform
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,9 +39,19 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config.setdefault("os_type", os.getenv("VPS_MONITOR_NODE_OS", platform.system()))
     config.setdefault("note", os.getenv("VPS_MONITOR_NODE_NOTE", ""))
     config.setdefault("disk_paths", os.getenv("VPS_MONITOR_DISK_PATHS", ",".join(default_disk_paths())))
+    config.setdefault("traffic_reset_day", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "0")))
+    config.setdefault("traffic_reset_hour", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0")))
+    config.setdefault("traffic_limit_gb", float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0")))
+    config.setdefault("traffic_offset_gb", float(os.getenv("VPS_MONITOR_TRAFFIC_OFFSET_GB", "0")))
+    default_state_path = (path or Path("agent.toml")).with_suffix(".traffic-state.json")
+    config.setdefault("traffic_state_path", os.getenv("VPS_MONITOR_TRAFFIC_STATE", str(default_state_path)))
 
     config["disk_paths"] = parse_items(config.get("disk_paths"))
     config["interval"] = max(1, int(config["interval"]))
+    config["traffic_reset_day"] = min(31, max(0, int(config["traffic_reset_day"])))
+    config["traffic_reset_hour"] = min(23, max(0, int(config["traffic_reset_hour"])))
+    config["traffic_limit_gb"] = max(0.0, float(config["traffic_limit_gb"]))
+    config["traffic_offset_gb"] = max(0.0, float(config["traffic_offset_gb"]))
     return config
 
 
@@ -108,40 +121,104 @@ class CpuSampler:
                 self.value = float(value)
 
 
+def traffic_cycle_key(now: datetime, reset_day: int, reset_hour: int) -> str:
+    def cycle_start(year: int, month: int) -> datetime:
+        day = min(reset_day, calendar.monthrange(year, month)[1])
+        return now.replace(year=year, month=month, day=day, hour=reset_hour, minute=0, second=0, microsecond=0)
+
+    start = cycle_start(now.year, now.month)
+    if now < start:
+        if now.month == 1:
+            start = cycle_start(now.year - 1, 12)
+        else:
+            start = cycle_start(now.year, now.month - 1)
+    return start.isoformat()
+
+
+def load_traffic_state(path: Path) -> dict[str, Any]:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def save_traffic_state(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    persisted = {key: value for key, value in state.items() if not key.startswith("_")}
+    temporary.write_text(json.dumps(persisted, separators=(",", ":")), encoding="utf-8")
+    temporary.chmod(0o600)
+    temporary.replace(path)
+
+
+def update_monthly_traffic(
+    current_net: dict[str, float],
+    config: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    current_time = now or datetime.now().astimezone()
+    reset_day = int(config["traffic_reset_day"])
+    cycle = (
+        traffic_cycle_key(current_time, reset_day, int(config["traffic_reset_hour"]))
+        if reset_day > 0
+        else "never"
+    )
+    current_sent = int(current_net["bytes_sent"])
+    current_recv = int(current_net["bytes_recv"])
+    cycle_changed = state.get("cycle") != cycle
+    if cycle_changed:
+        offset_bytes = int(float(config["traffic_offset_gb"]) * 1073741824)
+        state.clear()
+        state.update(
+            {
+                "cycle": cycle,
+                "last_sent": current_sent,
+                "last_recv": current_recv,
+                "tx": offset_bytes // 2,
+                "rx": offset_bytes - offset_bytes // 2,
+            }
+        )
+        return True
+
+    previous_sent = int(state.get("last_sent", current_sent))
+    previous_recv = int(state.get("last_recv", current_recv))
+    sent_delta = current_sent - previous_sent if current_sent >= previous_sent else current_sent
+    recv_delta = current_recv - previous_recv if current_recv >= previous_recv else current_recv
+    state["tx"] = max(0, int(state.get("tx", 0)) + sent_delta)
+    state["rx"] = max(0, int(state.get("rx", 0)) + recv_delta)
+    state["last_sent"] = current_sent
+    state["last_recv"] = current_recv
+    return False
+
+
 def report_once(
     config: dict[str, Any],
     previous_net: dict[str, float] | None,
     cpu_percent: float | None = None,
-    monthly_baseline: dict[str, int] | None = None,
-) -> dict[str, float]:
+    traffic_state: dict[str, Any] | None = None,
+) -> tuple[dict[str, float], dict[str, Any]]:
     metrics, current_net = collect_metrics(
         disk_paths=config["disk_paths"],
         previous_net=previous_net,
         cpu_percent=cpu_percent,
     )
-    # 月度流量（VPS_MONITOR_TRAFFIC_RESET_DAY 重置日默认1号，VPS_MONITOR_TRAFFIC_RESET_HOUR 重置时默认0点）
-    reset_day = int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
-    reset_hour = int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0"))
-    now = time.localtime()
-    passed = now.tm_mday > reset_day or (now.tm_mday == reset_day and now.tm_hour >= reset_hour)
-    if passed:
-        month_key = time.strftime("%Y-%m")
-    else:
-        prev = time.localtime(time.time() - 86400 * (now.tm_mday + 1))
-        month_key = time.strftime("%Y-%m", prev)
-    if monthly_baseline is None or monthly_baseline.get("key") != month_key:
-        # 新月份：扣除用户自定义的已用流量（GB），调整基线
-        offset_gb = float(os.getenv("VPS_MONITOR_TRAFFIC_OFFSET_GB", "0"))
-        offset_bytes = int(offset_gb * 1073741824)
-        # 把 offset 均分到收发
-        monthly_baseline = {
-            "key": month_key,
-            "sent": current_net["bytes_sent"] - offset_bytes // 2,
-            "recv": current_net["bytes_recv"] - offset_bytes // 2,
-        }
-    metrics["net_tx_month"] = max(0, int(current_net["bytes_sent"] - monthly_baseline["sent"]))
-    metrics["net_rx_month"] = max(0, int(current_net["bytes_recv"] - monthly_baseline["recv"]))
-    metrics["traffic_limit_gb"] = float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
+    traffic_state = traffic_state if traffic_state is not None else {}
+    cycle_changed = update_monthly_traffic(current_net, config, traffic_state)
+    metrics["net_tx_month"] = int(traffic_state["tx"])
+    metrics["net_rx_month"] = int(traffic_state["rx"])
+    metrics["traffic_limit_gb"] = float(config["traffic_limit_gb"])
+    metrics["traffic_reset_enabled"] = int(config["traffic_reset_day"]) > 0
+
+    save_after = float(traffic_state.get("_save_after", 0))
+    if cycle_changed or time.monotonic() >= save_after:
+        try:
+            save_traffic_state(Path(str(config["traffic_state_path"])), traffic_state)
+        except OSError as exc:
+            print(f"traffic state save failed: {exc.__class__.__name__}", file=sys.stderr, flush=True)
+        traffic_state["_save_after"] = time.monotonic() + 60
 
     payload = {"node_id": config["node_id"], **metrics}
     response = requests.post(
@@ -151,12 +228,12 @@ def report_once(
         timeout=request_timeout(config),
     )
     response.raise_for_status()
-    return current_net, monthly_baseline
+    return current_net, traffic_state
 
 
 def run_agent(config: dict[str, Any], once: bool = False) -> int:
     previous_net: dict[str, float] | None = None
-    monthly_baseline: dict[str, Any] | None = None
+    traffic_state = load_traffic_state(Path(str(config["traffic_state_path"])))
     register_after = 0.0
     next_report_at = time.monotonic()
     cpu_sampler = None if once else CpuSampler(float(config["interval"]))
@@ -175,7 +252,12 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
                 register_after = started_at + 300
             cpu_percent = cpu_sampler.current() if cpu_sampler else None
             report_started_at = time.monotonic()
-            previous_net, monthly_baseline = report_once(config, previous_net, cpu_percent=cpu_percent, monthly_baseline=monthly_baseline)
+            previous_net, traffic_state = report_once(
+                config,
+                previous_net,
+                cpu_percent=cpu_percent,
+                traffic_state=traffic_state,
+            )
             elapsed_ms = int((time.monotonic() - report_started_at) * 1000)
             print(f"reported metrics in {elapsed_ms}ms", flush=True)
             if once:
@@ -183,6 +265,10 @@ def run_agent(config: dict[str, Any], once: bool = False) -> int:
             next_report_at = max(next_report_at + float(config["interval"]), time.monotonic())
         except KeyboardInterrupt:
             print("agent stopped", flush=True)
+            try:
+                save_traffic_state(Path(str(config["traffic_state_path"])), traffic_state)
+            except OSError:
+                pass
             if cpu_sampler:
                 cpu_sampler.stop()
             return 0

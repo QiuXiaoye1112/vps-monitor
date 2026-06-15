@@ -9,8 +9,11 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("VPS_MONITOR_DB", BASE_DIR / "vps_monitor.db"))
 SERVER_TOKEN = os.getenv("VPS_MONITOR_TOKEN", "change-me")
 OFFLINE_AFTER_SECONDS = int(os.getenv("VPS_MONITOR_OFFLINE_AFTER", "30"))
+METRIC_RETENTION_DAYS = max(0.0, float(os.getenv("VPS_MONITOR_METRIC_RETENTION_DAYS", "2")))
+METRIC_CLEANUP_INTERVAL_SECONDS = max(
+    60, int(os.getenv("VPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS", "3600"))
+)
 
 API_HOST = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
 API_PORT = int(os.getenv("VPS_MONITOR_API_PORT", "8000"))
-TRAFFIC_LIMIT_GB = float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
 DASHBOARD_API_URL = os.getenv("VPS_MONITOR_API_URL", f"http://{API_HOST}:{API_PORT}")
