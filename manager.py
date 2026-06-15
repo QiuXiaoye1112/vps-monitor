@@ -1049,8 +1049,15 @@ def edit_node_info() -> None:
                 import tomli as tomllib
             config = tomllib.load(f)
     except Exception:
-        config = {}
+        print(color("配置文件解析失败！请检查 /etc/vps-monitor-agent.toml", RED))
+        print(color("修复后重试。引号必须是普通双引号，不能是 \\\"。", DIM))
+        pause()
+        return
     role = installation_role()
+    if not config:
+        print(color("配置文件为空或损坏。", RED))
+        pause()
+        return
 
     while True:
         title("修改本机信息")
