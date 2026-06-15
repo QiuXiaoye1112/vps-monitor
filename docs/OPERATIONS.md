@@ -28,6 +28,8 @@ sudo systemctl enable --now vps-monitor-agent  # 所有节点
 
 ## 修改 Agent 配置
 
+远程监控节点可直接运行 `sudo vm`，在“常用操作”中选择“重置 Agent 设置（不重新安装）”。该流程会重新询问首次配置时的全部参数，重写配置并重置流量统计，然后测试上报和重启 Agent，不会重新安装依赖或服务。
+
 ```bash
 sudo nano /etc/vps-monitor-agent.toml
 # 改完重启

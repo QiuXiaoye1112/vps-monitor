@@ -24,6 +24,7 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent
 VENV_DIR = PROJECT_DIR / ".venv"
 AGENT_CONFIG = Path("/etc/vps-monitor-agent.toml")
+AGENT_TRAFFIC_STATE = Path("/var/lib/vps-monitor-agent/traffic-state.json")
 SERVER_ENV = Path("/etc/vps-monitor.env")
 SYSTEMD_DIR = Path("/etc/systemd/system")
 LAUNCHER = Path("/usr/local/bin/vm")
@@ -564,8 +565,11 @@ def install_panel() -> None:
     pause()
 
 
-def configure_agent(local: bool) -> None:
-    title("配置本机监控" if local else "部署远程 Agent")
+def configure_agent(local: bool, *, install: bool = True) -> None:
+    if install:
+        title("配置本机监控" if local else "部署远程 Agent")
+    else:
+        title("重置 Agent 设置")
     if not require_root():
         return
     server_values = read_env(SERVER_ENV)
@@ -616,28 +620,52 @@ def configure_agent(local: bool) -> None:
         "traffic_reset_hour": reset_hour,
         "traffic_limit_gb": traffic_limit,
         "traffic_offset_gb": traffic_used,
-        "traffic_state_path": "/var/lib/vps-monitor-agent/traffic-state.json",
+        "traffic_state_path": str(AGENT_TRAFFIC_STATE),
     }
-    print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")
+    if install:
+        print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")
+    else:
+        print("\n即将停止 Agent、重写配置、重置流量统计并重启服务，不会重新安装。")
     try:
-        ensure_apt_packages(["python3", "python3-venv", "python3-pip"])
-        ensure_venv("requirements-agent.txt")
+        if install:
+            ensure_apt_packages(["python3", "python3-venv", "python3-pip"])
+            ensure_venv("requirements-agent.txt")
+        else:
+            run(["systemctl", "stop", AGENT_SERVICE], check=False)
         write_text_secure(AGENT_CONFIG, render_agent_config(values))
-        write_text_secure(SYSTEMD_DIR / f"{AGENT_SERVICE}.service", agent_unit(), 0o644)
-        install_launcher()
-        run(["systemctl", "daemon-reload"])
+        if install:
+            write_text_secure(SYSTEMD_DIR / f"{AGENT_SERVICE}.service", agent_unit(), 0o644)
+            install_launcher()
+            run(["systemctl", "daemon-reload"])
+        else:
+            remove_path(AGENT_TRAFFIC_STATE)
         print("\n正在测试一次上报...")
         test = run(
             [str(VENV_DIR / "bin/python"), str(PROJECT_DIR / "agent.py"), "--config", str(AGENT_CONFIG), "--once"],
             check=False,
         )
         if test.returncode != 0:
-            print(color("测试上报失败，服务仍会安装并启动，请稍后查看 Agent 日志。", YELLOW))
-        run(["systemctl", "enable", "--now", AGENT_SERVICE])
+            message = (
+                "测试上报失败，服务仍会安装并启动，请稍后查看 Agent 日志。"
+                if install
+                else "测试上报失败，仍会重启现有 Agent，请稍后查看日志。"
+            )
+            print(color(message, YELLOW))
+        if install:
+            run(["systemctl", "enable", "--now", AGENT_SERVICE])
         run(["systemctl", "restart", AGENT_SERVICE])
-        print(color("\nAgent 已配置并启动，已启用开机自启和异常自动重启。", GREEN))
+        if install:
+            print(color("\nAgent 已配置并启动，已启用开机自启和异常自动重启。", GREEN))
+        else:
+            print(color("\nAgent 设置已重置，流量统计已按新配置重新开始。", GREEN))
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
-        print(color(f"\nAgent 部署失败：{exc}", RED))
+        if not install:
+            try:
+                run(["systemctl", "restart", AGENT_SERVICE], check=False)
+            except OSError:
+                pass
+        action = "部署" if install else "设置重置"
+        print(color(f"\nAgent {action}失败：{exc}", RED))
     pause()
 
 
@@ -1500,9 +1528,10 @@ def main() -> int:
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "更新程序"),
-                    ("4", "重启服务"),
-                    ("5", "完整卸载"),
+                    ("3", "重置 Agent 设置（不重新安装）"),
+                    ("4", "更新程序"),
+                    ("5", "重启服务"),
+                    ("6", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1563,10 +1592,12 @@ def main() -> int:
         elif selected == "2":
             show_token()
         elif selected == "3":
-            quick_update()
+            configure_agent(local=False, install=False)
         elif selected == "4":
-            restart_services()
+            quick_update()
         elif selected == "5":
+            restart_services()
+        elif selected == "6":
             full_uninstall()
         else:
             return 0
