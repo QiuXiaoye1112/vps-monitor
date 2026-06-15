@@ -114,7 +114,8 @@ def init_db() -> None:
             ALTER TABLE metrics ADD COLUMN net_tx_month INTEGER DEFAULT 0;
             """
         )
-        # 兼容旧数据库：月度流量列
+        conn.commit()
+        # 兼容旧数据库（逐条执行，失败不中断）
         for col in ("net_tx_month", "net_rx_month"):
             try:
                 conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} INTEGER DEFAULT 0")
