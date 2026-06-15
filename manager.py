@@ -745,7 +745,6 @@ def ingress_menu() -> None:
                 ("1", f"开启或修改 Agent 入口（当前 {agent_port()}）"),
                 ("2", f"查看 {agent_port()} 防火墙规则"),
                 ("3", f"删除 {agent_port()} Agent 入口"),
-                ("4", f"清空 {agent_port()} 防火墙规则"),
             ],
         )
         if selected is None:
@@ -768,18 +767,13 @@ def ingress_menu() -> None:
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
             elif selected == "2":
                 run(["iptables", "-S", "INPUT"], check=False)
-            elif selected == "3":
+            else:
                 if confirm("确认删除 Agent 入口？"):
                     remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
                     remove_path(Path("/etc/nginx/sites-available/vps-monitor-agent.conf"))
                     run(["nginx", "-t"])
                     run(["systemctl", "reload", "nginx"])
                     print(color("Agent 入口已删除。", GREEN))
-            else:
-                port = ask("Agent 入口端口", agent_port())
-                if confirm(f"确认删除 TCP {port} 的全部 iptables 规则？"):
-                    removed = remove_firewall_port_rules(port)
-                    print(color(f"已删除 {removed} 条防火墙规则。", GREEN))
         except (OSError, ValueError, subprocess.CalledProcessError, RuntimeError) as exc:
             print(color(f"操作失败：{exc}", RED))
         pause()
