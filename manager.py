@@ -410,8 +410,6 @@ def ensure_venv(requirements: str) -> None:
 
 
 def api_unit() -> str:
-    host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
-    port = os.getenv("VPS_MONITOR_API_PORT", "8000")
     return textwrap.dedent(
         f"""\
         [Unit]
@@ -423,7 +421,7 @@ def api_unit() -> str:
         Type=simple
         WorkingDirectory={PROJECT_DIR}
         EnvironmentFile={SERVER_ENV}
-        ExecStart={VENV_DIR}/bin/python -m uvicorn server:app --host {host} --port {port}
+        ExecStart=/bin/sh -c 'exec {VENV_DIR}/bin/python -m uvicorn server:app --host "$VPS_MONITOR_API_HOST" --port "$VPS_MONITOR_API_PORT"'
         Restart=always
         RestartSec=5
 
@@ -535,7 +533,7 @@ def install_panel() -> None:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
         host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
-        port = os.getenv("VPS_MONITOR_API_PORT", "8000")
+        port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
         write_text_secure(
             SERVER_ENV,
             f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
