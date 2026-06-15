@@ -758,12 +758,29 @@ def toggle_https() -> None:
 
 def enable_https_for_domain() -> None:
     title("开启 HTTPS")
-    domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name")
-    if not domain:
-        domain = ask("面板域名")
-    if not domain:
+    domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name") or "-"
+    print(f"当前域名：{color(domain, CYAN)}")
+    print()
+    selected = choose("选择操作", [
+        ("1", f"为当前域名（{domain}）申请 SSL 证书"),
+        ("2", "更换域名并申请 SSL 证书"),
+    ])
+    if selected is None:
         return
-    if not confirm(f"为 {domain} 申请 Let's Encrypt 证书并启用 HTTPS？"):
+    if selected == "2":
+        domain = ask("新域名")
+        if not domain:
+            return
+        # 更新 nginx 配置的域名
+        write_text_secure(
+            Path("/etc/nginx/sites-available/vps-monitor.conf"),
+            panel_nginx_config(domain),
+            0o644,
+        )
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"域名已更新为 {domain}。", GREEN))
+    if not confirm(f"为 {domain} 申请 Let's Encrypt 证书？"):
         return
     if enable_https(domain):
         print(color(f"HTTPS 已启用：https://{domain}", GREEN))
