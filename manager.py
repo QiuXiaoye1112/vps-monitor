@@ -1584,9 +1584,8 @@ def main() -> int:
                     ("6", "重新部署中心面板"),
                     ("7", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
                     ("8", "更新程序"),
-                    ("9", "重置本机 Agent 设置（不重新安装）"),
-                    ("10", "重启服务"),
-                    ("11", "完整卸载"),
+                    ("9", "重启服务"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1646,10 +1645,8 @@ def main() -> int:
             elif selected == "8":
                 quick_update()
             elif selected == "9":
-                configure_agent(local=True, install=False)
-            elif selected == "10":
                 restart_services()
-            elif selected == "11":
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
