@@ -1489,7 +1489,7 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
                     ("3", "修改本机信息"),
-                    ("4", "删除 Agent"),
+                    ("4", "重新设置 Agent"),
                     ("5", "更新程序"),
                     ("6", "重启服务"),
                     ("7", "完整卸载"),
@@ -1557,7 +1557,7 @@ def main() -> int:
         elif selected == "3":
             edit_node_info()
         elif selected == "4":
-            remove_agent()
+            configure_agent(local=False)
         elif selected == "5":
             quick_update()
         elif selected == "6":
