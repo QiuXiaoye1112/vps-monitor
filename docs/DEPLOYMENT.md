@@ -75,7 +75,6 @@ disk_paths = ["/"]
 traffic_reset_day = 0
 traffic_reset_hour = 0
 traffic_limit_gb = 0
-traffic_offset_gb = 0
 traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
 
@@ -112,7 +111,6 @@ disk_paths = ["/"]
 traffic_reset_day = 0
 traffic_reset_hour = 4
 traffic_limit_gb = 0
-traffic_offset_gb = 0
 traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
 
@@ -120,7 +118,9 @@ traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 
 面板流量统一按 GB 显示。有流量上限时，前端保留 2 GB 余量：达到“上限减 2 GB”之前按实际流量和实际百分比显示，达到阈值后直接显示上限和 `100%`。例如上限 500 GB 时，实际使用达到 498 GB 后显示 `500 GB / 500 GB`。上限不超过 2 GB 时按实际上限计算。上传下载明细及 Agent 保存的实际流量不会被修改。
 
-首次配置时可以填写当前已使用流量，留空则从 0 开始。该初始流量只加入当前统计状态，后续账期重置时不会再次加入。
+当前已使用流量不在 Agent 上设置。请在中心 VPS 执行 `sudo vm`，进入“监控主机”选择节点后设置；本机和远程节点都支持，默认值为 0 GB。网页流量等于 Agent 实际上报流量加中心设置值。中心设置值只在当前账期有效，并在该节点下次到达自己的流量重置日和小时时自动归零；未配置月重置的节点不能设置正数。
+
+从旧版升级后，Agent 会丢弃旧格式中可能混有初始流量的状态并从 0 开始统计。需要保留的当月既有用量请在中心 VPS 手动设置。
 
 ```bash
 .venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once  # 测试

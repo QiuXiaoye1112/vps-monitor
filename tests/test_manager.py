@@ -33,7 +33,6 @@ def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_pa
         "每月流量重置日（1-31，留空=不重置）": "15",
         "流量重置小时（0-23）": "4",
         "月流量上限 GB（留空=无上限）": "500",
-        "当前已使用流量 GB（留空=从 0 开始）": "120",
     }
 
     monkeypatch.setattr(manager, "AGENT_CONFIG", config_path)
@@ -65,7 +64,7 @@ def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_pa
     assert 'server_url = "http://192.0.2.10:8080"' in content
     assert "traffic_reset_day = 15" in content
     assert "traffic_limit_gb = 500.0" in content
-    assert "traffic_offset_gb = 120.0" in content
+    assert "traffic_offset_gb" not in content
     assert not traffic_state.exists()
     assert not (systemd_dir / f"{manager.AGENT_SERVICE}.service").exists()
     assert ["systemctl", "stop", manager.AGENT_SERVICE] in commands

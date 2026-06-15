@@ -23,6 +23,9 @@ except ModuleNotFoundError:  # pragma: no cover - only used on Python < 3.11
     import tomli as tomllib
 
 
+TRAFFIC_STATE_VERSION = 2
+
+
 def load_config(path: Path | None) -> dict[str, Any]:
     config: dict[str, Any] = {}
     if path and path.exists():
@@ -42,7 +45,6 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config.setdefault("traffic_reset_day", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "0")))
     config.setdefault("traffic_reset_hour", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0")))
     config.setdefault("traffic_limit_gb", float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0")))
-    config.setdefault("traffic_offset_gb", float(os.getenv("VPS_MONITOR_TRAFFIC_OFFSET_GB", "0")))
     default_state_path = (path or Path("agent.toml")).with_suffix(".traffic-state.json")
     config.setdefault("traffic_state_path", os.getenv("VPS_MONITOR_TRAFFIC_STATE", str(default_state_path)))
 
@@ -51,7 +53,6 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config["traffic_reset_day"] = min(31, max(0, int(config["traffic_reset_day"])))
     config["traffic_reset_hour"] = min(23, max(0, int(config["traffic_reset_hour"])))
     config["traffic_limit_gb"] = max(0.0, float(config["traffic_limit_gb"]))
-    config["traffic_offset_gb"] = max(0.0, float(config["traffic_offset_gb"]))
     return config
 
 
@@ -168,18 +169,19 @@ def update_monthly_traffic(
     )
     current_sent = int(current_net["bytes_sent"])
     current_recv = int(current_net["bytes_recv"])
+    if state.get("version") != TRAFFIC_STATE_VERSION:
+        state.clear()
     cycle_changed = state.get("cycle") != cycle
     if cycle_changed:
-        initial_state = not state.get("cycle")
-        offset_bytes = int(float(config["traffic_offset_gb"]) * 1073741824) if initial_state else 0
         state.clear()
         state.update(
             {
+                "version": TRAFFIC_STATE_VERSION,
                 "cycle": cycle,
                 "last_sent": current_sent,
                 "last_recv": current_recv,
-                "tx": offset_bytes // 2,
-                "rx": offset_bytes - offset_bytes // 2,
+                "tx": 0,
+                "rx": 0,
             }
         )
         return True
@@ -212,6 +214,7 @@ def report_once(
     metrics["net_rx_month"] = int(traffic_state["rx"])
     metrics["traffic_limit_gb"] = float(config["traffic_limit_gb"])
     metrics["traffic_reset_enabled"] = int(config["traffic_reset_day"]) > 0
+    metrics["traffic_cycle"] = str(traffic_state["cycle"])
 
     save_after = float(traffic_state.get("_save_after", 0))
     if cycle_changed or time.monotonic() >= save_after:

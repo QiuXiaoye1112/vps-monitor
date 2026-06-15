@@ -43,6 +43,7 @@ METRIC_FIELDS = [
     "net_rx_month",
     "traffic_limit_gb",
     "traffic_reset_enabled",
+    "traffic_cycle",
     "uptime_seconds",
     "load_1",
     "load_5",
@@ -82,7 +83,9 @@ def init_db() -> None:
                 system_os TEXT DEFAULT '',
                 kernel_version TEXT DEFAULT '',
                 architecture TEXT DEFAULT '',
-                hostname TEXT DEFAULT ''
+                hostname TEXT DEFAULT '',
+                traffic_offset_gb REAL NOT NULL DEFAULT 0,
+                traffic_offset_cycle TEXT NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS metrics (
@@ -106,6 +109,11 @@ def init_db() -> None:
                 net_download_bps REAL,
                 net_bytes_sent INTEGER,
                 net_bytes_recv INTEGER,
+                net_tx_month INTEGER DEFAULT 0,
+                net_rx_month INTEGER DEFAULT 0,
+                traffic_limit_gb REAL DEFAULT 0,
+                traffic_reset_enabled INTEGER DEFAULT 0,
+                traffic_cycle TEXT DEFAULT '',
                 uptime_seconds REAL,
                 load_1 REAL,
                 load_5 REAL,
@@ -127,9 +135,25 @@ def init_db() -> None:
         )
         conn.commit()
         # 兼容旧数据库（逐条执行，失败不中断）
-        for col in ("net_tx_month", "net_rx_month", "traffic_limit_gb", "traffic_reset_enabled"):
+        metric_columns = {
+            "net_tx_month": "INTEGER DEFAULT 0",
+            "net_rx_month": "INTEGER DEFAULT 0",
+            "traffic_limit_gb": "REAL DEFAULT 0",
+            "traffic_reset_enabled": "INTEGER DEFAULT 0",
+            "traffic_cycle": "TEXT DEFAULT ''",
+        }
+        for col, definition in metric_columns.items():
             try:
-                conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} INTEGER DEFAULT 0")
+                conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} {definition}")
+            except sqlite3.OperationalError:
+                pass
+        node_columns = {
+            "traffic_offset_gb": "REAL NOT NULL DEFAULT 0",
+            "traffic_offset_cycle": "TEXT NOT NULL DEFAULT ''",
+        }
+        for col, definition in node_columns.items():
+            try:
+                conn.execute(f"ALTER TABLE nodes ADD COLUMN {col} {definition}")
             except sqlite3.OperationalError:
                 pass
         conn.commit()
@@ -291,6 +315,20 @@ def insert_metric(payload: dict[str, Any]) -> dict[str, Any]:
                 (node_id, node_id, received_at, received_at, service_json([])),
             )
 
+        traffic_cycle = str(payload.get("traffic_cycle") or "")
+        if traffic_cycle:
+            conn.execute(
+                """
+                UPDATE nodes
+                SET traffic_offset_gb = 0,
+                    traffic_offset_cycle = ''
+                WHERE id = ?
+                  AND traffic_offset_cycle != ''
+                  AND traffic_offset_cycle != ?
+                """,
+                (node_id, traffic_cycle),
+            )
+
         cursor = conn.execute(
             f"""
             INSERT INTO metrics (
@@ -379,6 +417,8 @@ def node_from_row(row: sqlite3.Row, latest_metric: dict[str, Any] | None = None)
         "kernel_version": data["kernel_version"],
         "architecture": data["architecture"],
         "hostname": data["hostname"],
+        "traffic_offset_gb": float(data.get("traffic_offset_gb") or 0),
+        "traffic_offset_cycle": data.get("traffic_offset_cycle") or "",
         "latest_metric": latest_metric,
     }
 
@@ -421,6 +461,37 @@ def get_metric(metric_id: int) -> dict[str, Any] | None:
     with closing(connect()) as conn:
         row = conn.execute("SELECT * FROM metrics WHERE id = ?", (metric_id,)).fetchone()
     return metric_from_row(row)
+
+
+def set_node_traffic_offset(node_id: str, used_gb: float) -> dict[str, Any] | None:
+    value = max(0.0, float(used_gb))
+    with closing(connect()) as conn:
+        row = conn.execute(
+            """
+            SELECT n.id, m.traffic_cycle, m.traffic_reset_enabled
+            FROM nodes AS n
+            LEFT JOIN metrics AS m ON m.id = n.last_metric_id
+            WHERE n.id = ?
+            """,
+            (node_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        cycle = str(row["traffic_cycle"] or "")
+        if value > 0 and not cycle:
+            raise ValueError("节点尚未上报账期信息，请先更新并重启 Agent")
+        if value > 0 and not bool(row["traffic_reset_enabled"]):
+            raise ValueError("该节点未配置每月流量重置时间")
+        conn.execute(
+            """
+            UPDATE nodes
+            SET traffic_offset_gb = ?, traffic_offset_cycle = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (value, cycle if value > 0 else "", iso_now(), node_id),
+        )
+        conn.commit()
+    return get_node(node_id)
 
 
 def delete_node(node_id: str) -> bool:

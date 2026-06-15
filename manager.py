@@ -16,6 +16,7 @@ import sys
 import textwrap
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -247,7 +248,6 @@ def render_agent_config(values: dict[str, object]) -> str:
         traffic_reset_day = {int(values.get('traffic_reset_day', 0))}
         traffic_reset_hour = {int(values.get('traffic_reset_hour', 0))}
         traffic_limit_gb = {float(values.get('traffic_limit_gb', 0))}
-        traffic_offset_gb = {float(values.get('traffic_offset_gb', 0))}
         traffic_state_path = {toml_string(str(values.get('traffic_state_path', '/var/lib/vps-monitor-agent/traffic-state.json')))}
         """
     )
@@ -594,14 +594,12 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
     reset_day_text = ask("每月流量重置日（1-31，留空=不重置）")
     reset_hour_text = ask("流量重置小时（0-23）", "0") if reset_day_text else "0"
     limit_text = ask("月流量上限 GB（留空=无上限）")
-    used_text = ask("当前已使用流量 GB（留空=从 0 开始）")
     try:
         reset_day = min(31, max(1, int(reset_day_text))) if reset_day_text else 0
         reset_hour = min(23, max(0, int(reset_hour_text)))
         traffic_limit = max(0.0, float(limit_text)) if limit_text else 0.0
-        traffic_used = max(0.0, float(used_text)) if used_text else 0.0
     except ValueError:
-        print(color("流量重置时间、上限或当前已用流量格式无效。", RED))
+        print(color("流量重置时间或上限格式无效。", RED))
         pause()
         return
     if not center_url or not node_id or not token:
@@ -619,7 +617,6 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         "traffic_reset_day": reset_day,
         "traffic_reset_hour": reset_hour,
         "traffic_limit_gb": traffic_limit,
-        "traffic_offset_gb": traffic_used,
         "traffic_state_path": str(AGENT_TRAFFIC_STATE),
     }
     if install:
@@ -1182,6 +1179,55 @@ def monitored_nodes() -> list[dict[str, Any]]:
     return nodes if isinstance(nodes, list) else []
 
 
+def set_node_used_traffic(node: dict[str, Any]) -> None:
+    title("设置当前已使用流量")
+    node_id = str(node.get("id") or "")
+    name = str(node.get("name") or node_id)
+    current = max(0.0, float(node.get("traffic_offset_gb") or 0))
+    print(f"主机：{name}")
+    print(f"当前中心补充值：{current:.1f} GB")
+    value_text = ask("当前已使用流量 GB", f"{current:g}")
+    try:
+        value = max(0.0, float(value_text))
+    except ValueError:
+        print(color("当前已使用流量必须是数字。", RED))
+        pause()
+        return
+
+    token = read_env(SERVER_ENV).get("VPS_MONITOR_TOKEN", "")
+    body = json.dumps({"used_gb": value}).encode("utf-8")
+    url = f"{api_base_url()}/api/nodes/{urllib.parse.quote(node_id, safe='')}/traffic-offset"
+    request = urllib.request.Request(
+        url,
+        data=body,
+        method="PUT",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError(f"HTTP {response.status}")
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("detail", "")
+        except (ValueError, OSError):
+            detail = ""
+        message = detail or f"HTTP {exc.code}"
+        print(color(f"设置失败：{message}", RED))
+        pause()
+        return
+    except (OSError, RuntimeError, urllib.error.URLError) as exc:
+        print(color(f"设置失败：{exc}", RED))
+        pause()
+        return
+
+    print(color(f"已设置为 {value:.1f} GB，将在该主机下次流量账期重置时自动归零。", GREEN))
+    pause()
+
+
 def firewall_allows(ip: str, port: int | None = None) -> bool:
     if port is None:
         port = int(agent_port())
@@ -1417,25 +1463,41 @@ def monitored_hosts_menu() -> None:
         print(f"节点 ID：{node.get('id') or '-'}")
         print(f"状态：{node.get('status') or '-'}")
         print(f"来源 IP：{ip}")
+        print(f"中心补充流量：{float(node.get('traffic_offset_gb') or 0):.1f} GB")
         if is_local:
             print()
             print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
-            if choose("本机操作", [("1", "删除本机监控")]) == "1":
+            local_action = choose(
+                "本机操作",
+                [
+                    ("1", "设置当前已使用流量"),
+                    ("2", "重置本机 Agent 设置（不重新安装）"),
+                    ("3", "删除本机监控"),
+                ],
+            )
+            if local_action == "1":
+                set_node_used_traffic(node)
+            elif local_action == "2":
+                configure_agent(local=True, install=False)
+            elif local_action == "3":
                 remove_agent()
             continue
         action = choose(
             "主机操作",
             [
-                ("1", f"允许该主机访问 {agent_port()} 并保存"),
-                ("2", "移除该主机放行规则并保存"),
-                ("3", "删除该主机（防火墙规则+数据）"),
+                ("1", "设置当前已使用流量"),
+                ("2", f"允许该主机访问 {agent_port()} 并保存"),
+                ("3", "移除该主机放行规则并保存"),
+                ("4", "删除该主机（防火墙规则+数据）"),
             ],
         )
         if action == "1":
-            allow_node_firewall(node)
+            set_node_used_traffic(node)
         elif action == "2":
-            remove_node_firewall(node)
+            allow_node_firewall(node)
         elif action == "3":
+            remove_node_firewall(node)
+        elif action == "4":
             remove_remote_node(node)
 
 
@@ -1520,8 +1582,9 @@ def main() -> int:
                     ("6", "重新部署中心面板"),
                     ("7", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
                     ("8", "更新程序"),
-                    ("9", "重启服务"),
-                    ("10", "完整卸载"),
+                    ("9", "重置本机 Agent 设置（不重新安装）"),
+                    ("10", "重启服务"),
+                    ("11", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1581,8 +1644,10 @@ def main() -> int:
             elif selected == "8":
                 quick_update()
             elif selected == "9":
-                restart_services()
+                configure_agent(local=True, install=False)
             elif selected == "10":
+                restart_services()
+            elif selected == "11":
                 full_uninstall()
             else:
                 return 0

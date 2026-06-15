@@ -1,13 +1,18 @@
 from datetime import datetime, timezone
 
-from agent import load_traffic_state, save_traffic_state, traffic_cycle_key, update_monthly_traffic
+from agent import (
+    TRAFFIC_STATE_VERSION,
+    load_traffic_state,
+    save_traffic_state,
+    traffic_cycle_key,
+    update_monthly_traffic,
+)
 
 
 def config(reset_day: int = 1, reset_hour: int = 0) -> dict[str, object]:
     return {
         "traffic_reset_day": reset_day,
         "traffic_reset_hour": reset_hour,
-        "traffic_offset_gb": 0,
     }
 
 
@@ -59,26 +64,46 @@ def test_missing_reset_time_can_still_have_a_traffic_limit() -> None:
     assert state["tx"] + state["rx"] == 1100
 
 
-def test_existing_usage_is_applied_only_to_initial_cycle() -> None:
+def test_new_cycle_starts_from_zero() -> None:
     state: dict[str, object] = {}
-    with_existing_usage = {**config(15, 4), "traffic_offset_gb": 10.0}
     first_cycle = datetime(2026, 6, 15, 5, 0, tzinfo=timezone.utc)
     next_cycle = datetime(2026, 7, 15, 5, 0, tzinfo=timezone.utc)
 
     update_monthly_traffic(
         {"bytes_sent": 1000, "bytes_recv": 2000},
-        with_existing_usage,
+        config(15, 4),
         state,
         now=first_cycle,
     )
-    assert state["tx"] + state["rx"] == 10 * 1073741824
+    assert state["tx"] + state["rx"] == 0
 
     update_monthly_traffic(
         {"bytes_sent": 3000, "bytes_recv": 4000},
-        with_existing_usage,
+        config(15, 4),
         state,
         now=next_cycle,
     )
+    assert state["tx"] + state["rx"] == 0
+
+
+def test_old_agent_traffic_state_is_discarded() -> None:
+    now = datetime(2026, 6, 15, 5, 0, tzinfo=timezone.utc)
+    state: dict[str, object] = {
+        "cycle": traffic_cycle_key(now, 15, 4),
+        "last_sent": 1000,
+        "last_recv": 2000,
+        "tx": 50 * 1073741824,
+        "rx": 50 * 1073741824,
+    }
+
+    update_monthly_traffic(
+        {"bytes_sent": 3000, "bytes_recv": 4000},
+        config(15, 4),
+        state,
+        now=now,
+    )
+
+    assert state["version"] == TRAFFIC_STATE_VERSION
     assert state["tx"] + state["rx"] == 0
 
 

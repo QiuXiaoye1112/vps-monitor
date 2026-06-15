@@ -13,6 +13,4 @@ traffic_reset_day = 0
 traffic_reset_hour = 0
 # 0 表示无上限。
 traffic_limit_gb = 0
-# 首次启用监控时已有的流量；留空配置流程默认写入 0，后续账期不会重复加入。
-traffic_offset_gb = 0
 traffic_state_path = "./agent.traffic-state.json"

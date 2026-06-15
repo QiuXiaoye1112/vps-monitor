@@ -311,7 +311,8 @@ DASHBOARD_HTML = """<!doctype html>
 
         const metrics = document.createElement("div");
         metrics.className = "metrics";
-        const totalTraffic = (metric.net_tx_month || 0) + (metric.net_rx_month || 0);
+        const reportedTraffic = (metric.net_tx_month || 0) + (metric.net_rx_month || 0);
+        const totalTraffic = reportedTraffic + ((node.traffic_offset_gb || 0) * 1073741824);
         const trafficHasReset = Boolean(metric.traffic_reset_enabled);
         metrics.append(
           metricBlock("CPU", fmtPercent(metric.cpu_percent)),
@@ -321,9 +322,7 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`),
           metricBlock(
             trafficHasReset ? "本月流量" : "累计流量",
-            trafficHasReset
-              ? `↑${fmtGB(metric.net_tx_month)} ↓${fmtGB(metric.net_rx_month)}`
-              : fmtGB(totalTraffic)
+            fmtGB(totalTraffic)
           )
         );
         // 有上限时保留 2 GB 余量，达到阈值后前端直接显示用满。
@@ -421,6 +420,7 @@ class MetricPayload(BaseModel):
     net_rx_month: int = 0
     traffic_limit_gb: float = 0.0
     traffic_reset_enabled: bool = False
+    traffic_cycle: str = ""
     uptime_seconds: float | None = None
     load_1: float | None = None
     load_5: float | None = None
@@ -431,6 +431,10 @@ class MetricPayload(BaseModel):
     architecture: str = ""
     hostname: str = ""
     services: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TrafficOffsetPayload(BaseModel):
+    used_gb: float = Field(default=0.0, ge=0)
 
 
 def token_from_request(
@@ -511,6 +515,17 @@ def delete_node(node_id: str) -> dict[str, Any]:
     if not storage.delete_node(node_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="node not found")
     return {"status": "deleted", "node_id": node_id}
+
+
+@app.put("/api/nodes/{node_id}/traffic-offset", dependencies=[Depends(require_token)])
+def update_traffic_offset(node_id: str, payload: TrafficOffsetPayload) -> dict[str, Any]:
+    try:
+        node = storage.set_node_traffic_offset(node_id, payload.used_gb)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if node is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="node not found")
+    return {"node": node}
 
 
 @app.post("/api/metrics", dependencies=[Depends(require_token)])
