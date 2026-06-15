@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 import storage
 from monitor_common import iso_now
-from settings import SERVER_TOKEN, TRAFFIC_LIMIT_GB
+from settings import SERVER_TOKEN
 
 
 app = FastAPI(title="VPS Monitor API", version="1.0.0")
@@ -307,12 +307,13 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`),
           metricBlock("本月流量", `↑${fmtBytes(metric.net_tx_month)} ↓${fmtBytes(metric.net_rx_month)}`)
         );
-        // 流量进度条
-        if (node.traffic_limit_gb) {
-          const pct = Math.min(100, (totalMonth / (node.traffic_limit_gb * 1073741824)) * 100).toFixed(1);
+        // 流量进度条（每节点独立上限）
+        const limitGB = metric.traffic_limit_gb;
+        if (limitGB > 0) {
+          const pct = Math.min(100, (totalMonth / (limitGB * 1073741824)) * 100).toFixed(1);
           const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
           const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
-          barLabel.innerHTML = `<span>月流量 ${fmtBytes(totalMonth)} / ${node.traffic_limit_gb}GB</span><span>${pct}%</span>`;
+          barLabel.innerHTML = `<span>月流量 ${fmtBytes(totalMonth)} / ${limitGB}GB</span><span>${pct}%</span>`;
           const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
           const barFill = document.createElement("div"); barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
           barBg.append(barFill); barWrap.append(barLabel, barBg); metrics.append(barWrap);
@@ -390,6 +391,7 @@ class MetricPayload(BaseModel):
     net_bytes_recv: int
     net_tx_month: int = 0
     net_rx_month: int = 0
+    traffic_limit_gb: float = 0.0
     uptime_seconds: float | None = None
     load_1: float | None = None
     load_5: float | None = None
@@ -470,10 +472,7 @@ def update_node(node_id: str, payload: NodePayload) -> dict[str, Any]:
 
 @app.get("/api/nodes")
 def get_nodes() -> dict[str, Any]:
-    nodes = storage.list_nodes()
-    for node in nodes:
-        node["traffic_limit_gb"] = TRAFFIC_LIMIT_GB if TRAFFIC_LIMIT_GB > 0 else None
-    return {"server_now": iso_now(), "nodes": nodes}
+    return {"server_now": iso_now(), "nodes": storage.list_nodes()}
 
 
 @app.get("/api/nodes/{node_id}")
@@ -481,7 +480,6 @@ def get_node(node_id: str) -> dict[str, Any]:
     node = storage.get_node(node_id)
     if node is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="node not found")
-    node["traffic_limit_gb"] = TRAFFIC_LIMIT_GB if TRAFFIC_LIMIT_GB > 0 else None
     return {"node": node}
 
 

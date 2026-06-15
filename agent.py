@@ -141,6 +141,7 @@ def report_once(
         }
     metrics["net_tx_month"] = max(0, int(current_net["bytes_sent"] - monthly_baseline["sent"]))
     metrics["net_rx_month"] = max(0, int(current_net["bytes_recv"] - monthly_baseline["recv"]))
+    metrics["traffic_limit_gb"] = float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
 
     payload = {"node_id": config["node_id"], **metrics}
     response = requests.post(

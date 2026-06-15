@@ -30,6 +30,7 @@ METRIC_FIELDS = [
     "net_bytes_recv",
     "net_tx_month",
     "net_rx_month",
+    "traffic_limit_gb",
     "uptime_seconds",
     "load_1",
     "load_5",
@@ -114,7 +115,7 @@ def init_db() -> None:
         )
         conn.commit()
         # 兼容旧数据库（逐条执行，失败不中断）
-        for col in ("net_tx_month", "net_rx_month"):
+        for col in ("net_tx_month", "net_rx_month", "traffic_limit_gb"):
             try:
                 conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
