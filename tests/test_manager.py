@@ -43,7 +43,7 @@ def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_pa
     monkeypatch.setattr(manager, "require_root", lambda: True)
     monkeypatch.setattr(manager, "title", lambda _: None)
     monkeypatch.setattr(manager, "pause", lambda *args, **kwargs: None)
-    monkeypatch.setattr(manager, "ask_ip", lambda _: "192.0.2.10")
+    monkeypatch.setattr(manager, "ask_ip", lambda prompt, default="": "192.0.2.10")
     monkeypatch.setattr(manager, "ask_port", lambda *args: 8080)
     monkeypatch.setattr(manager, "ask", lambda prompt, *args, **kwargs: answers[prompt])
 

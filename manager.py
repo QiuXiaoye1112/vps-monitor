@@ -102,9 +102,9 @@ def ask_port(prompt: str, default: int) -> int:
         print(color("端口必须在 1 到 65535 之间。", RED))
 
 
-def ask_ip(prompt: str) -> str:
+def ask_ip(prompt: str, default: str = "") -> str:
     while True:
-        value = ask(prompt)
+        value = ask(prompt, default)
         try:
             return str(ipaddress.ip_address(value))
         except ValueError:
@@ -603,11 +603,22 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         port = ask_port("中心上报端口", int(agent_port()))
         center_url = server_url(host, port)
     else:
-        center_url = agent_config_value("server_url")
-        if not center_url:
+        old_url = agent_config_value("server_url")
+        if not old_url:
             print(color("无法读取现有 Agent 配置中的服务地址，请删除后重新部署。", RED))
             pause()
             return
+        old_host = "127.0.0.1"
+        old_port = 8080
+        try:
+            parsed = urllib.parse.urlparse(old_url)
+            old_host = parsed.hostname or old_host
+            old_port = parsed.port or old_port
+        except (ValueError, OSError):
+            pass
+        host = ask_ip("中心 VPS IP", old_host)
+        port = ask_port("中心上报端口", old_port)
+        center_url = server_url(host, port)
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
     token = default_token if local and default_token else ask("通信 token", secret=True)
