@@ -326,7 +326,7 @@ DASHBOARD_HTML = """<!doctype html>
               : fmtGB(totalTraffic)
           )
         );
-        // 有上限时提前 5 GB 视为用满；无上限时固定满格且不显示百分比。
+        // 有上限时保留 2 GB 余量，达到阈值后前端直接显示用满。
         const limitGB = metric.traffic_limit_gb;
         const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
         const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
@@ -334,9 +334,11 @@ DASHBOARD_HTML = """<!doctype html>
         const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
         const barFill = document.createElement("div");
         if (limitGB > 0) {
-          const fullAtGB = limitGB > 5 ? limitGB - 5 : limitGB;
-          const pct = Math.min(100, (totalTraffic / (fullAtGB * 1073741824)) * 100).toFixed(1);
-          const displayedTraffic = Number(pct) >= 100 ? limitGB * 1073741824 : totalTraffic;
+          const actualTrafficGB = totalTraffic / 1073741824;
+          const fullAtGB = limitGB > 2 ? limitGB - 2 : limitGB;
+          const displayedTrafficGB = actualTrafficGB >= fullAtGB ? limitGB : actualTrafficGB;
+          const displayedTraffic = displayedTrafficGB * 1073741824;
+          const pct = Math.min(100, (displayedTrafficGB / limitGB) * 100).toFixed(1);
           barLabel.innerHTML = `<span>${trafficLabel} ${fmtGB(displayedTraffic)} / ${Number(limitGB).toFixed(1)} GB</span><span>${pct}%</span>`;
           barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
         } else {
