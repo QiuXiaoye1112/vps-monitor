@@ -1035,6 +1035,78 @@ def restart_services() -> None:
     pause()
 
 
+def edit_node_info() -> None:
+    title("修改本机信息")
+    if not AGENT_CONFIG.exists():
+        print(color("Agent 尚未配置。", YELLOW))
+        pause()
+        return
+    try:
+        with AGENT_CONFIG.open("rb") as f:
+            try:
+                import tomllib
+            except ModuleNotFoundError:
+                import tomli as tomllib
+            config = tomllib.load(f)
+    except Exception:
+        config = {}
+
+    role = installation_role()
+    if role == "center":
+        print(color("本机角色：中心服务器", CYAN))
+    else:
+        print(color("本机角色：远程节点", CYAN))
+    print()
+
+    name = ask("显示名称", config.get("name", ""))
+    node_id = ask("节点 ID", config.get("node_id", ""))
+    reset_day = ask("流量重置日", os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
+    limit_gb = ask("月流量上限（GB，0=不限制）", os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
+    interval = ask("上报间隔（秒）", str(config.get("interval", "1")))
+
+    if not name or not node_id:
+        print(color("名称和节点 ID 不能为空。", RED))
+        pause()
+        return
+
+    config["name"] = name
+    config["node_id"] = node_id
+    config["interval"] = int(interval) if interval.isdigit() else 1
+
+    content = textwrap.dedent(f"""\
+        server_url = "{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}"
+        node_id = "{node_id}"
+        token = "{config.get('token', 'change-me')}"
+        interval = {config['interval']}
+
+        name = "{name}"
+        ip = "{config.get('ip', '')}"
+        region = "{config.get('region', '')}"
+        os_type = "{config.get('os_type', 'Linux')}"
+        note = "{config.get('note', '')}"
+
+        disk_paths = [{', '.join(f'"{p}"' for p in (config.get('disk_paths') or ['/']))}]
+        """)
+    write_text_secure(AGENT_CONFIG, content)
+    # 写入环境变量
+    env_content = SERVER_ENV.read_text() if SERVER_ENV.exists() else ""
+    for key, val in (("VPS_MONITOR_TRAFFIC_RESET_DAY", reset_day), ("VPS_MONITOR_TRAFFIC_LIMIT_GB", limit_gb)):
+        if f"{key}=" in env_content:
+            env_content = re.sub(rf"^{key}=.*", f"{key}={val}", env_content, flags=re.MULTILINE)
+        elif env_content:
+            env_content += f"\n{key}={val}\n"
+        else:
+            pass  # agent-only mode, no env file needed; env vars can be set per-process
+    if SERVER_ENV.exists() and env_content:
+        write_text_secure(SERVER_ENV, env_content)
+    print(color("信息已保存。", GREEN))
+    active, _ = service_state(AGENT_SERVICE)
+    if active == "active":
+        run(["systemctl", "restart", AGENT_SERVICE], check=False)
+        print(color("Agent 已重启。", GREEN))
+    pause()
+
+
 def quick_update() -> None:
     title("更新 VPS Monitor")
     if not require_root():
@@ -1384,25 +1456,27 @@ def main() -> int:
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "监控主机"),
-                    ("4", "添加新主机"),
-                    ("5", f"防火墙配置（端口 {agent_port()}）"),
-                    ("6", "重新部署中心面板"),
-                    ("7", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("8", "更新程序"),
-                    ("9", "重启服务"),
-                    ("10", "完整卸载"),
+                    ("3", "修改本机信息"),
+                    ("4", "监控主机"),
+                    ("5", "添加新主机"),
+                    ("6", f"防火墙配置（端口 {agent_port()}）"),
+                    ("7", "重新部署中心面板"),
+                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("9", "更新程序"),
+                    ("10", "重启服务"),
+                    ("11", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "重新配置 Agent"),
-                    ("4", "删除 Agent"),
-                    ("5", "更新程序"),
-                    ("6", "重启服务"),
-                    ("7", "完整卸载"),
+                    ("3", "修改本机信息"),
+                    ("4", "重新配置 Agent"),
+                    ("5", "删除 Agent"),
+                    ("6", "更新程序"),
+                    ("7", "重启服务"),
+                    ("8", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1440,20 +1514,22 @@ def main() -> int:
             elif selected == "2":
                 show_token()
             elif selected == "3":
-                monitored_hosts_menu()
+                edit_node_info()
             elif selected == "4":
-                temp_open_for_new_agent()
+                monitored_hosts_menu()
             elif selected == "5":
-                firewall_rules_menu()
+                temp_open_for_new_agent()
             elif selected == "6":
-                install_panel()
+                firewall_rules_menu()
             elif selected == "7":
-                toggle_https()
+                install_panel()
             elif selected == "8":
-                quick_update()
+                toggle_https()
             elif selected == "9":
-                restart_services()
+                quick_update()
             elif selected == "10":
+                restart_services()
+            elif selected == "11":
                 full_uninstall()
             else:
                 return 0
@@ -1463,14 +1539,16 @@ def main() -> int:
         elif selected == "2":
             show_token()
         elif selected == "3":
-            configure_agent(local=False)
+            edit_node_info()
         elif selected == "4":
-            remove_agent()
+            configure_agent(local=False)
         elif selected == "5":
-            quick_update()
+            remove_agent()
         elif selected == "6":
-            restart_services()
+            quick_update()
         elif selected == "7":
+            restart_services()
+        elif selected == "8":
             full_uninstall()
         else:
             return 0
