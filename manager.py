@@ -575,7 +575,8 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
     server_values = read_env(SERVER_ENV)
     default_token = server_values.get("VPS_MONITOR_TOKEN", "") if local else ""
     if local:
-        port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
+        default_port = int(server_values.get("VPS_MONITOR_API_PORT", 8000))
+        port = ask_port("中心 API 端口", default_port)
         center_url = f"http://127.0.0.1:{port}"
     else:
         host = ask_ip("中心 VPS IP")
