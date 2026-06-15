@@ -565,7 +565,8 @@ def configure_agent(local: bool) -> None:
         center_url = f"http://127.0.0.1:{port}"
     else:
         host = ask_ip("中心 VPS IP")
-        port = int(ask_port("Agent 接入端口", int(agent_port())))
+        port = int(agent_port())
+        detail(f"Agent 接入端口：{port}（由中心配置决定，如需修改请设 VPS_MONITOR_AGENT_PORT 环境变量）")
         center_url = server_url(host, port)
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
