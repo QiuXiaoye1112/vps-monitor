@@ -319,17 +319,19 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock("内存", fmtPercent(metric.memory_percent)),
           metricBlock("磁盘", fmtPercent(metric.disk_percent)),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
-          metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`),
-          metricBlock(
-            trafficHasReset ? "本月流量" : "累计流量",
-            fmtGB(totalTraffic)
-          )
+          metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`)
         );
-        // 有上限时保留 2 GB 余量，达到阈值后前端直接显示用满。
+        // 流量进度条
         const limitGB = metric.traffic_limit_gb;
-        const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
-        const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
         const trafficLabel = trafficHasReset ? "月流量" : "累计流量";
+        const barWrap = document.createElement("div");
+        barWrap.className = "metric";
+        const barText = document.createElement("div");
+        barText.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;";
+        const barLabel = document.createElement("span");
+        barLabel.style.cssText = "color:var(--muted);";
+        const barPct = document.createElement("span");
+        barPct.style.cssText = "font-weight:700;";
         const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
         const barFill = document.createElement("div");
         if (limitGB > 0) {
@@ -338,13 +340,15 @@ DASHBOARD_HTML = """<!doctype html>
           const displayedTrafficGB = actualTrafficGB >= fullAtGB ? limitGB : actualTrafficGB;
           const displayedTraffic = displayedTrafficGB * 1073741824;
           const pct = Math.min(100, (displayedTrafficGB / limitGB) * 100).toFixed(1);
-          barLabel.innerHTML = `<span>${trafficLabel} ${fmtGB(displayedTraffic)} / ${Number(limitGB).toFixed(1)} GB</span><span>${pct}%</span>`;
+          barLabel.textContent = `${trafficLabel} ${fmtGB(displayedTraffic)} / ${Number(limitGB).toFixed(1)} GB`;
+          barPct.textContent = `${pct}%`;
           barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
         } else {
           barLabel.textContent = `${trafficLabel} ${fmtGB(totalTraffic)}`;
           barFill.style.cssText = "height:6px;border-radius:3px;background:#22c55e;width:100%;";
         }
-        barBg.append(barFill); barWrap.append(barLabel, barBg); metrics.append(barWrap);
+        barText.append(barLabel, barPct);
+        barBg.append(barFill); barWrap.append(barText, barBg); metrics.append(barWrap);
 
         const lastSeen = document.createElement("div");
         lastSeen.className = "last-seen";
