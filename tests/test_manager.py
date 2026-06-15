@@ -21,6 +21,7 @@ def test_dashboard_domain_validation_rejects_invalid_names() -> None:
 
 def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_path, monkeypatch) -> None:
     config_path = tmp_path / "agent.toml"
+    config_path.write_text('server_url = "http://192.0.2.10:8080"\n', encoding="utf-8")
     traffic_state = tmp_path / "traffic-state.json"
     traffic_state.write_text('{"cycle":"old"}', encoding="utf-8")
     systemd_dir = tmp_path / "systemd"

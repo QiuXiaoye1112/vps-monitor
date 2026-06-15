@@ -116,15 +116,19 @@ def server_url(host: str, port: int) -> str:
     return f"http://{rendered}:{port}"
 
 
-def agent_token() -> str:
+def agent_config_value(key: str) -> str:
     try:
         content = AGENT_CONFIG.read_text(encoding="utf-8")
     except OSError:
         return ""
-    match = re.search(r'^\s*token\s*=\s*"((?:\\.|[^"\\])*)"\s*$', content, re.MULTILINE)
+    match = re.search(rf'^\s*{re.escape(key)}\s*=\s*"((?:\\.|[^"\\])*)"\s*$', content, re.MULTILINE)
     if not match:
         return ""
     return match.group(1).replace('\\"', '"').replace("\\\\", "\\")
+
+
+def agent_token() -> str:
+    return agent_config_value("token")
 
 
 def show_token() -> None:
@@ -579,13 +583,18 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
     server_values = read_env(SERVER_ENV)
     default_token = server_values.get("VPS_MONITOR_TOKEN", "") if local else ""
     if local:
-        default_port = int(server_values.get("VPS_MONITOR_API_PORT", 8000))
-        port = ask_port("中心 API 端口", default_port)
+        port = int(server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or 8000)
         center_url = f"http://127.0.0.1:{port}"
-    else:
+    elif install:
         host = ask_ip("中心 VPS IP")
         port = ask_port("Agent 接入端口", int(agent_port()))
         center_url = server_url(host, port)
+    else:
+        center_url = agent_config_value("server_url")
+        if not center_url:
+            print(color("无法读取现有 Agent 配置中的服务地址，请删除后重新部署。", RED))
+            pause()
+            return
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
     token = default_token if local and default_token else ask("通信 token", secret=True)
@@ -955,10 +964,22 @@ def remove_agent() -> None:
     title("删除 Agent")
     if not require_root() or not confirm("确认停止并删除 Agent 服务和配置？"):
         return
+    node_id = agent_config_value("node_id")
     remove_service(AGENT_SERVICE)
     remove_path(AGENT_CONFIG)
     if installation_role() == "agent":
         remove_path(ROLE_FILE)
+    if node_id:
+        token = read_env(SERVER_ENV).get("VPS_MONITOR_TOKEN", "")
+        request = urllib.request.Request(
+            f"{api_base_url()}/api/nodes/{urllib.parse.quote(node_id, safe='')}",
+            method="DELETE",
+            headers={"Authorization": f"Bearer {token}"} if token else {},
+        )
+        try:
+            urllib.request.urlopen(request, timeout=5)
+        except (OSError, urllib.error.URLError):
+            pass
     print(color("Agent 已删除。", GREEN))
     pause()
 
