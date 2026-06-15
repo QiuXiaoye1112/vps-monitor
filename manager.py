@@ -41,7 +41,8 @@ def api_base_url() -> str:
 
 
 def agent_port() -> str:
-    return os.getenv("VPS_MONITOR_AGENT_PORT", "8080")
+    env = read_env(SERVER_ENV)
+    return env.get("VPS_MONITOR_AGENT_PORT") or os.getenv("VPS_MONITOR_AGENT_PORT") or "8080"
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -533,11 +534,13 @@ def install_panel() -> None:
         ensure_apt_packages(["python3", "python3-venv", "python3-pip", "nginx", "curl", "sqlite3"])
         ensure_venv("requirements.txt")
         host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
-        port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
-        os.environ["VPS_MONITOR_API_PORT"] = str(port)
+        api_port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
+        agent_listen = ask_port("Agent 接入端口", int(agent_port()))
+        os.environ["VPS_MONITOR_API_PORT"] = str(api_port)
+        os.environ["VPS_MONITOR_AGENT_PORT"] = str(agent_listen)
         write_text_secure(
             SERVER_ENV,
-            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
+            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={api_port}\nVPS_MONITOR_AGENT_PORT={agent_listen}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
         )
         write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
         nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
@@ -554,7 +557,8 @@ def install_panel() -> None:
         run(["systemctl", "restart", API_SERVICE])
         run(["systemctl", "reload", "nginx"])
         ingress_env = os.environ.copy()
-        ingress_env["AGENT_PORT"] = agent_port()
+        ingress_env["AGENT_PORT"] = str(agent_listen)
+        ingress_env["API_PORT"] = str(api_port)
         run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：http://{domain}")
