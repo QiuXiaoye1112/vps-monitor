@@ -542,7 +542,7 @@ def install_panel() -> None:
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：http://{domain}")
         if not is_ip_address(domain):
-            print(color("如需 HTTPS：sudo vm → 开启 HTTPS", DIM))
+            print(color("如需 HTTPS：sudo vm → SSL 证书设置", DIM))
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\n部署失败：{exc}", RED))
@@ -750,7 +750,7 @@ def toggle_https() -> None:
 
 
 def enable_https_for_domain() -> None:
-    title("开启 HTTPS")
+    title("SSL 证书设置")
     domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name") or "-"
     print(f"当前域名：{color(domain, CYAN)}")
     print()
@@ -1505,7 +1505,7 @@ def main() -> int:
                     ("5", "添加新主机"),
                     ("6", f"防火墙配置（端口 {agent_port()}）"),
                     ("7", "重新部署中心面板"),
-                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("8", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
                     ("9", "更新程序"),
                     ("10", "重启服务"),
                     ("11", "完整卸载"),
@@ -1521,7 +1521,7 @@ def main() -> int:
                     ("6", "添加新主机"),
                     ("7", f"防火墙配置（端口 {agent_port()}）"),
                     ("8", "重新部署中心面板"),
-                    ("9", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("9", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
                     ("10", "更新程序"),
                     ("11", "重启服务"),
                     ("12", "完整卸载"),
