@@ -1474,14 +1474,15 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
                     ("3", "修改本机信息"),
-                    ("4", "监控主机"),
-                    ("5", "添加新主机"),
-                    ("6", f"防火墙配置（端口 {agent_port()}）"),
-                    ("7", "重新部署中心面板"),
-                    ("8", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
-                    ("9", "更新程序"),
-                    ("10", "重启服务"),
-                    ("11", "完整卸载"),
+                    ("4", "重新设置本机 Agent"),
+                    ("5", "监控主机"),
+                    ("6", "添加新主机"),
+                    ("7", f"防火墙配置（端口 {agent_port()}）"),
+                    ("8", "重新部署中心面板"),
+                    ("9", "开启 HTTPS" if not https_is_on() else "关闭 HTTPS 恢复 HTTP"),
+                    ("10", "更新程序"),
+                    ("11", "重启服务"),
+                    ("12", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1532,20 +1533,22 @@ def main() -> int:
             elif selected == "3":
                 edit_node_info()
             elif selected == "4":
-                monitored_hosts_menu()
+                configure_agent(local=True)
             elif selected == "5":
-                temp_open_for_new_agent()
+                monitored_hosts_menu()
             elif selected == "6":
-                firewall_rules_menu()
+                temp_open_for_new_agent()
             elif selected == "7":
-                install_panel()
+                firewall_rules_menu()
             elif selected == "8":
-                toggle_https()
+                install_panel()
             elif selected == "9":
-                quick_update()
+                toggle_https()
             elif selected == "10":
-                restart_services()
+                quick_update()
             elif selected == "11":
+                restart_services()
+            elif selected == "12":
                 full_uninstall()
             else:
                 return 0
