@@ -486,7 +486,9 @@ def install_panel() -> None:
     title("部署中心面板")
     if not require_root():
         return
-    domain = ask("面板域名")
+    old_env = read_env(SERVER_ENV)
+    old_domain = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name") or ""
+    domain = ask("面板域名", old_domain)
     if not domain:
         print(color("域名不能为空。", RED))
         pause()
@@ -496,7 +498,8 @@ def install_panel() -> None:
         pause()
         return
     domain = domain.rstrip(".").lower()
-    generated = secrets.token_hex(24)
+    old_token = old_env.get("VPS_MONITOR_TOKEN", "")
+    generated = old_token or secrets.token_hex(24)
     token = ask("通信 token（留空自动生成）", generated, secret=True)
     if any(character.isspace() for character in token):
         print(color("token 不能包含空格或换行。", RED))
