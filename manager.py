@@ -247,6 +247,7 @@ def render_agent_config(values: dict[str, object]) -> str:
 
         traffic_reset_day = {int(values.get('traffic_reset_day', 0))}
         traffic_reset_hour = {int(values.get('traffic_reset_hour', 0))}
+        traffic_reset_minute = {int(values.get('traffic_reset_minute', 0))}
         traffic_limit_gb = {float(values.get('traffic_limit_gb', 0))}
         traffic_state_path = {toml_string(str(values.get('traffic_state_path', '/var/lib/vps-monitor-agent/traffic-state.json')))}
         """
@@ -593,10 +594,12 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         return
     reset_day_text = ask("每月流量重置日（1-31，留空=不重置）")
     reset_hour_text = ask("流量重置小时（0-23）", "0") if reset_day_text else "0"
+    reset_minute_text = ask("流量重置分钟（0-59）", "0") if reset_day_text else "0"
     limit_text = ask("月流量上限 GB（留空=无上限）")
     try:
         reset_day = min(31, max(1, int(reset_day_text))) if reset_day_text else 0
         reset_hour = min(23, max(0, int(reset_hour_text)))
+        reset_minute = min(59, max(0, int(reset_minute_text)))
         traffic_limit = max(0.0, float(limit_text)) if limit_text else 0.0
     except ValueError:
         print(color("流量重置时间或上限格式无效。", RED))
@@ -616,6 +619,7 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         "os_type": "Linux",
         "traffic_reset_day": reset_day,
         "traffic_reset_hour": reset_hour,
+        "traffic_reset_minute": reset_minute,
         "traffic_limit_gb": traffic_limit,
         "traffic_state_path": str(AGENT_TRAFFIC_STATE),
     }

@@ -316,7 +316,7 @@ def insert_metric(payload: dict[str, Any]) -> dict[str, Any]:
             )
 
         traffic_cycle = str(payload.get("traffic_cycle") or "")
-        if traffic_cycle:
+        if traffic_cycle and bool(payload.get("traffic_reset_enabled")):
             conn.execute(
                 """
                 UPDATE nodes
@@ -480,8 +480,6 @@ def set_node_traffic_offset(node_id: str, used_gb: float) -> dict[str, Any] | No
         cycle = str(row["traffic_cycle"] or "")
         if value > 0 and not cycle:
             raise ValueError("节点尚未上报账期信息，请先更新并重启 Agent")
-        if value > 0 and not bool(row["traffic_reset_enabled"]):
-            raise ValueError("该节点未配置每月流量重置时间")
         conn.execute(
             """
             UPDATE nodes

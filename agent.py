@@ -44,6 +44,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config.setdefault("disk_paths", os.getenv("VPS_MONITOR_DISK_PATHS", ",".join(default_disk_paths())))
     config.setdefault("traffic_reset_day", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "0")))
     config.setdefault("traffic_reset_hour", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0")))
+    config.setdefault("traffic_reset_minute", int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_MINUTE", "0")))
     config.setdefault("traffic_limit_gb", float(os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0")))
     default_state_path = (path or Path("agent.toml")).with_suffix(".traffic-state.json")
     config.setdefault("traffic_state_path", os.getenv("VPS_MONITOR_TRAFFIC_STATE", str(default_state_path)))
@@ -52,6 +53,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
     config["interval"] = max(1, int(config["interval"]))
     config["traffic_reset_day"] = min(31, max(0, int(config["traffic_reset_day"])))
     config["traffic_reset_hour"] = min(23, max(0, int(config["traffic_reset_hour"])))
+    config["traffic_reset_minute"] = min(59, max(0, int(config["traffic_reset_minute"])))
     config["traffic_limit_gb"] = max(0.0, float(config["traffic_limit_gb"]))
     return config
 
@@ -122,10 +124,10 @@ class CpuSampler:
                 self.value = float(value)
 
 
-def traffic_cycle_key(now: datetime, reset_day: int, reset_hour: int) -> str:
+def traffic_cycle_key(now: datetime, reset_day: int, reset_hour: int, reset_minute: int = 0) -> str:
     def cycle_start(year: int, month: int) -> datetime:
         day = min(reset_day, calendar.monthrange(year, month)[1])
-        return now.replace(year=year, month=month, day=day, hour=reset_hour, minute=0, second=0, microsecond=0)
+        return now.replace(year=year, month=month, day=day, hour=reset_hour, minute=reset_minute, second=0, microsecond=0)
 
     start = cycle_start(now.year, now.month)
     if now < start:
@@ -163,7 +165,7 @@ def update_monthly_traffic(
     current_time = now or datetime.now().astimezone()
     reset_day = int(config["traffic_reset_day"])
     cycle = (
-        traffic_cycle_key(current_time, reset_day, int(config["traffic_reset_hour"]))
+        traffic_cycle_key(current_time, reset_day, int(config["traffic_reset_hour"]), int(config["traffic_reset_minute"]))
         if reset_day > 0
         else "never"
     )

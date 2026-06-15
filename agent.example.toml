@@ -11,6 +11,7 @@ disk_paths = ["/"]
 # 0 表示不重置，1-31 表示每月重置日；超过当月天数时按最后一天处理。
 traffic_reset_day = 0
 traffic_reset_hour = 0
+traffic_reset_minute = 0
 # 0 表示无上限。
 traffic_limit_gb = 0
 traffic_state_path = "./agent.traffic-state.json"

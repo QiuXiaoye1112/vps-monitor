@@ -101,7 +101,7 @@ def test_center_traffic_offset_expires_when_agent_cycle_changes(tmp_path, monkey
     assert reset_node["traffic_offset_cycle"] == ""
 
 
-def test_center_traffic_offset_requires_monthly_reset(tmp_path, monkeypatch) -> None:
+def test_center_traffic_offset_without_monthly_reset_is_permanent(tmp_path, monkeypatch) -> None:
     database = tmp_path / "monitor.db"
     monkeypatch.setattr(storage, "DB_PATH", database)
     monkeypatch.setattr(storage, "METRIC_RETENTION_DAYS", 0)
@@ -109,13 +109,18 @@ def test_center_traffic_offset_requires_monthly_reset(tmp_path, monkeypatch) -> 
     storage.create_or_update_node({"node_id": "node-1", "name": "Node 1"})
     storage.insert_metric(traffic_metric("node-1", "never", reset_enabled=False))
 
-    try:
-        storage.set_node_traffic_offset("node-1", 10)
-    except ValueError as exc:
-        assert "未配置每月流量重置时间" in str(exc)
-    else:
-        raise AssertionError("positive center traffic offset must require a reset time")
+    # 未配置月重置也可以设置正数偏移量（永久偏移）
+    node = storage.set_node_traffic_offset("node-1", 10)
+    assert node is not None
+    assert node["traffic_offset_gb"] == 10
 
+    # 再次上报不会自动清零（因为没有月重置）
+    storage.insert_metric(traffic_metric("node-1", "never", reset_enabled=False))
+    node = storage.get_node("node-1")
+    assert node is not None
+    assert node["traffic_offset_gb"] == 10
+
+    # 可以手动归零
     node = storage.set_node_traffic_offset("node-1", 0)
     assert node is not None
     assert node["traffic_offset_gb"] == 0

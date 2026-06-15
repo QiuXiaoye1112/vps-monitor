@@ -32,6 +32,7 @@ def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_pa
         "上报间隔（秒）": "1",
         "每月流量重置日（1-31，留空=不重置）": "15",
         "流量重置小时（0-23）": "4",
+        "流量重置分钟（0-59）": "30",
         "月流量上限 GB（留空=无上限）": "500",
     }
 
@@ -63,6 +64,7 @@ def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_pa
     content = config_path.read_text(encoding="utf-8")
     assert 'server_url = "http://192.0.2.10:8080"' in content
     assert "traffic_reset_day = 15" in content
+    assert "traffic_reset_minute = 30" in content
     assert "traffic_limit_gb = 500.0" in content
     assert "traffic_offset_gb" not in content
     assert not traffic_state.exists()

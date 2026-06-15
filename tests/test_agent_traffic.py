@@ -9,10 +9,11 @@ from agent import (
 )
 
 
-def config(reset_day: int = 1, reset_hour: int = 0) -> dict[str, object]:
+def config(reset_day: int = 1, reset_hour: int = 0, reset_minute: int = 0) -> dict[str, object]:
     return {
         "traffic_reset_day": reset_day,
         "traffic_reset_hour": reset_hour,
+        "traffic_reset_minute": reset_minute,
     }
 
 
