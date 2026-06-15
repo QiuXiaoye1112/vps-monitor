@@ -1050,60 +1050,73 @@ def edit_node_info() -> None:
             config = tomllib.load(f)
     except Exception:
         config = {}
-
     role = installation_role()
-    if role == "center":
-        print(color("本机角色：中心服务器", CYAN))
-    else:
-        print(color("本机角色：远程节点", CYAN))
-    print()
 
-    name = ask("显示名称", config.get("name", ""))
-    node_id = ask("节点 ID", config.get("node_id", ""))
-    reset_day = ask("流量重置日", os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
-    limit_gb = ask("月流量上限（GB，0=不限制）", os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
-    interval = ask("上报间隔（秒）", str(config.get("interval", "1")))
-
-    if not name or not node_id:
-        print(color("名称和节点 ID 不能为空。", RED))
-        pause()
-        return
-
-    config["name"] = name
-    config["node_id"] = node_id
-    config["interval"] = int(interval) if interval.isdigit() else 1
+    while True:
+        title("修改本机信息")
+        print(f"角色：{color('中心服务器' if role == 'center' else '远程节点', CYAN)}")
+        print(f"  显示名称：{config.get('name', '-')}")
+        print(f"  节点 ID：{config.get('node_id', '-')}")
+        print(f"  流量重置：每月 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_DAY', '1')} 号 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_HOUR', '0')}:00")
+        print(f"  月流量上限：{os.getenv('VPS_MONITOR_TRAFFIC_LIMIT_GB', '0')} GB")
+        print(f"  上报间隔：{config.get('interval', '1')} 秒")
+        print()
+        selected = choose("选择要修改的项", [
+            ("1", "显示名称"), ("2", "节点 ID"), ("3", "流量重置时间"),
+            ("4", "月流量上限"), ("5", "上报间隔"), ("6", "保存并退出"),
+        ])
+        if selected is None or selected == "6":
+            break
+        if selected == "1":
+            val = ask("显示名称", config.get("name", ""))
+            if val: config["name"] = val
+        elif selected == "2":
+            val = ask("节点 ID", config.get("node_id", ""))
+            if val: config["node_id"] = val
+        elif selected == "3":
+            val = ask("重置日（几号）", os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
+            if val: os.environ["VPS_MONITOR_TRAFFIC_RESET_DAY"] = val
+            val = ask("重置时（几点，0-23）", os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0"))
+            if val: os.environ["VPS_MONITOR_TRAFFIC_RESET_HOUR"] = val
+        elif selected == "4":
+            val = ask("月流量上限（GB，0=不限制）", os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
+            if val: os.environ["VPS_MONITOR_TRAFFIC_LIMIT_GB"] = val
+        elif selected == "5":
+            val = ask("上报间隔（秒）", str(config.get("interval", "1")))
+            if val and val.isdigit(): config["interval"] = int(val)
 
     content = textwrap.dedent(f"""\
-        server_url = "{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}"
-        node_id = "{node_id}"
-        token = "{config.get('token', 'change-me')}"
-        interval = {config['interval']}
+        server_url = \"{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}\"
+        node_id = \"{config.get('node_id', '')}\"
+        token = \"{config.get('token', 'change-me')}\"
+        interval = {config.get('interval', 1)}
 
-        name = "{name}"
-        ip = "{config.get('ip', '')}"
-        region = "{config.get('region', '')}"
-        os_type = "{config.get('os_type', 'Linux')}"
-        note = "{config.get('note', '')}"
+        name = \"{config.get('name', '')}\"
+        ip = \"{config.get('ip', '')}\"
+        region = \"{config.get('region', '')}\"
+        os_type = \"{config.get('os_type', 'Linux')}\"
+        note = \"{config.get('note', '')}\"
 
         disk_paths = [{', '.join(f'"{p}"' for p in (config.get('disk_paths') or ['/']))}]
         """)
     write_text_secure(AGENT_CONFIG, content)
-    # 写入环境变量
-    env_content = SERVER_ENV.read_text() if SERVER_ENV.exists() else ""
-    for key, val in (("VPS_MONITOR_TRAFFIC_RESET_DAY", reset_day), ("VPS_MONITOR_TRAFFIC_LIMIT_GB", limit_gb)):
-        if f"{key}=" in env_content:
-            env_content = re.sub(rf"^{key}=.*", f"{key}={val}", env_content, flags=re.MULTILINE)
-        elif env_content:
-            env_content += f"\n{key}={val}\n"
-        else:
-            pass  # agent-only mode, no env file needed; env vars can be set per-process
-    if SERVER_ENV.exists() and env_content:
-        write_text_secure(SERVER_ENV, env_content)
-    print(color("信息已保存。", GREEN))
+    env_path = SERVER_ENV
+    env_lines = env_path.read_text().splitlines() if env_path.exists() else []
+    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB"):
+        val = os.getenv(key, "")
+        found = False
+        for i, line in enumerate(env_lines):
+            if line.startswith(f"{key}="):
+                env_lines[i] = f"{key}={val}"
+                found = True
+                break
+        if not found:
+            env_lines.append(f"{key}={val}")
+    write_text_secure(env_path, "\\n".join(env_lines) + "\\n")
+    print(color("已保存。", GREEN))
     active, _ = service_state(AGENT_SERVICE)
     if active == "active":
         run(["systemctl", "restart", AGENT_SERVICE], check=False)
-        print(color("Agent 已重启。", GREEN))
     pause()
 
 
@@ -1472,11 +1485,10 @@ def main() -> int:
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
                     ("3", "修改本机信息"),
-                    ("4", "重新配置 Agent"),
-                    ("5", "删除 Agent"),
-                    ("6", "更新程序"),
-                    ("7", "重启服务"),
-                    ("8", "完整卸载"),
+                    ("4", "删除 Agent"),
+                    ("5", "更新程序"),
+                    ("6", "重启服务"),
+                    ("7", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1541,14 +1553,12 @@ def main() -> int:
         elif selected == "3":
             edit_node_info()
         elif selected == "4":
-            configure_agent(local=False)
-        elif selected == "5":
             remove_agent()
-        elif selected == "6":
+        elif selected == "5":
             quick_update()
-        elif selected == "7":
+        elif selected == "6":
             restart_services()
-        elif selected == "8":
+        elif selected == "7":
             full_uninstall()
         else:
             return 0
