@@ -358,12 +358,9 @@ DASHBOARD_HTML = """<!doctype html>
           bootInfo = ` · 上次启动：${fmtTime(bootTime.toISOString())}`;
         }
         if (metric.traffic_reset_enabled && metric.traffic_cycle) {
-          const resetDate = new Date(metric.traffic_cycle);
-          if (!Number.isNaN(resetDate.getTime())) {
-            const day = resetDate.getDate();
-            const hour = String(resetDate.getHours()).padStart(2, '0');
-            const minute = String(resetDate.getMinutes()).padStart(2, '0');
-            bootInfo += ` · 流量重置：每月 ${day} 日 ${hour}:${minute}`;
+          const m = metric.traffic_cycle.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+          if (m) {
+            bootInfo += ` · 流量重置：每月 ${parseInt(m[3], 10)} 日 ${m[4]}:${m[5]}`;
           }
         }
         lastSeen.textContent = `最后上报：${fmtAge(node.last_seen_at, serverNow)}${bootInfo}`;
