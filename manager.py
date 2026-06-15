@@ -539,12 +539,10 @@ def install_panel() -> None:
         ensure_venv("requirements.txt")
         host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
         api_port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
-        agent_listen = ask_port("Agent 接入端口", int(agent_port()))
         os.environ["VPS_MONITOR_API_PORT"] = str(api_port)
-        os.environ["VPS_MONITOR_AGENT_PORT"] = str(agent_listen)
         write_text_secure(
             SERVER_ENV,
-            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={api_port}\nVPS_MONITOR_AGENT_PORT={agent_listen}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
+            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={api_port}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
         )
         write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
         nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
@@ -560,10 +558,6 @@ def install_panel() -> None:
         run(["systemctl", "enable", API_SERVICE, "nginx"])
         run(["systemctl", "restart", API_SERVICE])
         run(["systemctl", "reload", "nginx"])
-        ingress_env = os.environ.copy()
-        ingress_env["AGENT_PORT"] = str(agent_listen)
-        ingress_env["API_PORT"] = str(api_port)
-        run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：http://{domain}")
         print(color("如需 HTTPS：sudo vm → SSL 证书设置", DIM))
@@ -745,9 +739,12 @@ def ingress_menu() -> None:
             continue
         try:
             if selected == "1":
-                port = ask("Agent 入口端口", agent_port())
+                port = ask_port("Agent 入口端口", int(agent_port()))
+                server_values = read_env(SERVER_ENV)
+                api_port = server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or "8000"
                 env = os.environ.copy()
-                env["AGENT_PORT"] = port
+                env["AGENT_PORT"] = str(port)
+                env["API_PORT"] = str(api_port)
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
             elif selected == "2":
                 agent_ip = ask("Agent 公网 IP")
@@ -1289,7 +1286,9 @@ def allow_node_firewall(node: dict[str, Any]) -> None:
     if not require_root():
         return
     ingress_env = os.environ.copy()
+    server_values = read_env(SERVER_ENV)
     ingress_env["AGENT_PORT"] = agent_port()
+    ingress_env["API_PORT"] = server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or "8000"
     run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
     ensure_apt_packages(["iptables"])
     run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), str(address)], env=ingress_env)
