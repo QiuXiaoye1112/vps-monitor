@@ -1661,7 +1661,7 @@ def main() -> int:
             elif selected == "5":
                 temp_open_for_new_agent()
             elif selected == "6":
-                firewall_rules_menu()
+                ingress_menu()
             elif selected == "7":
                 toggle_https()
             elif selected == "8":
@@ -1683,7 +1683,7 @@ def main() -> int:
             elif selected == "4":
                 temp_open_for_new_agent()
             elif selected == "5":
-                firewall_rules_menu()
+                ingress_menu()
             elif selected == "6":
                 toggle_https()
             elif selected == "7":
