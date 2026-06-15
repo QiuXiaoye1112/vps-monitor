@@ -1499,8 +1499,12 @@ def monitored_hosts_menu() -> None:
                 is_local = ipaddress.ip_address(ip).is_loopback
             except ValueError:
                 is_local = False
+            display_ip = ip
+            if is_local:
+                api_port = read_env(SERVER_ENV).get("VPS_MONITOR_API_PORT") or "8000"
+                display_ip = f"{ip}:{api_port}"
             tag = color("本机", DIM) if is_local else ("已放行" if firewall_allows(ip) else "未放行")
-            label = f"{node.get('name') or node.get('id')} | {node.get('status', 'unknown')} | {ip} | {tag}"
+            label = f"{node.get('name') or node.get('id')} | {node.get('status', 'unknown')} | {display_ip} | {tag}"
             options.append((str(index), label))
         selected = choose("选择一台主机", options)
         if selected is None:
@@ -1518,8 +1522,9 @@ def monitored_hosts_menu() -> None:
         print(f"来源 IP：{ip}")
         print(f"中心补充流量：{float(node.get('traffic_offset_gb') or 0):.1f} GB")
         if is_local:
+            api_port = read_env(SERVER_ENV).get("VPS_MONITOR_API_PORT") or "8000"
             print()
-            print(color("本机节点通过 127.0.0.1 直接访问 API，无需配置远程防火墙。", GREEN))
+            print(color(f"本机节点通过 127.0.0.1:{api_port} 直接访问 API，无需配置远程防火墙。", GREEN))
             local_action = choose(
                 "本机操作",
                 [
