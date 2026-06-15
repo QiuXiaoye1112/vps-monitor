@@ -119,8 +119,16 @@ def report_once(
         previous_net=previous_net,
         cpu_percent=cpu_percent,
     )
-    # 月度流量
-    month_key = time.strftime("%Y-%m")
+    # 月度流量（重置日可通过 VPS_MONITOR_TRAFFIC_RESET_DAY 自定义，默认1号）
+    reset_day = int(os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
+    now = time.localtime()
+    if now.tm_mday >= reset_day:
+        month_key = time.strftime("%Y-%m")
+    else:
+        # 还没到重置日，算上个月
+        import calendar
+        prev = time.localtime(time.time() - 86400 * (now.tm_mday + 1))
+        month_key = time.strftime("%Y-%m", prev)
     if monthly_baseline is None or monthly_baseline.get("key") != month_key:
         monthly_baseline = {
             "key": month_key,
