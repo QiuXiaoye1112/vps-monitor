@@ -1596,11 +1596,10 @@ def main() -> int:
                     ("4", "监控主机"),
                     ("5", "添加新主机"),
                     ("6", f"防火墙配置（端口 {agent_port()}）"),
-                    ("7", "重新部署中心面板"),
-                    ("8", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
-                    ("9", "更新程序"),
-                    ("10", "重启服务"),
-                    ("11", "完整卸载"),
+                    ("7", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
+                    ("8", "更新程序"),
+                    ("9", "重启服务"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center" and not AGENT_CONFIG.exists()
@@ -1610,11 +1609,10 @@ def main() -> int:
                     ("3", "监控主机"),
                     ("4", "添加新主机"),
                     ("5", f"防火墙配置（端口 {agent_port()}）"),
-                    ("6", "重新部署中心面板"),
-                    ("7", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
-                    ("8", "更新程序"),
-                    ("9", "重启服务"),
-                    ("10", "完整卸载"),
+                    ("6", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
+                    ("7", "更新程序"),
+                    ("8", "重启服务"),
+                    ("9", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
@@ -1644,14 +1642,12 @@ def main() -> int:
             elif selected == "6":
                 firewall_rules_menu()
             elif selected == "7":
-                install_panel()
-            elif selected == "8":
                 toggle_https()
-            elif selected == "9":
+            elif selected == "8":
                 quick_update()
-            elif selected == "10":
+            elif selected == "9":
                 restart_services()
-            elif selected == "11":
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1668,14 +1664,12 @@ def main() -> int:
             elif selected == "5":
                 firewall_rules_menu()
             elif selected == "6":
-                install_panel()
-            elif selected == "7":
                 toggle_https()
-            elif selected == "8":
+            elif selected == "7":
                 quick_update()
-            elif selected == "9":
+            elif selected == "8":
                 restart_services()
-            elif selected == "10":
+            elif selected == "9":
                 full_uninstall()
             else:
                 return 0
