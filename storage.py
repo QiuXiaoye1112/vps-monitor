@@ -110,8 +110,6 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_metrics_node_collected ON metrics(node_id, collected_at DESC);
             CREATE INDEX IF NOT EXISTS idx_nodes_last_seen ON nodes(last_seen_at);
 
-            -- 月度流量列（兼容旧数据库，已存在则忽略错误）
-            ALTER TABLE metrics ADD COLUMN net_tx_month INTEGER DEFAULT 0;
             """
         )
         conn.commit()
