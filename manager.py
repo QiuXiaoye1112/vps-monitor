@@ -548,7 +548,8 @@ def install_panel() -> None:
         print(f"访问地址：{'https' if https_enabled else 'http'}://{domain}")
         if not is_ip_address(domain) and not https_enabled:
             print(color("SSL 申请失败，请确认域名已解析到本机且公网 80 端口可访问。当前可先使用 HTTP。", YELLOW))
-        print(f"健康检查：{'正常' if ok else '启动中，稍后刷新即可'}")
+        if not ok:
+            print(color("API 启动中，稍后刷新页面即可。", DIM))
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\n部署失败：{exc}", RED))

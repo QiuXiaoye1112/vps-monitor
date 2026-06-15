@@ -180,15 +180,13 @@ enable_https() {
 }
 
 wait_for_api() {
-  info "等待 API 启动..."
-  local dots=""
   for i in $(seq 1 30); do
     if curl -sf "http://${API_HOST}:${API_PORT}/api/health" >/dev/null 2>&1; then
-      printf "\r  ${GREEN}✓${RESET} API 已就绪        \n"; return 0
+      return 0
     fi
-    dots="${dots}."; printf "\r  ${DIM}启动中%s${RESET}" "$dots"; sleep 1
+    sleep 1
   done
-  printf "\n"; warn "API 启动较慢，稍后刷新即可，不影响使用。"; return 1
+  return 1
 }
 
 print_preflight() {
@@ -226,7 +224,7 @@ main() {
     warn "服务启动遇到问题，配置已备份。"; warn "journalctl -u $SERVICE_NAME -n 50"; exit 1
   fi
   _step "申请 HTTPS 证书";    enable_https
-  _step "验证 API 可用性";    wait_for_api || true
+  wait_for_api || true
   print_result
 }
 
