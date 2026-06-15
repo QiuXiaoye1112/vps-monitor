@@ -780,7 +780,14 @@ def ingress_menu() -> None:
                     save_firewall()
                     print(color(f"已清理旧端口 {old} 的防火墙规则。", GREEN))
             elif selected == "2":
-                run(["iptables", "-S", "INPUT"], check=False)
+                port = agent_port()
+                result = subprocess.run(["iptables", "-S", "INPUT"], capture_output=True, text=True, check=False)
+                lines = [l for l in result.stdout.splitlines() if f"--dport {port}" in l]
+                if lines:
+                    for line in lines:
+                        print(line)
+                else:
+                    print(f"端口 {port} 暂无防火墙规则。")
             else:
                 if confirm("确认删除 Agent 入口？"):
                     remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
