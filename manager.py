@@ -776,9 +776,9 @@ def enable_https_for_domain() -> None:
         write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
         run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
         print(color(f"域名已更换：http://{new_domain}", GREEN))
-        _show_cf_ssl_steps(new_domain)
+        apply_cf_ssl(new_domain)
     elif not is_ip and selected == "1":
-        _show_cf_ssl_steps(current)
+        apply_cf_ssl(current)
     elif not is_ip and selected == "2":
         new_domain = ask("新域名")
         if not new_domain: return
@@ -810,7 +810,49 @@ def _show_cf_ssl_steps(domain: str) -> None:
     print(f"  {color('5', CYAN)}. 等待 DNS 生效，访问 {color('https://' + domain, GREEN)}")
     print()
     print(color("CF 会自动签发证书，无需在 VPS 上操作。", DIM))
-    print(color("如果已有 Let\'s Encrypt 证书，需先关闭 HTTPS 再用 CF。", DIM))
+    pause()
+
+def apply_cf_ssl(domain: str) -> None:
+    print()
+    print(color("=== 通过 Cloudflare API 申请证书 ===", BOLD + CYAN))
+    print()
+    print("需要 CF API Token（Zone:DNS:Edit 权限）")
+    print("获取：cloudflare.com → 个人资料 → API 令牌 → 创建令牌")
+    print()
+    token = ask("CF API Token", secret=True)
+    if not token:
+        return
+    cred_file = Path("/root/.cloudflare.ini")
+    write_text_secure(cred_file, f"dns_cloudflare_api_token = {token}\n")
+    print(color("凭据已保存。", GREEN))
+    try:
+        ensure_apt_packages(["python3-certbot-dns-cloudflare"])
+    except Exception:
+        print(color("安装 dns-cloudflare 插件失败。", RED))
+        return
+    print(color("正在申请证书（DNS 验证）...", CYAN))
+    result = run([
+        "certbot", "certonly", "--dns-cloudflare",
+        "--dns-cloudflare-credentials", str(cred_file),
+        "-d", domain,
+        "--non-interactive", "--agree-tos",
+        "--register-unsafely-without-email",
+    ], check=False)
+    if result.returncode == 0:
+        site_conf = Path("/etc/nginx/sites-available/vps-monitor.conf")
+        conf = site_conf.read_text()
+        if "listen 443" not in conf:
+            conf = conf.replace(
+                "server {\n    listen 80;",
+                f"server {{\n    listen 80;\n    listen 443 ssl;\n    ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/{domain}/privkey.pem;"
+            )
+        write_text_secure(site_conf, conf, 0o644)
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"证书已安装：https://{domain}", GREEN))
+        subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
+    else:
+        print(color("证书申请失败，请确认 Token 权限和域名解析。", RED))
     pause()
 
 def disable_https() -> None:
