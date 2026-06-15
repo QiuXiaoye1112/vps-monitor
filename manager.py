@@ -754,75 +754,57 @@ def enable_https_for_domain() -> None:
     current = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name") or "-"
     is_ip = is_ip_address(current)
     print(f"当前地址：{color(current, CYAN)}")
-    if is_ip:
-        print(color("IP 模式：SSL 需通过 Cloudflare 实现", DIM))
-    else:
-        print(color("域名模式：可申请 Let's Encrypt 免费证书", DIM))
     print()
 
     if is_ip:
         selected = choose("选择操作", [
-            ("1", "换成域名并申请 Let's Encrypt SSL 证书"),
-            ("2", "Cloudflare SSL 设置说明"),
+            ("1", "换成域名并申请 CF SSL 证书"),
         ])
     else:
         selected = choose("选择操作", [
-            ("1", f"为 {current} 申请 Let's Encrypt SSL 证书"),
+            ("1", "申请 CF SSL 证书"),
             ("2", "更换域名并申请 SSL 证书"),
-            ("3", "换成 IP 访问"),
+            ("3", "更换 IP 并申请 Let\'s Encrypt SSL 证书"),
         ])
 
     if selected is None:
         return
 
-    if is_ip:
-        if selected == "1":
-            new_domain = ask("域名")
-            if not new_domain:
-                return
-            write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
-            run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-            if confirm(f"为 {new_domain} 申请 Let's Encrypt 证书？"):
-                if enable_https(new_domain):
-                    print(color(f"已启用：https://{new_domain}", GREEN))
-                    subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
-                else:
-                    print(color("证书申请失败，请确认域名已解析到本机。", RED))
-        else:
-            print(color("Cloudflare SSL 设置方法：", CYAN))
-            print("  1. 域名 DNS 添加到 Cloudflare，开启小黄云")
-            print("  2. SSL/TLS 设为 Full 或 Full strict")
-            print("  3. Dashboard 通过 https://域名 访问即可")
-    else:
-        if selected == "1":
-            if confirm(f"为 {current} 申请 Let's Encrypt 证书？"):
-                if enable_https(current):
-                    print(color(f"已启用：https://{current}", GREEN))
-                    subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
-                else:
-                    print(color("证书申请失败，请确认域名已解析到本机。", RED))
-        elif selected == "2":
-            new_domain = ask("新域名")
-            if not new_domain: return
-            if command_exists("certbot"):
-                run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
-            write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
-            run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-            if confirm(f"为 {new_domain} 申请 Let's Encrypt 证书？"):
-                if enable_https(new_domain):
-                    print(color(f"已启用：https://{new_domain}", GREEN))
-                    subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
-                else:
-                    print(color("证书申请失败。", RED))
-        elif selected == "3":
-            if command_exists("certbot"):
-                run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
-            ip = ask("公网 IP")
-            if not ip: return
-            write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(ip), 0o644)
-            run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-            print(color(f"已切回 IP 模式：http://{ip}", GREEN))
-            print(color("如需 SSL：Cloudflare 小黄云 + Full SSL", DIM))
+    if is_ip and selected == "1":
+        new_domain = ask("域名")
+        if not new_domain: return
+        write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
+        run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"已更换为：http://{new_domain}", GREEN))
+        print(color("CF SSL 设置：域名 DNS 添加到 Cloudflare → 开启小黄云 → SSL/TLS 设为 Full", CYAN))
+    elif not is_ip and selected == "1":
+        print(color("CF SSL 设置方法：", CYAN))
+        print(f"  1. {current} 的 DNS 添加到 Cloudflare")
+        print("  2. 开启小黄云（代理模式）")
+        print("  3. SSL/TLS 设为 Full 或 Full strict")
+    elif not is_ip and selected == "2":
+        new_domain = ask("新域名")
+        if not new_domain: return
+        if command_exists("certbot"):
+            run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
+        write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
+        run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"已更换为：http://{new_domain}", GREEN))
+        print(color("CF SSL 设置：域名 DNS 添加到 Cloudflare → 开启小黄云 → SSL/TLS 设为 Full", CYAN))
+    elif not is_ip and selected == "3":
+        if command_exists("certbot"):
+            run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
+        ip = ask("公网 IP")
+        if not ip: return
+        write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(ip), 0o644)
+        run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"已更换为：http://{ip}", GREEN))
+        if confirm("尝试为 IP 申请 Let\'s Encrypt 证书？"):
+            if enable_https(ip):
+                print(color(f"已启用：https://{ip}", GREEN))
+                subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
+            else:
+                print(color("Let\'s Encrypt 不支持 IP 证书，请使用 CF SSL。", RED))
     pause()
 
 def disable_https() -> None:
