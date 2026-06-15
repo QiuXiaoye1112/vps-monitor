@@ -1094,16 +1094,16 @@ def edit_node_info() -> None:
             if val: os.environ["VPS_MONITOR_AGENT_PORT"] = val
 
     content = textwrap.dedent(f"""\
-        server_url = \"{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}\"
-        node_id = \"{config.get('node_id', '')}\"
-        token = \"{config.get('token', 'change-me')}\"
+        server_url = "{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}"
+        node_id = "{config.get('node_id', '')}"
+        token = "{config.get('token', 'change-me')}"
         interval = {config.get('interval', 1)}
 
-        name = \"{config.get('name', '')}\"
-        ip = \"{config.get('ip', '')}\"
-        region = \"{config.get('region', '')}\"
-        os_type = \"{config.get('os_type', 'Linux')}\"
-        note = \"{config.get('note', '')}\"
+        name = "{config.get('name', '')}"
+        ip = "{config.get('ip', '')}"
+        region = "{config.get('region', '')}"
+        os_type = "{config.get('os_type', 'Linux')}"
+        note = "{config.get('note', '')}"
 
         disk_paths = [{', '.join(f'"{p}"' for p in (config.get('disk_paths') or ['/']))}]
         """)
