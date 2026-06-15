@@ -757,6 +757,7 @@ def enable_https_for_domain() -> None:
     selected = choose("选择操作", [
         ("1", f"为当前域名（{domain}）申请 SSL 证书"),
         ("2", "更换域名并申请 SSL 证书"),
+        ("3", "换成 IP 访问（关闭 HTTPS）"),
     ])
     if selected is None:
         return
@@ -764,10 +765,8 @@ def enable_https_for_domain() -> None:
         new_domain = ask("新域名")
         if not new_domain:
             return
-        # 删旧证书
         if command_exists("certbot"):
             run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
-        # 更新 nginx 配置的域名
         write_text_secure(
             Path("/etc/nginx/sites-available/vps-monitor.conf"),
             panel_nginx_config(new_domain),
@@ -775,17 +774,33 @@ def enable_https_for_domain() -> None:
         )
         run(["nginx", "-t"], check=False)
         run(["systemctl", "reload", "nginx"], check=False)
-        print(color(f"域名已从 {domain} 更换为 {new_domain}，旧证书已删除。", GREEN))
         domain = new_domain
-    if not confirm(f"为 {domain} 申请 Let's Encrypt 证书？"):
+    elif selected == "3":
+        if command_exists("certbot"):
+            run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
+        ip = ask("公网 IP")
+        if not ip:
+            return
+        write_text_secure(
+            Path("/etc/nginx/sites-available/vps-monitor.conf"),
+            panel_nginx_config(ip),
+            0o644,
+        )
+        run(["nginx", "-t"], check=False)
+        run(["systemctl", "reload", "nginx"], check=False)
+        print(color(f"已切回 HTTP：http://{ip}", GREEN))
+        pause()
         return
-    if enable_https(domain):
-        print(color(f"HTTPS 已启用：https://{domain}", GREEN))
-        if command_exists("systemctl"):
-            subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
-            print(color("已启用证书自动续期。", DIM))
-    else:
-        print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
+    if selected in ("1", "2"):
+        if not confirm(f"为 {domain} 申请 Let's Encrypt 证书？"):
+            return
+        if enable_https(domain):
+            print(color(f"HTTPS 已启用：https://{domain}", GREEN))
+            if command_exists("systemctl"):
+                subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
+                print(color("已启用证书自动续期。", DIM))
+        else:
+            print(color("证书申请失败，请确认域名已解析到本机且 80 端口公网可达。", RED))
     pause()
 
 
