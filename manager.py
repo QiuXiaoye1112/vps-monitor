@@ -590,12 +590,14 @@ def configure_agent(local: bool) -> None:
     reset_day_text = ask("每月流量重置日（1-31，留空=不重置）")
     reset_hour_text = ask("流量重置小时（0-23）", "0") if reset_day_text else "0"
     limit_text = ask("月流量上限 GB（留空=无上限）")
+    used_text = ask("当前已使用流量 GB（留空=从 0 开始）")
     try:
         reset_day = min(31, max(1, int(reset_day_text))) if reset_day_text else 0
         reset_hour = min(23, max(0, int(reset_hour_text)))
         traffic_limit = max(0.0, float(limit_text)) if limit_text else 0.0
+        traffic_used = max(0.0, float(used_text)) if used_text else 0.0
     except ValueError:
-        print(color("流量重置时间和上限格式无效。", RED))
+        print(color("流量重置时间、上限或当前已用流量格式无效。", RED))
         pause()
         return
     if not center_url or not node_id or not token:
@@ -613,7 +615,7 @@ def configure_agent(local: bool) -> None:
         "traffic_reset_day": reset_day,
         "traffic_reset_hour": reset_hour,
         "traffic_limit_gb": traffic_limit,
-        "traffic_offset_gb": 0,
+        "traffic_offset_gb": traffic_used,
         "traffic_state_path": "/var/lib/vps-monitor-agent/traffic-state.json",
     }
     print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")

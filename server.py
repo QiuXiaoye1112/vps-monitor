@@ -232,6 +232,11 @@ DASHBOARD_HTML = """<!doctype html>
       return `${fmtBytes(value)}/s`;
     }
 
+    function fmtGB(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+      return `${(Number(value) / 1073741824).toFixed(1)} GB`;
+    }
+
     function fmtTime(value) {
       if (!value) return "-";
       const date = new Date(value);
@@ -317,11 +322,11 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock(
             trafficHasReset ? "本月流量" : "累计流量",
             trafficHasReset
-              ? `↑${fmtBytes(metric.net_tx_month)} ↓${fmtBytes(metric.net_rx_month)}`
-              : fmtBytes(totalTraffic)
+              ? `↑${fmtGB(metric.net_tx_month)} ↓${fmtGB(metric.net_rx_month)}`
+              : fmtGB(totalTraffic)
           )
         );
-        // 有上限时显示实际占用；无上限时固定满格且不显示百分比。
+        // 有上限时提前 5 GB 视为用满；无上限时固定满格且不显示百分比。
         const limitGB = metric.traffic_limit_gb;
         const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
         const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
@@ -329,11 +334,13 @@ DASHBOARD_HTML = """<!doctype html>
         const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
         const barFill = document.createElement("div");
         if (limitGB > 0) {
-          const pct = Math.min(100, (totalTraffic / (limitGB * 1073741824)) * 100).toFixed(1);
-          barLabel.innerHTML = `<span>${trafficLabel} ${fmtBytes(totalTraffic)} / ${limitGB}GB</span><span>${pct}%</span>`;
+          const fullAtGB = limitGB > 5 ? limitGB - 5 : limitGB;
+          const pct = Math.min(100, (totalTraffic / (fullAtGB * 1073741824)) * 100).toFixed(1);
+          const displayedTraffic = Number(pct) >= 100 ? limitGB * 1073741824 : totalTraffic;
+          barLabel.innerHTML = `<span>${trafficLabel} ${fmtGB(displayedTraffic)} / ${Number(limitGB).toFixed(1)} GB</span><span>${pct}%</span>`;
           barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
         } else {
-          barLabel.textContent = `${trafficLabel} ${fmtBytes(totalTraffic)}`;
+          barLabel.textContent = `${trafficLabel} ${fmtGB(totalTraffic)}`;
           barFill.style.cssText = "height:6px;border-radius:3px;background:#22c55e;width:100%;";
         }
         barBg.append(barFill); barWrap.append(barLabel, barBg); metrics.append(barWrap);

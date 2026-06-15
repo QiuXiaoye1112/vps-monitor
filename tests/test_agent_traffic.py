@@ -59,6 +59,29 @@ def test_missing_reset_time_can_still_have_a_traffic_limit() -> None:
     assert state["tx"] + state["rx"] == 1100
 
 
+def test_existing_usage_is_applied_only_to_initial_cycle() -> None:
+    state: dict[str, object] = {}
+    with_existing_usage = {**config(15, 4), "traffic_offset_gb": 10.0}
+    first_cycle = datetime(2026, 6, 15, 5, 0, tzinfo=timezone.utc)
+    next_cycle = datetime(2026, 7, 15, 5, 0, tzinfo=timezone.utc)
+
+    update_monthly_traffic(
+        {"bytes_sent": 1000, "bytes_recv": 2000},
+        with_existing_usage,
+        state,
+        now=first_cycle,
+    )
+    assert state["tx"] + state["rx"] == 10 * 1073741824
+
+    update_monthly_traffic(
+        {"bytes_sent": 3000, "bytes_recv": 4000},
+        with_existing_usage,
+        state,
+        now=next_cycle,
+    )
+    assert state["tx"] + state["rx"] == 0
+
+
 def test_traffic_state_round_trip(tmp_path) -> None:
     path = tmp_path / "traffic-state.json"
     save_traffic_state(path, {"cycle": "cycle-1", "tx": 12, "rx": 34, "_save_after": 99})

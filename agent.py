@@ -170,7 +170,8 @@ def update_monthly_traffic(
     current_recv = int(current_net["bytes_recv"])
     cycle_changed = state.get("cycle") != cycle
     if cycle_changed:
-        offset_bytes = int(float(config["traffic_offset_gb"]) * 1073741824)
+        initial_state = not state.get("cycle")
+        offset_bytes = int(float(config["traffic_offset_gb"]) * 1073741824) if initial_state else 0
         state.clear()
         state.update(
             {

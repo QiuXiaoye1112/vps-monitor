@@ -75,6 +75,7 @@ disk_paths = ["/"]
 traffic_reset_day = 0
 traffic_reset_hour = 0
 traffic_limit_gb = 0
+traffic_offset_gb = 0
 traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
 
@@ -111,10 +112,15 @@ disk_paths = ["/"]
 traffic_reset_day = 0
 traffic_reset_hour = 4
 traffic_limit_gb = 0
+traffic_offset_gb = 0
 traffic_state_path = "/var/lib/vps-monitor-agent/traffic-state.json"
 ```
 
 流量账期配置保存在每台 Agent 自己的 TOML 中，因此不同主机可以使用不同的重置日和小时。`traffic_reset_day = 0` 表示持续累计、不自动重置；`traffic_limit_gb = 0` 表示无上限，面板显示已使用流量和固定满格进度条，但不显示百分比。如果不设置重置时间但设置了流量上限，面板仍会显示累计占用、额度百分比和进度条，但不会按月清零。
+
+面板流量统一按 GB 显示。有流量上限时，进度条默认在距离上限还剩 5 GB 时显示 100%，额度已用量也按上限显示；Agent 保存的实际流量不会被修改。上限不超过 5 GB 时按实际上限计算。
+
+首次配置时可以填写当前已使用流量，留空则从 0 开始。该初始流量只加入当前统计状态，后续账期重置时不会再次加入。
 
 ```bash
 .venv/bin/python agent.py --config /etc/vps-monitor-agent.toml --once  # 测试
