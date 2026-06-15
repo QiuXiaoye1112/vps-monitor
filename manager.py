@@ -565,8 +565,7 @@ def configure_agent(local: bool) -> None:
         center_url = f"http://127.0.0.1:{port}"
     else:
         host = ask_ip("中心 VPS IP")
-        port = int(agent_port())
-        detail(f"Agent 接入端口：{port}（由中心配置决定，如需修改请设 VPS_MONITOR_AGENT_PORT 环境变量）")
+        port = ask_port("Agent 接入端口", int(agent_port()))
         center_url = server_url(host, port)
     node_id = ask("节点 ID（每台机器必须不同）", "center" if local else socket.gethostname())
     name = ask("面板显示名", "中心 VPS" if local else socket.gethostname())
@@ -1062,12 +1061,17 @@ def edit_node_info() -> None:
         print(f"  月流量上限：{os.getenv('VPS_MONITOR_TRAFFIC_LIMIT_GB', '0')} GB")
         print(f"  当前已用：{os.getenv('VPS_MONITOR_TRAFFIC_OFFSET_GB', '0')} GB")
         print(f"  上报间隔：{config.get('interval', '1')} 秒")
+        if role == "center":
+            print(f"  Agent 入口端口：{agent_port()}")
         print()
-        selected = choose("选择要修改的项", [
-            ("1", "显示名称"), ("2", "节点 ID"), ("3", "流量重置时间"),
-            ("4", "月流量上限"), ("5", "当前已用流量"), ("6", "上报间隔"), ("7", "保存并退出"),
-        ])
-        if selected is None or selected == "7":
+        options = [("1", "显示名称"), ("2", "节点 ID"), ("3", "流量重置时间"),
+                   ("4", "月流量上限"), ("5", "当前已用流量"), ("6", "上报间隔")]
+        if role == "center":
+            options.append(("7", "Agent 入口端口"))
+        options.append(("8" if role == "center" else "7", "保存并退出"))
+        selected = choose("选择要修改的项", options)
+        save_key = "8" if role == "center" else "7"
+        if selected is None or selected == save_key:
             break
         if selected == "1":
             val = ask("显示名称", config.get("name", ""))
@@ -1089,6 +1093,9 @@ def edit_node_info() -> None:
         elif selected == "6":
             val = ask("上报间隔（秒）", str(config.get("interval", "1")))
             if val and val.isdigit(): config["interval"] = int(val)
+        elif selected == "7" and role == "center":
+            val = ask("Agent 入口端口", agent_port())
+            if val: os.environ["VPS_MONITOR_AGENT_PORT"] = val
 
     content = textwrap.dedent(f"""\
         server_url = \"{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}\"
@@ -1107,7 +1114,7 @@ def edit_node_info() -> None:
     write_text_secure(AGENT_CONFIG, content)
     env_path = SERVER_ENV
     env_lines = env_path.read_text().splitlines() if env_path.exists() else []
-    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB", "VPS_MONITOR_TRAFFIC_OFFSET_GB"):
+    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB", "VPS_MONITOR_TRAFFIC_OFFSET_GB", "VPS_MONITOR_AGENT_PORT"):
         val = os.getenv(key, "")
         found = False
         for i, line in enumerate(env_lines):
