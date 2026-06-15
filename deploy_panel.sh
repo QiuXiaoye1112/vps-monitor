@@ -10,7 +10,7 @@ LEGACY_DASHBOARD="vps-monitor-dashboard"; REPO_URL="${REPO_URL:-https://github.c
 BOLD='\033[1m'; DIM='\033[2m'; RED='\033[31m'; GREEN='\033[32m'
 YELLOW='\033[33m'; BLUE='\033[34m'; CYAN='\033[36m'; RESET='\033[0m'
 
-step=0; total_steps=7; is_domain=false; https_ok=false
+step=0; total_steps=7
 
 _step() { step=$((step+1)); printf "\n${BOLD}${BLUE}[%d/%d]${RESET} %s\n" "$step" "$total_steps" "$*"; }
 ok()     { printf "  ${GREEN}✓${RESET} %s\n" "$*"; }
@@ -19,18 +19,41 @@ fail()   { printf "\n${RED}✗${RESET} %s\n" "$*" >&2; exit 1; }
 info()   { printf "  ${CYAN}›${RESET} %s\n" "$*"; }
 detail() { printf "    ${DIM}%s${RESET}\n" "$*"; }
 
-check_root() { [[ "${EUID:-$(id -u)}" -eq 0 ]] || fail "请以 root 运行：sudo bash deploy_panel.sh <域名或IP> <token>"; }
+check_root() { [[ "${EUID:-$(id -u)}" -eq 0 ]] || fail "请以 root 运行：sudo bash deploy_panel.sh <域名> <token>"; }
 
 validate_input() {
   if [[ -z "$DOMAIN" || -z "$TOKEN" ]]; then
     clear 2>/dev/null || true
     printf "${BOLD}${CYAN}╔══════════════════════════════════════════╗\n║       VPS Monitor · 中心面板部署          ║\n╚══════════════════════════════════════════╝${RESET}\n\n"
-    printf "${BOLD}用法：${RESET}\n  sudo bash deploy_panel.sh ${CYAN}<域名或IP>${RESET} ${CYAN}<token>${RESET}\n\n"
-    printf "${BOLD}示例：${RESET}\n  # 域名 → 自动 HTTPS\n  sudo bash deploy_panel.sh monitor.example.com \$(openssl rand -hex 24)\n\n  # IP → HTTP\n  sudo bash deploy_panel.sh 1.2.3.4 \$(openssl rand -hex 24)\n\n"
+    printf "${BOLD}用法：${RESET}\n  sudo bash deploy_panel.sh ${CYAN}<域名>${RESET} ${CYAN}<token>${RESET}\n\n"
+    printf "${BOLD}示例：${RESET}\n  sudo bash deploy_panel.sh monitor.example.com \$(openssl rand -hex 24)\n\n"
     printf "${BOLD}可选 ENV：${RESET} API_HOST API_PORT APP_DIR\n"
     exit 1
   fi
   [[ "$TOKEN" =~ [[:space:]] ]] && fail "token 不能包含空格或换行"
+  "$PYTHON_BIN" - "$DOMAIN" <<'PY' || fail "请输入有效域名，例如 monitor.example.com；不支持使用 IP 部署面板。"
+import ipaddress
+import re
+import sys
+
+domain = sys.argv[1].strip().rstrip(".")
+try:
+    ipaddress.ip_address(domain)
+    raise SystemExit(1)
+except ValueError:
+    pass
+labels = domain.split(".")
+valid = (
+    0 < len(domain) <= 253
+    and len(labels) >= 2
+    and all(
+        1 <= len(label) <= 63
+        and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label)
+        for label in labels
+    )
+)
+raise SystemExit(0 if valid else 1)
+PY
 }
 
 check_python() {
@@ -161,26 +184,6 @@ apply_and_start() {
   ok "服务已启动"
 }
 
-enable_https() {
-  if ! $is_domain; then detail "IP 部署，跳过 HTTPS"; https_ok=false; return 0; fi
-  info "检测到域名，正在申请 HTTPS 证书..."
-  if ! command -v certbot >/dev/null 2>&1; then
-    detail "安装 certbot..."
-    { command -v apt-get >/dev/null 2>&1 && apt-get install -y -qq certbot python3-certbot-nginx 2>/dev/null; } || \
-    { command -v dnf >/dev/null 2>&1 && dnf install -y -q certbot python3-certbot-nginx 2>/dev/null; } || \
-    { command -v yum >/dev/null 2>&1 && yum install -y -q certbot python3-certbot-nginx 2>/dev/null; } || \
-    { warn "无法自动安装 certbot，跳过 HTTPS"; https_ok=false; return; }
-  fi
-  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>/dev/null; then
-    ok "HTTPS 证书已启用：https://${DOMAIN}"; https_ok=true
-    systemctl enable --now certbot.timer 2>/dev/null || true
-    detail "证书自动续期已启用"
-  else
-    warn "证书申请失败（80 端口公网不可达或 DNS 未生效？）"
-    warn "HTTP 仍然可用：http://${DOMAIN}"; detail "稍后手动：sudo certbot --nginx -d ${DOMAIN}"; https_ok=false
-  fi
-}
-
 wait_for_api() {
   for i in $(seq 1 30); do
     if curl -sf "http://${API_HOST}:${API_PORT}/api/health" >/dev/null 2>&1; then
@@ -193,7 +196,7 @@ wait_for_api() {
 
 print_preflight() {
   echo; printf "${BOLD}部署摘要：${RESET}\n"
-  printf "  %-16s ${CYAN}%s${RESET}\n" "面板地址" "http${is_domain:+s}://${DOMAIN}"
+  printf "  %-16s ${CYAN}%s${RESET}\n" "面板地址" "http://${DOMAIN}"
   printf "  %-16s ${CYAN}%s${RESET}\n" "API 监听" "${API_HOST}:${API_PORT}"
   printf "  %-16s ${CYAN}%s${RESET}\n" "项目目录" "$APP_DIR"
   printf "  %-16s ${GREEN}%s${RESET}\n" "Token" "${TOKEN:0:12}..."
@@ -209,8 +212,7 @@ print_result() {
 }
 
 main() {
-  check_root; validate_input; check_python; check_project
-  [[ ! "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && is_domain=true
+  check_root; check_python; validate_input; check_project
   clear 2>/dev/null || true
   printf "${BOLD}${CYAN}╔══════════════════════════════════════════╗\n║       VPS Monitor · 中心面板部署          ║\n╚══════════════════════════════════════════╝${RESET}\n"
   print_preflight; detect_nginx_dirs; cd "$APP_DIR"

@@ -289,12 +289,21 @@ def panel_nginx_config(domain: str) -> str:
     )
 
 
-def is_ip_address(value: str) -> bool:
-    try:
-        ipaddress.ip_address(value)
-        return True
-    except ValueError:
+def is_valid_domain(value: str) -> bool:
+    domain = value.strip().rstrip(".")
+    if not domain or len(domain) > 253 or "." not in domain:
         return False
+    try:
+        ipaddress.ip_address(domain)
+        return False
+    except ValueError:
+        pass
+    labels = domain.split(".")
+    return all(
+        1 <= len(label) <= 63
+        and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) is not None
+        for label in labels
+    )
 
 
 def enable_https(domain: str) -> bool:
@@ -472,15 +481,16 @@ def install_panel() -> None:
     title("部署中心面板")
     if not require_root():
         return
-    domain = ask("面板域名或公网 IP")
+    domain = ask("面板域名")
     if not domain:
-        print(color("域名或 IP 不能为空。", RED))
+        print(color("域名不能为空。", RED))
         pause()
         return
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", domain):
-        print(color("域名或 IP 只能包含字母、数字、点和连字符。", RED))
+    if not is_valid_domain(domain):
+        print(color("请输入有效域名，例如 monitor.example.com；不支持使用 IP 部署面板。", RED))
         pause()
         return
+    domain = domain.rstrip(".").lower()
     generated = secrets.token_hex(24)
     token = ask("通信 token（留空自动生成）", generated, secret=True)
     if any(character.isspace() for character in token):
@@ -547,8 +557,7 @@ def install_panel() -> None:
         run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=ingress_env)
         print(color("\n中心面板部署完成。", GREEN))
         print(f"访问地址：http://{domain}")
-        if not is_ip_address(domain):
-            print(color("如需 HTTPS：sudo vm → SSL 证书设置", DIM))
+        print(color("如需 HTTPS：sudo vm → SSL 证书设置", DIM))
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\n部署失败：{exc}", RED))
@@ -774,50 +783,36 @@ def toggle_https() -> None:
 def enable_https_for_domain() -> None:
     title("SSL 证书设置")
     current = nginx_value(Path("/etc/nginx/sites-available/vps-monitor.conf"), "server_name") or "-"
-    is_ip = is_ip_address(current)
     print(f"当前地址：{color(current, CYAN)}")
     print()
 
-    if is_ip:
-        selected = choose("选择操作", [
-            ("1", "换成域名并申请 CF SSL 证书"),
-        ])
-    else:
-        selected = choose("选择操作", [
-            ("1", "申请 CF SSL 证书"),
-            ("2", "更换域名"),
-            ("3", "更换为 IP"),
-        ])
+    selected = choose("选择操作", [
+        ("1", "申请 CF SSL 证书"),
+        ("2", "更换域名"),
+    ])
 
     if selected is None:
         return
 
-    if is_ip and selected == "1":
-        new_domain = ask("域名")
-        if not new_domain: return
-        write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
-        run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-        print(color(f"域名已更换：http://{new_domain}", GREEN))
-        apply_cf_ssl(new_domain)
-    elif not is_ip and selected == "1":
+    if selected == "1":
+        if not is_valid_domain(current):
+            print(color("当前 Nginx 配置不是有效域名，请先选择更换域名。", RED))
+            pause()
+            return
         apply_cf_ssl(current)
-    elif not is_ip and selected == "2":
+    elif selected == "2":
         new_domain = ask("新域名")
-        if not new_domain: return
+        if not is_valid_domain(new_domain):
+            print(color("请输入有效域名，不支持切换为 IP。", RED))
+            pause()
+            return
+        new_domain = new_domain.rstrip(".").lower()
         if command_exists("certbot"):
             run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
         write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
         run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
         print(color(f"已更换为：http://{new_domain}", GREEN))
         print(color("如需 SSL：返回本菜单选择 1", DIM))
-    elif not is_ip and selected == "3":
-        if command_exists("certbot"):
-            run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
-        ip = ask("公网 IP")
-        if not ip: return
-        write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(ip), 0o644)
-        run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-        print(color(f"已更换为：http://{ip}", GREEN))
     pause()
 
 

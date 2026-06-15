@@ -5,7 +5,7 @@
 ## 1. 准备条件
 
 - 一台中心 VPS + 一台或多台被监控 VPS
-- 域名（可选，没有域名直接使用 IP）
+- 一个已解析到中心 VPS 的域名（Dashboard 不支持使用 IP 部署）
 - Python 3.8+
 
 角色：
@@ -35,22 +35,19 @@ sudo apt-get update && sudo apt-get install -y git python3 python3-venv python3-
 git clone https://github.com/QiuXiaoye1112/vps-monitor.git /opt/vps-monitor
 cd /opt/vps-monitor
 
-# 部署（域名自动 HTTPS，IP 走 HTTP）
+# 使用域名部署
 sudo bash deploy_panel.sh monitor.example.com $(openssl rand -hex 24)
-# 或
-sudo bash deploy_panel.sh 1.2.3.4 $(openssl rand -hex 24)
 
 # 检查
 systemctl status vps-monitor-api
 curl http://127.0.0.1:8000/api/health
 ```
 
-访问：`https://monitor.example.com` 或 `http://1.2.3.4`
+访问：`http://monitor.example.com`，随后可通过 `sudo vm` 配置 SSL。
 
 ## 4. HTTPS
 
-域名部署时 `deploy_panel.sh` 自动申请 Let's Encrypt 证书。
-如失败可手动：
+部署完成后可通过 `sudo vm` → SSL 证书设置配置证书，或手动执行：
 
 ```bash
 sudo apt-get install -y certbot python3-certbot-nginx
