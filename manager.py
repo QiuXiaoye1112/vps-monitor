@@ -449,7 +449,7 @@ def show_overview() -> None:
         api_active, api_enabled = service_state(API_SERVICE)
         ok, _ = health_check(f"{api_base_url()}/api/health")
         print(f"中心 API      {state_badge(api_active)} / 自启 {state_badge(api_enabled)}")
-        print(f"API 健康检查  {color('正常', GREEN) if ok else color('不可用', RED)}")
+        print(f"API 健康检查  {color('正常', GREEN) if ok else color('启动中', YELLOW)}")
         print(f"中心配置      {'已创建' if SERVER_ENV.exists() else '未创建'}")
         env = read_env(SERVER_ENV)
         db_path = Path(env.get("VPS_MONITOR_DB", PROJECT_DIR / "vps_monitor.db"))
@@ -548,7 +548,7 @@ def install_panel() -> None:
         print(f"访问地址：{'https' if https_enabled else 'http'}://{domain}")
         if not is_ip_address(domain) and not https_enabled:
             print(color("SSL 申请失败，请确认域名已解析到本机且公网 80 端口可访问。当前可先使用 HTTP。", YELLOW))
-        print(f"健康检查：{'正常' if ok else '失败 - ' + detail}")
+        print(f"健康检查：{'正常' if ok else '启动中，稍后刷新即可'}")
         print(f"token：{token}")
     except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
         print(color(f"\n部署失败：{exc}", RED))

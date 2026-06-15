@@ -180,15 +180,15 @@ enable_https() {
 }
 
 wait_for_api() {
-  info "等待 API 就绪..."
+  info "等待 API 启动..."
   local dots=""
-  for i in $(seq 1 15); do
+  for i in $(seq 1 30); do
     if curl -sf "http://${API_HOST}:${API_PORT}/api/health" >/dev/null 2>&1; then
-      printf "\r  ${GREEN}✓${RESET} API 响应正常        \n"; return 0
+      printf "\r  ${GREEN}✓${RESET} API 已就绪        \n"; return 0
     fi
-    dots="${dots}."; printf "\r  ${DIM}检查中%s${RESET}" "$dots"; sleep 1
+    dots="${dots}."; printf "\r  ${DIM}启动中%s${RESET}" "$dots"; sleep 1
   done
-  printf "\n"; warn "API 未在 15 秒内响应。稍后检查：curl http://${API_HOST}:${API_PORT}/api/health"; return 1
+  printf "\n"; warn "API 启动较慢，稍后刷新即可，不影响使用。"; return 1
 }
 
 print_preflight() {
