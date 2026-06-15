@@ -600,8 +600,7 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
             run(["systemctl", "restart", API_SERVICE], check=False)
     elif install:
         host = ask_ip("中心 VPS IP")
-        port = int(agent_port())
-        print(f"上报端口：{port}（在中心防火墙菜单修改）")
+        port = ask_port("中心上报端口", int(agent_port()))
         center_url = server_url(host, port)
     else:
         center_url = agent_config_value("server_url")
