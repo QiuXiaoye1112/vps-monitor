@@ -775,13 +775,10 @@ def enable_https_for_domain() -> None:
         if not new_domain: return
         write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
         run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
-        print(color(f"已更换为：http://{new_domain}", GREEN))
-        print(color("CF SSL 设置：域名 DNS 添加到 Cloudflare → 开启小黄云 → SSL/TLS 设为 Full", CYAN))
+        print(color(f"域名已更换：http://{new_domain}", GREEN))
+        _show_cf_ssl_steps(new_domain)
     elif not is_ip and selected == "1":
-        print(color("CF SSL 设置方法：", CYAN))
-        print(f"  1. {current} 的 DNS 添加到 Cloudflare")
-        print("  2. 开启小黄云（代理模式）")
-        print("  3. SSL/TLS 设为 Full 或 Full strict")
+        _show_cf_ssl_steps(current)
     elif not is_ip and selected == "2":
         new_domain = ask("新域名")
         if not new_domain: return
@@ -790,7 +787,7 @@ def enable_https_for_domain() -> None:
         write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(new_domain), 0o644)
         run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
         print(color(f"已更换为：http://{new_domain}", GREEN))
-        print(color("如需 SSL：返回本菜单选择 1 申请 CF SSL 证书", DIM))
+        print(color("如需 SSL：返回本菜单选择 1", DIM))
     elif not is_ip and selected == "3":
         if command_exists("certbot"):
             run(["certbot", "delete", "--cert-name", current, "--non-interactive"], check=False)
@@ -799,6 +796,21 @@ def enable_https_for_domain() -> None:
         write_text_secure(Path("/etc/nginx/sites-available/vps-monitor.conf"), panel_nginx_config(ip), 0o644)
         run(["nginx", "-t"], check=False); run(["systemctl", "reload", "nginx"], check=False)
         print(color(f"已更换为：http://{ip}", GREEN))
+    pause()
+
+
+def _show_cf_ssl_steps(domain: str) -> None:
+    print()
+    print(color("=== Cloudflare SSL 设置步骤 ===", BOLD + CYAN))
+    print()
+    print(f"  {color('1', CYAN)}. 登录 cloudflare.com，添加站点 {color(domain, GREEN)}")
+    print(f"  {color('2', CYAN)}. DNS → 添加 A 记录，指向本机公网 IP")
+    print(f"  {color('3', CYAN)}. 开启小黄云（橙色 = 代理模式）")
+    print(f"  {color('4', CYAN)}. SSL/TLS → 设为 {color('Full', GREEN)} 或 {color('Full (strict)', GREEN)}")
+    print(f"  {color('5', CYAN)}. 等待 DNS 生效，访问 {color('https://' + domain, GREEN)}")
+    print()
+    print(color("CF 会自动签发证书，无需在 VPS 上操作。", DIM))
+    print(color("如果已有 Let\'s Encrypt 证书，需先关闭 HTTPS 再用 CF。", DIM))
     pause()
 
 def disable_https() -> None:
