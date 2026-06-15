@@ -534,6 +534,7 @@ def install_panel() -> None:
         ensure_venv("requirements.txt")
         host = os.getenv("VPS_MONITOR_API_HOST", "127.0.0.1")
         port = ask_port("中心 API 端口", int(os.getenv("VPS_MONITOR_API_PORT", "8000")))
+        os.environ["VPS_MONITOR_API_PORT"] = str(port)
         write_text_secure(
             SERVER_ENV,
             f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
