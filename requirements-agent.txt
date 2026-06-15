@@ -1,4 +1,4 @@
-psutil>=5.9
-requests>=2.31
-tomli>=2.0; python_version < "3.11"
-
+-c constraints.txt
+psutil==7.2.2
+requests==2.32.4
+tomli==2.4.1; python_version < "3.11"

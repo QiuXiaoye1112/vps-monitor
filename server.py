@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ipaddress
+import secrets
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -12,7 +14,13 @@ from monitor_common import iso_now
 from settings import SERVER_TOKEN
 
 
-app = FastAPI(title="VPS Monitor API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    storage.init_db()
+    yield
+
+
+app = FastAPI(title="VPS Monitor API", version="1.0.0", lifespan=lifespan)
 
 
 DASHBOARD_HTML = """<!doctype html>
@@ -298,26 +306,37 @@ DASHBOARD_HTML = """<!doctype html>
 
         const metrics = document.createElement("div");
         metrics.className = "metrics";
-        const totalMonth = (metric.net_tx_month || 0) + (metric.net_rx_month || 0);
+        const totalTraffic = (metric.net_tx_month || 0) + (metric.net_rx_month || 0);
+        const trafficHasReset = Boolean(metric.traffic_reset_enabled);
         metrics.append(
           metricBlock("CPU", fmtPercent(metric.cpu_percent)),
           metricBlock("内存", fmtPercent(metric.memory_percent)),
           metricBlock("磁盘", fmtPercent(metric.disk_percent)),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
           metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`),
-          metricBlock("本月流量", `↑${fmtBytes(metric.net_tx_month)} ↓${fmtBytes(metric.net_rx_month)}`)
+          metricBlock(
+            trafficHasReset ? "本月流量" : "累计流量",
+            trafficHasReset
+              ? `↑${fmtBytes(metric.net_tx_month)} ↓${fmtBytes(metric.net_rx_month)}`
+              : fmtBytes(totalTraffic)
+          )
         );
-        // 流量进度条（每节点独立上限）
+        // 有上限时显示实际占用；无上限时固定满格且不显示百分比。
         const limitGB = metric.traffic_limit_gb;
+        const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
+        const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
+        const trafficLabel = trafficHasReset ? "月流量" : "累计流量";
+        const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
+        const barFill = document.createElement("div");
         if (limitGB > 0) {
-          const pct = Math.min(100, (totalMonth / (limitGB * 1073741824)) * 100).toFixed(1);
-          const barWrap = document.createElement("div"); barWrap.style.cssText = "margin-top:12px;";
-          const barLabel = document.createElement("div"); barLabel.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;";
-          barLabel.innerHTML = `<span>月流量 ${fmtBytes(totalMonth)} / ${limitGB}GB</span><span>${pct}%</span>`;
-          const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
-          const barFill = document.createElement("div"); barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
-          barBg.append(barFill); barWrap.append(barLabel, barBg); metrics.append(barWrap);
+          const pct = Math.min(100, (totalTraffic / (limitGB * 1073741824)) * 100).toFixed(1);
+          barLabel.innerHTML = `<span>${trafficLabel} ${fmtBytes(totalTraffic)} / ${limitGB}GB</span><span>${pct}%</span>`;
+          barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
+        } else {
+          barLabel.textContent = `${trafficLabel} ${fmtBytes(totalTraffic)}`;
+          barFill.style.cssText = "height:6px;border-radius:3px;background:#22c55e;width:100%;";
         }
+        barBg.append(barFill); barWrap.append(barLabel, barBg); metrics.append(barWrap);
 
         const lastSeen = document.createElement("div");
         lastSeen.className = "last-seen";
@@ -352,7 +371,7 @@ DASHBOARD_HTML = """<!doctype html>
     }
 
     refresh();
-    setInterval(refresh, 500);
+    setInterval(refresh, 1000);
   </script>
 </body>
 </html>
@@ -392,6 +411,7 @@ class MetricPayload(BaseModel):
     net_tx_month: int = 0
     net_rx_month: int = 0
     traffic_limit_gb: float = 0.0
+    traffic_reset_enabled: bool = False
     uptime_seconds: float | None = None
     load_1: float | None = None
     load_5: float | None = None
@@ -405,7 +425,6 @@ class MetricPayload(BaseModel):
 
 
 def token_from_request(
-    request: Request,
     authorization: str | None = Header(default=None),
     x_monitor_token: str | None = Header(default=None),
 ) -> str | None:
@@ -413,11 +432,11 @@ def token_from_request(
         return x_monitor_token
     if authorization and authorization.lower().startswith("bearer "):
         return authorization.split(" ", 1)[1].strip()
-    return request.query_params.get("token")
+    return None
 
 
 def require_token(token: str | None = Depends(token_from_request)) -> None:
-    if SERVER_TOKEN and token != SERVER_TOKEN:
+    if SERVER_TOKEN and (token is None or not secrets.compare_digest(token, SERVER_TOKEN)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid monitor token")
 
 
@@ -437,11 +456,6 @@ def request_client_ip(request: Request) -> str:
         except ValueError:
             continue
     return ""
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    storage.init_db()
 
 
 @app.get("/api/health")

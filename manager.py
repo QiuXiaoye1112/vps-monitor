@@ -242,6 +242,12 @@ def render_agent_config(values: dict[str, object]) -> str:
         note = {toml_string(str(values.get('note', '')))}
 
         disk_paths = [{rendered_paths}]
+
+        traffic_reset_day = {int(values.get('traffic_reset_day', 0))}
+        traffic_reset_hour = {int(values.get('traffic_reset_hour', 0))}
+        traffic_limit_gb = {float(values.get('traffic_limit_gb', 0))}
+        traffic_offset_gb = {float(values.get('traffic_offset_gb', 0))}
+        traffic_state_path = {toml_string(str(values.get('traffic_state_path', '/var/lib/vps-monitor-agent/traffic-state.json')))}
         """
     )
 
@@ -520,7 +526,7 @@ def install_panel() -> None:
         port = os.getenv("VPS_MONITOR_API_PORT", "8000")
         write_text_secure(
             SERVER_ENV,
-            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\n",
+            f"VPS_MONITOR_TOKEN={token}\nVPS_MONITOR_DB={PROJECT_DIR / 'vps_monitor.db'}\nVPS_MONITOR_API_HOST={host}\nVPS_MONITOR_API_PORT={port}\nVPS_MONITOR_METRIC_RETENTION_DAYS=2\nVPS_MONITOR_METRIC_CLEANUP_INTERVAL_SECONDS=3600\n",
         )
         write_text_secure(SYSTEMD_DIR / f"{API_SERVICE}.service", api_unit(), 0o644)
         nginx_site = Path("/etc/nginx/sites-available/vps-monitor.conf")
@@ -572,6 +578,17 @@ def configure_agent(local: bool) -> None:
         print(color("上报间隔必须是整数。", RED))
         pause()
         return
+    reset_day_text = ask("每月流量重置日（1-31，留空=不重置）")
+    reset_hour_text = ask("流量重置小时（0-23）", "0") if reset_day_text else "0"
+    limit_text = ask("月流量上限 GB（留空=无上限）")
+    try:
+        reset_day = min(31, max(1, int(reset_day_text))) if reset_day_text else 0
+        reset_hour = min(23, max(0, int(reset_hour_text)))
+        traffic_limit = max(0.0, float(limit_text)) if limit_text else 0.0
+    except ValueError:
+        print(color("流量重置时间和上限格式无效。", RED))
+        pause()
+        return
     if not center_url or not node_id or not token:
         print(color("服务地址、节点 ID 和 token 不能为空。", RED))
         pause()
@@ -584,6 +601,11 @@ def configure_agent(local: bool) -> None:
         "interval": interval,
         "disk_paths": ["/"],
         "os_type": "Linux",
+        "traffic_reset_day": reset_day,
+        "traffic_reset_hour": reset_hour,
+        "traffic_limit_gb": traffic_limit,
+        "traffic_offset_gb": 0,
+        "traffic_state_path": "/var/lib/vps-monitor-agent/traffic-state.json",
     }
     print("\n即将安装 Agent 依赖、写入配置、测试上报并启用开机自启。")
     try:
@@ -1117,106 +1139,6 @@ def restart_services() -> None:
     pause()
 
 
-def edit_node_info() -> None:
-    title("修改本机信息")
-    if not AGENT_CONFIG.exists():
-        print(color("Agent 尚未配置。", YELLOW))
-        pause()
-        return
-    try:
-        with AGENT_CONFIG.open("rb") as f:
-            try:
-                import tomllib
-            except ModuleNotFoundError:
-                import tomli as tomllib
-            config = tomllib.load(f)
-    except Exception:
-        print(color("配置文件解析失败！请检查 /etc/vps-monitor-agent.toml", RED))
-        print(color("修复后重试。引号必须是普通双引号，不能是 \\\"。", DIM))
-        pause()
-        return
-    role = installation_role()
-    if not config:
-        print(color("配置文件为空或损坏。", RED))
-        pause()
-        return
-
-    while True:
-        title("修改本机信息")
-        print(f"角色：{color('中心服务器' if role == 'center' else '远程节点', CYAN)}")
-        print(f"  显示名称：{config.get('name', '-')}")
-        print(f"  节点 ID：{config.get('node_id', '-')}")
-        print(f"  流量重置：每月 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_DAY', '1')} 号 {os.getenv('VPS_MONITOR_TRAFFIC_RESET_HOUR', '0')}:00")
-        print(f"  月流量上限：{os.getenv('VPS_MONITOR_TRAFFIC_LIMIT_GB', '0')} GB")
-        print(f"  上报间隔：{config.get('interval', '1')} 秒")
-        if role == "center":
-            print(f"  Agent 入口端口：{agent_port()}")
-        print()
-        options = [("1", "显示名称"), ("2", "节点 ID"), ("3", "流量重置时间"),
-                   ("4", "月流量上限"), ("5", "上报间隔")]
-        if role == "center":
-            options.append(("6", "Agent 入口端口"))
-        options.append(("7" if role == "center" else "6", "保存并退出"))
-        selected = choose("选择要修改的项", options)
-        save_key = "7" if role == "center" else "6"
-        if selected is None or selected == save_key:
-            break
-        if selected == "1":
-            val = ask("显示名称", config.get("name", ""))
-            if val: config["name"] = val
-        elif selected == "2":
-            val = ask("节点 ID", config.get("node_id", ""))
-            if val: config["node_id"] = val
-        elif selected == "3":
-            val = ask("重置日（几号）", os.getenv("VPS_MONITOR_TRAFFIC_RESET_DAY", "1"))
-            if val: os.environ["VPS_MONITOR_TRAFFIC_RESET_DAY"] = val
-            val = ask("重置时（几点，0-23）", os.getenv("VPS_MONITOR_TRAFFIC_RESET_HOUR", "0"))
-            if val: os.environ["VPS_MONITOR_TRAFFIC_RESET_HOUR"] = val
-        elif selected == "4":
-            val = ask("月流量上限（GB，0=不限制）", os.getenv("VPS_MONITOR_TRAFFIC_LIMIT_GB", "0"))
-            if val: os.environ["VPS_MONITOR_TRAFFIC_LIMIT_GB"] = val
-        elif selected == "5":
-            val = ask("上报间隔（秒）", str(config.get("interval", "1")))
-            if val and val.isdigit(): config["interval"] = int(val)
-        elif selected == "6" and role == "center":
-            val = ask("Agent 入口端口", agent_port())
-            if val: os.environ["VPS_MONITOR_AGENT_PORT"] = val
-
-    content = textwrap.dedent(f"""\
-        server_url = "{config.get('server_url', f'http://127.0.0.1:{os.getenv("VPS_MONITOR_API_PORT", "8000")}')}"
-        node_id = "{config.get('node_id', '')}"
-        token = "{config.get('token', 'change-me')}"
-        interval = {config.get('interval', 1)}
-
-        name = "{config.get('name', '')}"
-        ip = "{config.get('ip', '')}"
-        region = "{config.get('region', '')}"
-        os_type = "{config.get('os_type', 'Linux')}"
-        note = "{config.get('note', '')}"
-
-        disk_paths = [{', '.join(f'"{p}"' for p in (config.get('disk_paths') or ['/']))}]
-        """)
-    write_text_secure(AGENT_CONFIG, content)
-    env_path = SERVER_ENV
-    env_lines = env_path.read_text().splitlines() if env_path.exists() else []
-    for key in ("VPS_MONITOR_TRAFFIC_RESET_DAY", "VPS_MONITOR_TRAFFIC_RESET_HOUR", "VPS_MONITOR_TRAFFIC_LIMIT_GB", "VPS_MONITOR_TRAFFIC_OFFSET_GB", "VPS_MONITOR_AGENT_PORT"):
-        val = os.getenv(key, "")
-        found = False
-        for i, line in enumerate(env_lines):
-            if line.startswith(f"{key}="):
-                env_lines[i] = f"{key}={val}"
-                found = True
-                break
-        if not found:
-            env_lines.append(f"{key}={val}")
-    write_text_secure(env_path, "\\n".join(env_lines) + "\\n")
-    print(color("已保存。", GREEN))
-    active, _ = service_state(AGENT_SERVICE)
-    if active == "active":
-        run(["systemctl", "restart", AGENT_SERVICE], check=False)
-    pause()
-
-
 def quick_update() -> None:
     title("更新 VPS Monitor")
     if not require_root():
@@ -1324,8 +1246,9 @@ def remove_remote_node(node: dict[str, Any]) -> None:
     try:
         token = read_env(SERVER_ENV).get("VPS_MONITOR_TOKEN", "")
         req = urllib.request.Request(
-            f"{api_base_url()}/api/nodes/{node_id}?token={token}",
+            f"{api_base_url()}/api/nodes/{node_id}",
             method="DELETE",
+            headers={"Authorization": f"Bearer {token}"},
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
             if resp.status == 200:
@@ -1566,27 +1489,23 @@ def main() -> int:
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "修改本机信息"),
-                    ("4", "重新设置本机 Agent"),
-                    ("5", "监控主机"),
-                    ("6", "添加新主机"),
-                    ("7", f"防火墙配置（端口 {agent_port()}）"),
-                    ("8", "重新部署中心面板"),
-                    ("9", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
-                    ("10", "更新程序"),
-                    ("11", "重启服务"),
-                    ("12", "完整卸载"),
+                    ("3", "监控主机"),
+                    ("4", "添加新主机"),
+                    ("5", f"防火墙配置（端口 {agent_port()}）"),
+                    ("6", "重新部署中心面板"),
+                    ("7", "SSL 证书设置" if not https_is_on() else "SSL 证书设置"),
+                    ("8", "更新程序"),
+                    ("9", "重启服务"),
+                    ("10", "完整卸载"),
                     ("0", "退出"),
                 ]
                 if role == "center"
                 else [
                     ("1", "查看运行状态"),
                     ("2", "查看 token"),
-                    ("3", "修改本机信息"),
-                    ("4", "重新设置 Agent"),
-                    ("5", "更新程序"),
-                    ("6", "重启服务"),
-                    ("7", "完整卸载"),
+                    ("3", "更新程序"),
+                    ("4", "重启服务"),
+                    ("5", "完整卸载"),
                     ("0", "退出"),
                 ]
             ),
@@ -1624,24 +1543,20 @@ def main() -> int:
             elif selected == "2":
                 show_token()
             elif selected == "3":
-                edit_node_info()
-            elif selected == "4":
-                configure_agent(local=True)
-            elif selected == "5":
                 monitored_hosts_menu()
-            elif selected == "6":
+            elif selected == "4":
                 temp_open_for_new_agent()
-            elif selected == "7":
+            elif selected == "5":
                 firewall_rules_menu()
-            elif selected == "8":
+            elif selected == "6":
                 install_panel()
-            elif selected == "9":
+            elif selected == "7":
                 toggle_https()
-            elif selected == "10":
+            elif selected == "8":
                 quick_update()
-            elif selected == "11":
+            elif selected == "9":
                 restart_services()
-            elif selected == "12":
+            elif selected == "10":
                 full_uninstall()
             else:
                 return 0
@@ -1651,14 +1566,10 @@ def main() -> int:
         elif selected == "2":
             show_token()
         elif selected == "3":
-            edit_node_info()
-        elif selected == "4":
-            configure_agent(local=False)
-        elif selected == "5":
             quick_update()
-        elif selected == "6":
+        elif selected == "4":
             restart_services()
-        elif selected == "7":
+        elif selected == "5":
             full_uninstall()
         else:
             return 0

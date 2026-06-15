@@ -2,13 +2,24 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
 import uuid
 from contextlib import closing
 from datetime import timedelta
 from typing import Any
 
 from monitor_common import iso_now, parse_datetime, utc_now
-from settings import DB_PATH, OFFLINE_AFTER_SECONDS
+from settings import (
+    DB_PATH,
+    METRIC_CLEANUP_INTERVAL_SECONDS,
+    METRIC_RETENTION_DAYS,
+    OFFLINE_AFTER_SECONDS,
+)
+
+
+_cleanup_lock = threading.Lock()
+_next_cleanup_at = 0.0
 
 
 METRIC_FIELDS = [
@@ -31,6 +42,7 @@ METRIC_FIELDS = [
     "net_tx_month",
     "net_rx_month",
     "traffic_limit_gb",
+    "traffic_reset_enabled",
     "uptime_seconds",
     "load_1",
     "load_5",
@@ -115,12 +127,51 @@ def init_db() -> None:
         )
         conn.commit()
         # 兼容旧数据库（逐条执行，失败不中断）
-        for col in ("net_tx_month", "net_rx_month", "traffic_limit_gb"):
+        for col in ("net_tx_month", "net_rx_month", "traffic_limit_gb", "traffic_reset_enabled"):
             try:
                 conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
         conn.commit()
+    cleanup_metrics()
+
+
+def cleanup_metrics(
+    retention_days: float | None = None,
+    *,
+    now: Any = None,
+) -> int:
+    days = METRIC_RETENTION_DAYS if retention_days is None else max(0.0, retention_days)
+    if days <= 0:
+        return 0
+    current = now or utc_now()
+    cutoff = (current - timedelta(days=days)).isoformat()
+    with closing(connect()) as conn:
+        cursor = conn.execute(
+            """
+            DELETE FROM metrics
+            WHERE received_at < ?
+              AND id NOT IN (
+                  SELECT last_metric_id
+                  FROM nodes
+                  WHERE last_metric_id IS NOT NULL
+              )
+            """,
+            (cutoff,),
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def maybe_cleanup_metrics() -> None:
+    global _next_cleanup_at
+    if METRIC_RETENTION_DAYS <= 0 or time.monotonic() < _next_cleanup_at:
+        return
+    with _cleanup_lock:
+        if time.monotonic() < _next_cleanup_at:
+            return
+        cleanup_metrics()
+        _next_cleanup_at = time.monotonic() + METRIC_CLEANUP_INTERVAL_SECONDS
 
 
 def normalize_services(services: Any) -> list[str]:
@@ -280,25 +331,31 @@ def insert_metric(payload: dict[str, Any]) -> dict[str, Any]:
         )
         conn.commit()
 
+    maybe_cleanup_metrics()
     metric = get_metric(metric_id)
     if metric is None:
         raise RuntimeError("metric was not persisted")
     return metric
 
 
-def metric_from_row(row: sqlite3.Row | dict[str, Any] | None) -> dict[str, Any] | None:
+def metric_from_row(
+    row: sqlite3.Row | dict[str, Any] | None,
+    prefix: str = "",
+) -> dict[str, Any] | None:
     if row is None:
         return None
     data = dict(row)
-    metric = {field: data.get(field) for field in METRIC_FIELDS}
+    if prefix and data.get(f"{prefix}id") is None:
+        return None
+    metric = {field: data.get(f"{prefix}{field}") for field in METRIC_FIELDS}
     metric.update(
         {
-            "id": data.get("metric_id", data.get("id")),
-            "node_id": data.get("metric_node_id", data.get("node_id")),
-            "collected_at": data.get("collected_at"),
-            "received_at": data.get("received_at"),
-            "services": decode_json(data.get("services_json"), []),
-            "disks": decode_json(data.get("disks_json"), []),
+            "id": data.get(f"{prefix}id"),
+            "node_id": data.get(f"{prefix}node_id"),
+            "collected_at": data.get(f"{prefix}collected_at"),
+            "received_at": data.get(f"{prefix}received_at"),
+            "services": decode_json(data.get(f"{prefix}services_json"), []),
+            "disks": decode_json(data.get(f"{prefix}disks_json"), []),
         }
     )
     return metric
@@ -327,10 +384,29 @@ def node_from_row(row: sqlite3.Row, latest_metric: dict[str, Any] | None = None)
 
 
 def list_nodes() -> list[dict[str, Any]]:
+    metric_columns = [
+        "id",
+        "node_id",
+        "collected_at",
+        "received_at",
+        *METRIC_FIELDS,
+        "services_json",
+        "disks_json",
+    ]
+    latest_metric_select = ", ".join(
+        f"m.{column} AS metric_{column}" for column in metric_columns
+    )
     with closing(connect()) as conn:
-        rows = conn.execute("SELECT * FROM nodes ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            f"""
+            SELECT n.*, {latest_metric_select}
+            FROM nodes AS n
+            LEFT JOIN metrics AS m ON m.id = n.last_metric_id
+            ORDER BY n.created_at DESC
+            """
+        ).fetchall()
 
-    return [node_from_row(row, get_metric(row["last_metric_id"]) if row["last_metric_id"] else None) for row in rows]
+    return [node_from_row(row, metric_from_row(row, "metric_")) for row in rows]
 
 
 def get_node(node_id: str) -> dict[str, Any] | None:
