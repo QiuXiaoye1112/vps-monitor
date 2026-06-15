@@ -304,7 +304,9 @@ DASHBOARD_HTML = """<!doctype html>
           metricBlock("磁盘", fmtPercent(metric.disk_percent)),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
           metricBlock("上传", fmtSpeed(metric.net_upload_bps)),
-          metricBlock("下载", fmtSpeed(metric.net_download_bps))
+          metricBlock("下载", fmtSpeed(metric.net_download_bps)),
+          metricBlock("本月上传", fmtBytes(metric.net_tx_month)),
+          metricBlock("本月下载", fmtBytes(metric.net_rx_month))
         );
 
         const lastSeen = document.createElement("div");
