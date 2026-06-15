@@ -738,19 +738,14 @@ def service_menu() -> None:
 
 def ingress_menu() -> None:
     while True:
-        title("Agent 入口与防火墙")
+        title("Agent 入口管理")
         selected = choose(
-            "安全操作",
+            "操作",
             [
                 ("1", f"开启或修改 Agent 入口（当前 {agent_port()}）"),
-                ("2", "允许一台 Agent IP"),
-                ("3", f"查看 {agent_port()} 防火墙规则"),
-                ("4", "保存当前防火墙规则"),
-                ("5", "申请 Dashboard HTTPS 证书"),
-                ("6", f"删除 {agent_port()} Agent 入口"),
-                ("7", "删除一台 Agent IP 白名单"),
-                ("8", "删除 Agent 端口全部防火墙规则"),
-                ("9", "删除 HTTPS 证书并恢复 HTTP"),
+                ("2", f"查看 {agent_port()} 防火墙规则"),
+                ("3", f"删除 {agent_port()} Agent 入口"),
+                ("4", f"清空 {agent_port()} 防火墙规则"),
             ],
         )
         if selected is None:
@@ -772,60 +767,19 @@ def ingress_menu() -> None:
                 env["API_PORT"] = str(api_port)
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
             elif selected == "2":
-                agent_ip = ask("Agent 公网 IP")
-                ipaddress.ip_address(agent_ip)
-                port = ask("Agent 入口端口", agent_port())
-                env = os.environ.copy()
-                env["AGENT_PORT"] = port
-                run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), agent_ip], env=env)
-            elif selected == "3":
                 run(["iptables", "-S", "INPUT"], check=False)
-            elif selected == "4":
-                if not command_exists("netfilter-persistent"):
-                    run(["apt-get", "install", "-y", "iptables-persistent"])
-                run(["netfilter-persistent", "save"])
-            elif selected == "5":
-                domain = ask("已解析到本机的域名")
-                if enable_https(domain):
-                    print(color("HTTPS 已启用。", GREEN))
-                else:
-                    print(color("SSL 申请失败，请检查域名解析和公网 80 端口。", RED))
-            elif selected == "6":
+            elif selected == "3":
                 if confirm("确认删除 Agent 入口？"):
                     remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
                     remove_path(Path("/etc/nginx/sites-available/vps-monitor-agent.conf"))
                     run(["nginx", "-t"])
                     run(["systemctl", "reload", "nginx"])
                     print(color("Agent 入口已删除。", GREEN))
-            elif selected == "7":
-                agent_ip = ask("要删除的 Agent 公网 IP")
-                ipaddress.ip_address(agent_ip)
-                port = ask("Agent 入口端口", agent_port())
-                while subprocess.run(
-                    ["iptables", "-C", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"],
-                    check=False,
-                    capture_output=True,
-                ).returncode == 0:
-                    run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"])
-                print(color("IP 白名单已删除。", GREEN))
-            elif selected == "8":
+            else:
                 port = ask("Agent 入口端口", agent_port())
                 if confirm(f"确认删除 TCP {port} 的全部 iptables 规则？"):
                     removed = remove_firewall_port_rules(port)
                     print(color(f"已删除 {removed} 条防火墙规则。", GREEN))
-            else:
-                domain = ask("要删除证书的域名")
-                if confirm(f"确认删除 {domain} 的 HTTPS 并恢复 HTTP？"):
-                    if command_exists("certbot"):
-                        run(["certbot", "delete", "--cert-name", domain, "--non-interactive"], check=False)
-                    write_text_secure(
-                        Path("/etc/nginx/sites-available/vps-monitor.conf"),
-                        panel_nginx_config(domain),
-                        0o644,
-                    )
-                    run(["nginx", "-t"])
-                    run(["systemctl", "reload", "nginx"])
-                    print(color("HTTPS 已删除，面板已恢复 HTTP。", GREEN))
         except (OSError, ValueError, subprocess.CalledProcessError, RuntimeError) as exc:
             print(color(f"操作失败：{exc}", RED))
         pause()
