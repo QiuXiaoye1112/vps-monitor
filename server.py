@@ -332,7 +332,7 @@ DASHBOARD_HTML = """<!doctype html>
         barLabel.style.cssText = "color:var(--muted);";
         const barPct = document.createElement("span");
         barPct.style.cssText = "font-weight:700;";
-        const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);";
+        const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);border:1px solid var(--border);";
         const barFill = document.createElement("div");
         if (limitGB > 0) {
           const actualTrafficGB = totalTraffic / 1073741824;
