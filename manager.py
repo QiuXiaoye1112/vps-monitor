@@ -740,16 +740,15 @@ def ingress_menu() -> None:
         selected = choose(
             "安全操作",
             [
-                ("1", f"修改远程上报端口（当前 {agent_port()}）"),
-                ("2", f"开启或更新 Agent 入口"),
-                ("3", "允许一台 Agent IP"),
-                ("4", f"查看 {agent_port()} 防火墙规则"),
-                ("5", "保存当前防火墙规则"),
-                ("6", "申请 Dashboard HTTPS 证书"),
-                ("7", f"删除 {agent_port()} Agent 入口"),
-                ("8", "删除一台 Agent IP 白名单"),
-                ("9", "删除 Agent 端口全部防火墙规则"),
-                ("10", "删除 HTTPS 证书并恢复 HTTP"),
+                ("1", f"开启或修改 Agent 入口（当前 {agent_port()}）"),
+                ("2", "允许一台 Agent IP"),
+                ("3", f"查看 {agent_port()} 防火墙规则"),
+                ("4", "保存当前防火墙规则"),
+                ("5", "申请 Dashboard HTTPS 证书"),
+                ("6", f"删除 {agent_port()} Agent 入口"),
+                ("7", "删除一台 Agent IP 白名单"),
+                ("8", "删除 Agent 端口全部防火墙规则"),
+                ("9", "删除 HTTPS 证书并恢复 HTTP"),
             ],
         )
         if selected is None:
@@ -759,48 +758,44 @@ def ingress_menu() -> None:
         try:
             if selected == "1":
                 old = int(agent_port())
-                port = ask_port("远程上报端口", old)
+                port = ask_port("远程主机上报端口", old)
                 if port != old and SERVER_ENV.exists():
                     env = read_env(SERVER_ENV)
                     env["VPS_MONITOR_AGENT_PORT"] = str(port)
                     write_text_secure(SERVER_ENV, "".join(f"{k}={v}\n" for k, v in env.items() if k.startswith("VPS_MONITOR_")))
-                print(color(f"远程上报端口已设为 {port}。", GREEN))
-                pause()
-            elif selected == "2":
-                port = ask_port("Agent 入口端口", int(agent_port()))
                 server_values = read_env(SERVER_ENV)
                 api_port = server_values.get("VPS_MONITOR_API_PORT") or os.getenv("VPS_MONITOR_API_PORT") or "8000"
                 env = os.environ.copy()
                 env["AGENT_PORT"] = str(port)
                 env["API_PORT"] = str(api_port)
                 run(["bash", str(PROJECT_DIR / "deploy_agent_ingress.sh")], env=env)
-            elif selected == "3":
+            elif selected == "2":
                 agent_ip = ask("Agent 公网 IP")
                 ipaddress.ip_address(agent_ip)
                 port = ask("Agent 入口端口", agent_port())
                 env = os.environ.copy()
                 env["AGENT_PORT"] = port
                 run(["bash", str(PROJECT_DIR / "allow_agent_ip.sh"), agent_ip], env=env)
-            elif selected == "4":
+            elif selected == "3":
                 run(["iptables", "-S", "INPUT"], check=False)
-            elif selected == "5":
+            elif selected == "4":
                 if not command_exists("netfilter-persistent"):
                     run(["apt-get", "install", "-y", "iptables-persistent"])
                 run(["netfilter-persistent", "save"])
-            elif selected == "6":
+            elif selected == "5":
                 domain = ask("已解析到本机的域名")
                 if enable_https(domain):
                     print(color("HTTPS 已启用。", GREEN))
                 else:
                     print(color("SSL 申请失败，请检查域名解析和公网 80 端口。", RED))
-            elif selected == "7":
+            elif selected == "6":
                 if confirm("确认删除 Agent 入口？"):
                     remove_path(Path("/etc/nginx/sites-enabled/vps-monitor-agent.conf"))
                     remove_path(Path("/etc/nginx/sites-available/vps-monitor-agent.conf"))
                     run(["nginx", "-t"])
                     run(["systemctl", "reload", "nginx"])
                     print(color("Agent 入口已删除。", GREEN))
-            elif selected == "8":
+            elif selected == "7":
                 agent_ip = ask("要删除的 Agent 公网 IP")
                 ipaddress.ip_address(agent_ip)
                 port = ask("Agent 入口端口", agent_port())
@@ -811,7 +806,7 @@ def ingress_menu() -> None:
                 ).returncode == 0:
                     run(["iptables", "-D", "INPUT", "-p", "tcp", "-s", agent_ip, "--dport", port, "-j", "ACCEPT"])
                 print(color("IP 白名单已删除。", GREEN))
-            elif selected == "9":
+            elif selected == "8":
                 port = ask("Agent 入口端口", agent_port())
                 if confirm(f"确认删除 TCP {port} 的全部 iptables 规则？"):
                     removed = remove_firewall_port_rules(port)
