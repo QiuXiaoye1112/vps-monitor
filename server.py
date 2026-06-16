@@ -500,7 +500,7 @@ DASHBOARD_HTML = """<!doctype html>
 
         const metrics = element("div", "metrics");
         metrics.append(
-          metricBlock("CPU", fmtPercent(metric.cpu_percent), metric.cpu_percent),
+          metricBlock("CPU", fmtPercent(metric.cpu_percent)),
           metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent),
           metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
