@@ -8,7 +8,7 @@ import platform
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - only used on Python < 3.11
 
 
 TRAFFIC_STATE_VERSION = 2
+BEIJING_TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
 
 
 def load_config(path: Path | None) -> dict[str, Any]:
@@ -125,6 +126,11 @@ class CpuSampler:
 
 
 def traffic_cycle_key(now: datetime, reset_day: int, reset_hour: int, reset_minute: int = 0) -> str:
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=BEIJING_TZ)
+    else:
+        now = now.astimezone(BEIJING_TZ)
+
     def cycle_start(year: int, month: int) -> datetime:
         day = min(reset_day, calendar.monthrange(year, month)[1])
         return now.replace(year=year, month=month, day=day, hour=reset_hour, minute=reset_minute, second=0, microsecond=0)
@@ -162,7 +168,7 @@ def update_monthly_traffic(
     *,
     now: datetime | None = None,
 ) -> bool:
-    current_time = now or datetime.now().astimezone()
+    current_time = now or datetime.now(BEIJING_TZ)
     reset_day = int(config["traffic_reset_day"])
     cycle = (
         traffic_cycle_key(current_time, reset_day, int(config["traffic_reset_hour"]), int(config["traffic_reset_minute"]))

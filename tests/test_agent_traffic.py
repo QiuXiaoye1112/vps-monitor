@@ -17,9 +17,9 @@ def config(reset_day: int = 1, reset_hour: int = 0, reset_minute: int = 0) -> di
     }
 
 
-def test_cycle_uses_previous_month_before_host_reset_time() -> None:
-    now = datetime(2026, 6, 15, 3, 0, tzinfo=timezone.utc)
-    assert traffic_cycle_key(now, 15, 4).startswith("2026-05-15T04:00:00")
+def test_cycle_uses_previous_month_before_beijing_reset_time() -> None:
+    now = datetime(2026, 6, 14, 19, 0, tzinfo=timezone.utc)
+    assert traffic_cycle_key(now, 15, 4).startswith("2026-05-15T04:00:00+08:00")
 
 
 def test_reset_day_is_clamped_to_last_day_of_short_month() -> None:
