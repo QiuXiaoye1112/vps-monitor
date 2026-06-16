@@ -31,165 +31,304 @@ DASHBOARD_HTML = """<!doctype html>
   <title>VPS Monitor</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #0b1020;
-      --panel: #111827;
-      --panel-2: #162033;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --border: #253246;
-      --online: #22c55e;
-      --offline: #ef4444;
-      --accent: #38bdf8;
+      color-scheme: light;
+      --bg: #f5f5f7;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-solid: #ffffff;
+      --surface-soft: rgba(255, 255, 255, 0.58);
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --subtle: #86868b;
+      --line: rgba(0, 0, 0, 0.08);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.10);
+      --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.07);
+      --blue: #007aff;
+      --green: #34c759;
+      --red: #ff3b30;
+      --orange: #ff9500;
+      --purple: #af52de;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
-      background: var(--bg);
       color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(0, 122, 255, 0.16), transparent 34rem),
+        radial-gradient(circle at top right, rgba(175, 82, 222, 0.13), transparent 30rem),
+        linear-gradient(180deg, #fbfbfd 0%, var(--bg) 48%, #ededf1 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.42), transparent 62%);
     }
     main {
-      width: min(1120px, calc(100% - 28px));
+      position: relative;
+      width: min(1180px, calc(100% - 40px));
       margin: 0 auto;
-      padding: 28px 0 40px;
+      padding: 36px 0 48px;
     }
     header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
       margin-bottom: 22px;
     }
-    h1 {
-      margin: 0;
-      font-size: 28px;
-      line-height: 1.1;
-      font-weight: 760;
-      letter-spacing: 0;
-    }
-    .sub {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-    .summary {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       color: var(--muted);
       font-size: 13px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.58);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.16);
+    }
+    h1 {
+      margin: 14px 0 0;
+      font-size: clamp(34px, 7vw, 68px);
+      line-height: 0.96;
+      letter-spacing: -0.06em;
+      font-weight: 780;
+    }
+    .sub {
+      max-width: 560px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(108px, 1fr));
+      gap: 10px;
     }
     .badge {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: rgba(17, 24, 39, 0.72);
-      padding: 7px 10px;
+      min-width: 108px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--surface);
+      padding: 13px 15px;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .badge strong {
+      display: block;
+      font-size: 25px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+    .badge span {
+      display: block;
+      margin-top: 5px;
       color: var(--muted);
-      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(292px, 1fr));
+      gap: 16px;
     }
     .card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--panel);
-      padding: 14px;
+      position: relative;
+      overflow: hidden;
       min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(24px) saturate(1.18);
+      -webkit-backdrop-filter: blur(24px) saturate(1.18);
+      padding: 20px;
     }
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,255,255,0.72), transparent 42%);
+    }
+    .card > * { position: relative; z-index: 1; }
     .card-head {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 12px;
+      gap: 14px;
+      margin-bottom: 18px;
     }
     .name {
-      font-size: 18px;
-      font-weight: 730;
+      font-size: 23px;
+      line-height: 1.12;
+      letter-spacing: -0.035em;
+      font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+    .host {
+      margin-top: 6px;
+      color: var(--subtle);
+      font-size: 12px;
+      font-weight: 560;
       overflow-wrap: anywhere;
     }
     .status {
       flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
       border-radius: 999px;
-      padding: 4px 9px;
+      padding: 7px 10px;
       font-size: 12px;
-      font-weight: 730;
-      text-transform: lowercase;
-      border: 1px solid;
+      font-weight: 720;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--muted);
     }
-    .status.online {
-      color: #bbf7d0;
-      background: rgba(34, 197, 94, 0.14);
-      border-color: rgba(34, 197, 94, 0.42);
+    .status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
     }
-    .status.offline {
-      color: #fecaca;
-      background: rgba(239, 68, 68, 0.14);
-      border-color: rgba(239, 68, 68, 0.42);
-    }
+    .status.online { color: var(--green); }
+    .status.offline { color: var(--red); }
     .metrics {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
+      gap: 10px;
     }
     .metric {
-      border-radius: 8px;
-      background: var(--panel-2);
-      padding: 9px 10px;
       min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.62);
+      padding: 13px;
     }
+    .metric.wide { grid-column: 1 / -1; }
     .label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
       color: var(--muted);
       font-size: 12px;
-      margin-bottom: 5px;
+      font-weight: 680;
+      margin-bottom: 7px;
     }
     .value {
-      font-size: 17px;
-      font-weight: 700;
+      font-size: 21px;
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+      font-weight: 760;
       overflow-wrap: anywhere;
     }
-    .last-seen {
-      margin-top: 11px;
+    .value.small { font-size: 15px; letter-spacing: -0.015em; }
+    .bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(120, 120, 128, 0.16);
+      margin-top: 10px;
+    }
+    .fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), #5ac8fa);
+      transition: width .45s ease;
+    }
+    .fill.warn { background: linear-gradient(90deg, var(--orange), #ffcc00); }
+    .fill.danger { background: linear-gradient(90deg, var(--red), #ff6b61); }
+    .traffic-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+    }
+    .traffic-title {
       color: var(--muted);
       font-size: 12px;
-      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+    .traffic-value {
+      font-size: 17px;
+      font-weight: 760;
+      letter-spacing: -0.025em;
+      text-align: right;
     }
     .empty, .error {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--panel);
-      padding: 18px;
+      grid-column: 1 / -1;
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      padding: 24px;
       color: var(--muted);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
     }
-    .error { color: #fecaca; border-color: rgba(239, 68, 68, 0.45); }
-    @media (max-width: 640px) {
-      main { width: min(100% - 18px, 1120px); padding-top: 12px; padding-bottom: 22px; }
-      header { display: block; }
-      h1, .sub { display: none; }
-      .summary {
-        justify-content: flex-start;
-        gap: 7px;
-        margin-top: 0;
-        margin-bottom: 12px;
-        font-size: 12px;
+    .error { color: var(--red); }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #050506;
+        --surface: rgba(28, 28, 30, 0.74);
+        --surface-solid: #1c1c1e;
+        --surface-soft: rgba(44, 44, 46, 0.66);
+        --text: #f5f5f7;
+        --muted: #a1a1a6;
+        --subtle: #8e8e93;
+        --line: rgba(255, 255, 255, 0.11);
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+        --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.26);
       }
-      .badge { padding: 5px 8px; border-radius: 7px; }
-      .grid { grid-template-columns: 1fr; gap: 10px; }
-      .card { padding: 12px; }
-      .card-head { align-items: center; margin-bottom: 10px; }
-      .name { font-size: 19px; line-height: 1.15; }
-      .status { padding: 3px 8px; font-size: 12px; }
-      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-      .metric { padding: 8px; border-radius: 7px; }
-      .label { font-size: 12px; margin-bottom: 3px; }
-      .value { font-size: 18px; line-height: 1.18; }
-      .last-seen { margin-top: 9px; font-size: 12px; }
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(0, 122, 255, 0.22), transparent 32rem),
+          radial-gradient(circle at top right, rgba(175, 82, 222, 0.18), transparent 30rem),
+          linear-gradient(180deg, #08080a 0%, #101014 56%, #050506 100%);
+      }
+      .eyebrow, .badge, .metric, .status { background: rgba(44, 44, 46, 0.62); }
+      .card::after { background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 44%); }
+      body::before { opacity: 0.18; }
+    }
+    @media (max-width: 720px) {
+      main { width: min(100% - 22px, 1180px); padding: 18px 0 30px; }
+      header { display: block; margin-bottom: 14px; }
+      h1 { font-size: 38px; }
+      .sub { font-size: 14px; margin-top: 10px; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; }
+      .badge { border-radius: 18px; padding: 11px 12px; }
+      .badge strong { font-size: 22px; }
+      .grid { grid-template-columns: 1fr; gap: 12px; }
+      .card { border-radius: 24px; padding: 15px; }
+      .card-head { margin-bottom: 13px; }
+      .name { font-size: 21px; }
+      .metrics { gap: 8px; }
+      .metric { border-radius: 18px; padding: 11px; }
+      .value { font-size: 19px; }
     }
   </style>
 </head>
@@ -197,12 +336,13 @@ DASHBOARD_HTML = """<!doctype html>
   <main>
     <header>
       <div>
+        <div class="eyebrow">Live Monitor</div>
         <h1>VPS Monitor</h1>
-        <div class="sub">每 1 秒自动刷新</div>
+        <div class="sub">轻量服务器状态面板，自动刷新 CPU、内存、磁盘、网络和流量状态。</div>
       </div>
       <div class="summary">
-        <div class="badge" id="online-count">online 0</div>
-        <div class="badge" id="offline-count">offline 0</div>
+        <div class="badge"><strong id="online-count">0</strong><span>在线</span></div>
+        <div class="badge"><strong id="offline-count">0</strong><span>离线</span></div>
       </div>
     </header>
     <section id="content" class="grid"></section>
@@ -213,7 +353,7 @@ DASHBOARD_HTML = """<!doctype html>
     const offlineCount = document.querySelector("#offline-count");
 
     function fmtPercent(value) {
-      return value === null || value === undefined ? "-" : `${Number(value).toFixed(1)}%`;
+      return value === null || value === undefined || Number.isNaN(Number(value)) ? "-" : `${Number(value).toFixed(1)}%`;
     }
 
     function fmtBytes(value) {
@@ -228,29 +368,13 @@ DASHBOARD_HTML = """<!doctype html>
       return `${unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
     }
 
-    function fmtSpeed(value) {
-      return `${fmtBytes(value)}/s`;
-    }
-
     function fmtGB(value) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
       return `${(Number(value) / 1073741824).toFixed(1)} GB`;
     }
 
-    function fmtTime(value) {
-      if (!value) return "-";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return value;
-      return date.toLocaleString();
-    }
-
-    function fmtAge(value, serverNow) {
-      if (!value) return "-";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "-";
-      const now = serverNow ? new Date(serverNow) : new Date();
-      const seconds = Math.max(0, Math.round((now.getTime() - date.getTime()) / 1000));
-      return `${seconds}s ago`;
+    function fmtSpeed(value) {
+      return `${fmtBytes(value)}/s`;
     }
 
     function fmtDuration(seconds) {
@@ -264,29 +388,71 @@ DASHBOARD_HTML = """<!doctype html>
       return `${minutes}m`;
     }
 
-    function metricBlock(label, value) {
-      const wrap = document.createElement("div");
-      wrap.className = "metric";
-      const labelEl = document.createElement("div");
-      labelEl.className = "label";
-      labelEl.textContent = label;
-      const valueEl = document.createElement("div");
-      valueEl.className = "value";
-      valueEl.textContent = value;
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function colorClass(percent) {
+      if (percent >= 90) return "danger";
+      if (percent >= 75) return "warn";
+      return "";
+    }
+
+    function metricBlock(label, value, percent) {
+      const wrap = element("div", "metric");
+      const labelEl = element("div", "label", label);
+      const valueEl = element("div", "value", value);
       wrap.append(labelEl, valueEl);
+      if (percent !== undefined && percent !== null && !Number.isNaN(Number(percent))) {
+        const bar = element("div", "bar");
+        const fill = element("div", `fill ${colorClass(Number(percent))}`.trim());
+        fill.style.width = `${Math.max(0, Math.min(100, Number(percent)))}%`;
+        bar.append(fill);
+        wrap.append(bar);
+      }
       return wrap;
     }
 
-    function render(nodes, serverNow) {
+    function trafficBlock(metric, node) {
+      const reportedTraffic = Number(metric.net_tx_month || 0) + Number(metric.net_rx_month || 0);
+      const totalTraffic = reportedTraffic + (Number(node.traffic_offset_gb || 0) * 1073741824);
+      const limitGB = Number(metric.traffic_limit_gb || 0);
+      const label = metric.traffic_reset_enabled ? "月流量" : "累计流量";
+      const wrap = element("div", "metric wide");
+      const line = element("div", "traffic-line");
+      const title = element("div", "traffic-title", label);
+      const value = element("div", "traffic-value");
+      const bar = element("div", "bar");
+      const fill = element("div", "fill");
+
+      if (limitGB > 0) {
+        const actualGB = totalTraffic / 1073741824;
+        const pctNumber = Math.min(100, Math.max(0, (actualGB / limitGB) * 100));
+        value.textContent = `${actualGB.toFixed(1)} / ${limitGB.toFixed(1)} GB`;
+        fill.style.width = `${pctNumber}%`;
+        fill.className = `fill ${colorClass(pctNumber)}`.trim();
+      } else {
+        value.textContent = fmtGB(totalTraffic);
+        fill.style.width = "100%";
+      }
+
+      line.append(title, value);
+      bar.append(fill);
+      wrap.append(line, bar);
+      return wrap;
+    }
+
+    function render(nodes) {
       content.innerHTML = "";
       if (!nodes.length) {
-        content.className = "";
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "还没有节点上报。启动 agent.py 后这里会显示 VPS 状态。";
+        const empty = element("div", "empty", "还没有节点上报。启动 Agent 后这里会显示 VPS 状态。");
         content.append(empty);
-      } else {
-        content.className = "grid";
+        onlineCount.textContent = "0";
+        offlineCount.textContent = "0";
+        return;
       }
 
       let online = 0;
@@ -296,80 +462,33 @@ DASHBOARD_HTML = """<!doctype html>
         else offline += 1;
 
         const metric = node.latest_metric || {};
-        const card = document.createElement("article");
-        card.className = "card";
+        const card = element("article", "card");
+        const head = element("div", "card-head");
+        const title = element("div");
+        const name = element("div", "name", node.name || node.id);
+        const host = element("div", "host", node.hostname || node.ip || node.id || "-");
+        const status = element("div", `status ${node.status === "online" ? "online" : "offline"}`, node.status === "online" ? "在线" : "离线");
 
-        const head = document.createElement("div");
-        head.className = "card-head";
-        const name = document.createElement("div");
-        name.className = "name";
-        name.textContent = node.name || node.id;
-        const status = document.createElement("div");
-        status.className = `status ${node.status === "online" ? "online" : "offline"}`;
-        status.textContent = node.status === "online" ? "online" : "offline";
-        head.append(name, status);
+        title.append(name, host);
+        head.append(title, status);
 
-        const metrics = document.createElement("div");
-        metrics.className = "metrics";
-        const reportedTraffic = (metric.net_tx_month || 0) + (metric.net_rx_month || 0);
-        const totalTraffic = reportedTraffic + ((node.traffic_offset_gb || 0) * 1073741824);
-        const trafficHasReset = Boolean(metric.traffic_reset_enabled);
+        const metrics = element("div", "metrics");
         metrics.append(
-          metricBlock("CPU", fmtPercent(metric.cpu_percent)),
-          metricBlock("内存", fmtPercent(metric.memory_percent)),
-          metricBlock("磁盘", fmtPercent(metric.disk_percent)),
+          metricBlock("CPU", fmtPercent(metric.cpu_percent), metric.cpu_percent),
+          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent),
+          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
-          metricBlock("网络", `↑${fmtSpeed(metric.net_upload_bps)} ↓${fmtSpeed(metric.net_download_bps)}`)
+          metricBlock("上行", fmtSpeed(metric.net_upload_bps)),
+          metricBlock("下行", fmtSpeed(metric.net_download_bps)),
+          trafficBlock(metric, node)
         );
-        // 流量进度条
-        const limitGB = metric.traffic_limit_gb;
-        const trafficLabel = trafficHasReset ? "月流量" : "累计流量";
-        const barWrap = document.createElement("div");
-        barWrap.className = "metric";
-        const barText = document.createElement("div");
-        barText.style.cssText = "display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;";
-        const barLabel = document.createElement("span");
-        barLabel.style.cssText = "color:var(--muted);";
-        const barPct = document.createElement("span");
-        barPct.style.cssText = "font-weight:700;";
-        const barBg = document.createElement("div"); barBg.style.cssText = "height:6px;border-radius:3px;background:var(--panel-2);border:1px solid var(--border);";
-        const barFill = document.createElement("div");
-        if (limitGB > 0) {
-          const actualTrafficGB = totalTraffic / 1073741824;
-          const fullAtGB = limitGB > 2 ? limitGB - 2 : limitGB;
-          const displayedTrafficGB = actualTrafficGB >= fullAtGB ? limitGB : actualTrafficGB;
-          const displayedTraffic = displayedTrafficGB * 1073741824;
-          const pct = Math.min(100, (displayedTrafficGB / limitGB) * 100).toFixed(1);
-          barLabel.textContent = `${trafficLabel} ${fmtGB(displayedTraffic)} / ${Number(limitGB).toFixed(1)} GB`;
-          barPct.textContent = `${pct}%`;
-          barFill.style.cssText = `height:6px;border-radius:3px;background:${pct>90?'#ef4444':pct>75?'#f59e0b':'#22c55e'};width:${pct}%;transition:width .5s;`;
-        } else {
-          barLabel.textContent = `${trafficLabel} ${fmtGB(totalTraffic)}`;
-          barFill.style.cssText = "height:6px;border-radius:3px;background:#22c55e;width:100%;";
-        }
-        barText.append(barLabel, barPct);
-        barBg.append(barFill); barWrap.append(barText, barBg); metrics.append(barWrap);
 
-        const lastSeen = document.createElement("div");
-        lastSeen.className = "last-seen";
-        let bootInfo = "";
-        if (metric.uptime_seconds) {
-          const bootTime = new Date(new Date(serverNow).getTime() - metric.uptime_seconds * 1000);
-          bootInfo = ` · 上次启动：${fmtTime(bootTime.toISOString())}`;
-        }
-        if (metric.traffic_reset_enabled && metric.traffic_cycle) {
-          const m = metric.traffic_cycle.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-          if (m) {
-            bootInfo += ` · 流量重置：每月 ${parseInt(m[3], 10)} 日 ${m[4]}:${m[5]}`;
-          }
-        }
-        lastSeen.textContent = `最后上报：${fmtAge(node.last_seen_at, serverNow)}${bootInfo}`;
-        card.append(head, metrics, lastSeen);
+        card.append(head, metrics);
         content.append(card);
       }
 
-      onlineCount.textContent = `online ${online}`;
-      offlineCount.textContent = `offline ${offline}`;
+      onlineCount.textContent = online;
+      offlineCount.textContent = offline;
     }
 
     async function refresh() {
@@ -377,14 +496,10 @@ DASHBOARD_HTML = """<!doctype html>
         const res = await fetch("/api/nodes", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        render(data.nodes || [], data.server_now);
+        render(data.nodes || []);
       } catch (err) {
-        content.className = "";
         content.innerHTML = "";
-        const error = document.createElement("div");
-        error.className = "error";
-        error.textContent = `无法加载节点数据：${err.message}`;
-        content.append(error);
+        content.append(element("div", "error", `无法加载节点数据：${err.message}`));
       }
     }
 
