@@ -185,13 +185,6 @@ DASHBOARD_HTML = """<!doctype html>
       font-weight: 760;
       overflow-wrap: anywhere;
     }
-    .host {
-      margin-top: 6px;
-      color: var(--subtle);
-      font-size: 12px;
-      font-weight: 560;
-      overflow-wrap: anywhere;
-    }
     .status {
       flex: 0 0 auto;
       display: inline-flex;
@@ -277,6 +270,12 @@ DASHBOARD_HTML = """<!doctype html>
       font-weight: 760;
       letter-spacing: -0.025em;
       text-align: right;
+    }
+    .traffic-meta {
+      margin: -1px 0 8px;
+      color: var(--subtle);
+      font-size: 12px;
+      font-weight: 620;
     }
     .empty, .error {
       grid-column: 1 / -1;
@@ -401,6 +400,13 @@ DASHBOARD_HTML = """<!doctype html>
       return "";
     }
 
+    function fmtTrafficCycle(value) {
+      if (!value || value === "never") return "";
+      const match = String(value).match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!match) return `重置周期：${value}`;
+      return `重置规则：每月 ${Number(match[2])} 日 ${match[3]}:${match[4]}`;
+    }
+
     function metricBlock(label, value, percent) {
       const wrap = element("div", "metric");
       const labelEl = element("div", "label", label);
@@ -425,8 +431,10 @@ DASHBOARD_HTML = """<!doctype html>
       const line = element("div", "traffic-line");
       const title = element("div", "traffic-title", label);
       const value = element("div", "traffic-value");
+      const meta = element("div", "traffic-meta");
       const bar = element("div", "bar");
       const fill = element("div", "fill");
+      const cycleText = metric.traffic_reset_enabled ? fmtTrafficCycle(metric.traffic_cycle) : "";
 
       if (limitGB > 0) {
         const actualGB = totalTraffic / 1073741824;
@@ -441,7 +449,12 @@ DASHBOARD_HTML = """<!doctype html>
 
       line.append(title, value);
       bar.append(fill);
-      wrap.append(line, bar);
+      wrap.append(line);
+      if (cycleText) {
+        meta.textContent = cycleText;
+        wrap.append(meta);
+      }
+      wrap.append(bar);
       return wrap;
     }
 
@@ -466,10 +479,9 @@ DASHBOARD_HTML = """<!doctype html>
         const head = element("div", "card-head");
         const title = element("div");
         const name = element("div", "name", node.name || node.id);
-        const host = element("div", "host", node.hostname || node.ip || node.id || "-");
         const status = element("div", `status ${node.status === "online" ? "online" : "offline"}`, node.status === "online" ? "在线" : "离线");
 
-        title.append(name, host);
+        title.append(name);
         head.append(title, status);
 
         const metrics = element("div", "metrics");
