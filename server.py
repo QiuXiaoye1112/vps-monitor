@@ -501,9 +501,9 @@ DASHBOARD_HTML = """<!doctype html>
         const metrics = element("div", "metrics");
         metrics.append(
           metricBlock("CPU", fmtPercent(metric.cpu_percent)),
-          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent),
-          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
+          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent),
+          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent),
           metricBlock("上行", fmtSpeed(metric.net_upload_bps)),
           metricBlock("下行", fmtSpeed(metric.net_download_bps)),
           trafficBlock(metric, node)
