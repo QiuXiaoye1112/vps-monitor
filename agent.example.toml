@@ -8,7 +8,6 @@ os_type = "Linux"
 
 disk_paths = ["/"]
 
-# 流量重置时间按北京时间 UTC+8 计算。
 # 0 表示不重置，1-31 表示每月重置日；超过当月天数时按最后一天处理。
 traffic_reset_day = 0
 traffic_reset_hour = 0

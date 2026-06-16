@@ -629,9 +629,9 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         print(color("上报间隔必须是整数。", RED))
         pause()
         return
-    reset_day_text = ask("每月流量重置日（北京时间，1-31，留空=不重置）")
-    reset_hour_text = ask("流量重置小时（北京时间 0-23）", "0") if reset_day_text else "0"
-    reset_minute_text = ask("流量重置分钟（北京时间 0-59）", "0") if reset_day_text else "0"
+    reset_day_text = ask("每月流量重置日（1-31，留空=不重置）")
+    reset_hour_text = ask("流量重置小时（0-23）", "0") if reset_day_text else "0"
+    reset_minute_text = ask("流量重置分钟（0-59）", "0") if reset_day_text else "0"
     limit_text = ask("月流量上限 GB（留空=无上限）")
     try:
         reset_day = min(31, max(1, int(reset_day_text))) if reset_day_text else 0

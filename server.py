@@ -414,11 +414,11 @@ DASHBOARD_HTML = """<!doctype html>
         }).formatToParts(date);
         const part = (type) => parts.find((item) => item.type === type)?.value || "";
         const hour = part("hour") === "24" ? "00" : part("hour");
-        return `重置规则：每月 ${Number(part("day"))} 日 ${hour}:${part("minute")} 北京时间`;
+        return `重置规则：每月 ${Number(part("day"))} 日 ${hour}:${part("minute")}`;
       }
       const match = String(value).match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
       if (!match) return `重置周期：${value}`;
-      return `重置规则：每月 ${Number(match[2])} 日 ${match[3]}:${match[4]} 北京时间`;
+      return `重置规则：每月 ${Number(match[2])} 日 ${match[3]}:${match[4]}`;
     }
 
     function metricBlock(label, value, percent) {
