@@ -23,546 +23,637 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="VPS Monitor API", version="1.0.0", lifespan=lifespan)
 
 
-DASHBOARD_HTML = """<!doctype html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VPS Monitor</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f5f5f7;
-      --surface: rgba(255, 255, 255, 0.82);
-      --surface-solid: #ffffff;
-      --surface-soft: rgba(255, 255, 255, 0.58);
-      --text: #1d1d1f;
-      --muted: #6e6e73;
-      --subtle: #86868b;
-      --line: rgba(0, 0, 0, 0.08);
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.10);
-      --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.07);
-      --blue: #007aff;
-      --green: #34c759;
-      --red: #ff3b30;
-      --orange: #ff9500;
-      --purple: #af52de;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(0, 122, 255, 0.16), transparent 34rem),
-        radial-gradient(circle at top right, rgba(175, 82, 222, 0.13), transparent 30rem),
-        linear-gradient(180deg, #fbfbfd 0%, var(--bg) 48%, #ededf1 100%);
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image: linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px);
-      background-size: 44px 44px;
-      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.42), transparent 62%);
-    }
-    main {
-      position: relative;
-      width: min(1180px, calc(100% - 40px));
-      margin: 0 auto;
-      padding: 36px 0 48px;
-    }
-    header {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 20px;
-      align-items: end;
-      margin-bottom: 22px;
-    }
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 650;
-      letter-spacing: 0.02em;
-      padding: 7px 11px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.58);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-    }
-    .eyebrow::before {
-      content: "";
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: var(--green);
-      box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.16);
-    }
-    h1 {
-      margin: 14px 0 0;
-      font-size: clamp(34px, 7vw, 68px);
-      line-height: 0.96;
-      letter-spacing: -0.06em;
-      font-weight: 780;
-    }
-    .sub {
-      max-width: 560px;
-      margin-top: 14px;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.5;
-    }
-    .summary {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(108px, 1fr));
-      gap: 10px;
-    }
-    .badge {
-      min-width: 108px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: var(--surface);
-      padding: 13px 15px;
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
-    .badge strong {
-      display: block;
-      font-size: 25px;
-      line-height: 1;
-      letter-spacing: -0.04em;
-    }
-    .badge span {
-      display: block;
-      margin-top: 5px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 650;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(292px, 1fr));
-      gap: 16px;
-    }
-    .card {
-      position: relative;
-      overflow: hidden;
-      min-width: 0;
-      border: 1px solid var(--line);
-      border-radius: 30px;
-      background: var(--surface);
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(24px) saturate(1.18);
-      -webkit-backdrop-filter: blur(24px) saturate(1.18);
-      padding: 20px;
-    }
-    .card::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background: linear-gradient(135deg, rgba(255,255,255,0.72), transparent 42%);
-    }
-    .card > * { position: relative; z-index: 1; }
-    .card-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-    .name {
-      font-size: 23px;
-      line-height: 1.12;
-      letter-spacing: -0.035em;
-      font-weight: 760;
-      overflow-wrap: anywhere;
-    }
-    .status {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      border-radius: 999px;
-      padding: 7px 10px;
-      font-size: 12px;
-      font-weight: 720;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.62);
-      color: var(--muted);
-    }
-    .status::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: currentColor;
-    }
-    .status.online { color: var(--green); }
-    .status.offline { color: var(--red); }
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .metric {
-      min-width: 0;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255, 255, 255, 0.62);
-      padding: 13px;
-    }
-    .metric.wide { grid-column: 1 / -1; }
-    .label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 680;
-      margin-bottom: 7px;
-    }
-    .label-text {
-      flex: 0 0 auto;
-      white-space: nowrap;
-    }
-    .value {
-      font-size: 21px;
-      line-height: 1.08;
-      letter-spacing: -0.035em;
-      font-weight: 760;
-      overflow-wrap: anywhere;
-    }
-    .value.small { font-size: 15px; letter-spacing: -0.015em; }
-    .detail {
-      color: var(--subtle);
-      font-size: 12px;
-      font-weight: 640;
-      line-height: 1;
-      min-width: 0;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .bar {
-      height: 8px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: rgba(120, 120, 128, 0.16);
-      margin-top: 10px;
-    }
-    .fill {
-      height: 100%;
-      width: 0%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--blue), #5ac8fa);
-      transition: width .45s ease;
-    }
-    .fill.warn { background: linear-gradient(90deg, var(--orange), #ffcc00); }
-    .fill.danger { background: linear-gradient(90deg, var(--red), #ff6b61); }
-    .traffic-line {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 7px;
-    }
-    .traffic-title {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .traffic-value {
-      font-size: 17px;
-      font-weight: 760;
-      letter-spacing: -0.025em;
-      text-align: right;
-    }
-    .traffic-meta {
-      margin: -1px 0 8px;
-      color: var(--subtle);
-      font-size: 12px;
-      font-weight: 620;
-    }
-    .empty, .error {
-      grid-column: 1 / -1;
-      border: 1px solid var(--line);
-      border-radius: 30px;
-      background: var(--surface);
-      box-shadow: var(--shadow-soft);
-      padding: 24px;
-      color: var(--muted);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
-    .error { color: var(--red); }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        color-scheme: dark;
-        --bg: #050506;
-        --surface: rgba(28, 28, 30, 0.74);
-        --surface-solid: #1c1c1e;
-        --surface-soft: rgba(44, 44, 46, 0.66);
-        --text: #f5f5f7;
-        --muted: #a1a1a6;
-        --subtle: #8e8e93;
-        --line: rgba(255, 255, 255, 0.11);
-        --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
-        --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.26);
-      }
-      body {
-        background:
-          radial-gradient(circle at top left, rgba(0, 122, 255, 0.22), transparent 32rem),
-          radial-gradient(circle at top right, rgba(175, 82, 222, 0.18), transparent 30rem),
-          linear-gradient(180deg, #08080a 0%, #101014 56%, #050506 100%);
-      }
-      .eyebrow, .badge, .metric, .status { background: rgba(44, 44, 46, 0.62); }
-      .card::after { background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 44%); }
-      body::before { opacity: 0.18; }
-    }
-    @media (max-width: 720px) {
-      main { width: min(100% - 22px, 1180px); padding: 18px 0 30px; }
-      header { display: block; margin-bottom: 14px; }
-      h1 { font-size: 38px; }
-      .sub { font-size: 14px; margin-top: 10px; }
-      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; }
-      .badge { border-radius: 18px; padding: 11px 12px; }
-      .badge strong { font-size: 22px; }
-      .grid { grid-template-columns: 1fr; gap: 12px; }
-      .card { border-radius: 24px; padding: 15px; }
-      .card-head { margin-bottom: 13px; }
-      .name { font-size: 21px; }
-      .metrics { gap: 8px; }
-      .metric { border-radius: 18px; padding: 11px; }
-      .value { font-size: 19px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>VPS Monitor</title>
+<style>
+  :root{
+    --bg:#0c0f14;
+    --bg-elevated:#11151c;
+    --card-bg:#141922;
+    --border:#252b35;
+    --border-soft:#1c222b;
+    --text:#e6edf3;
+    --text-dim:#8b949e;
+    --text-faint:#5f6975;
+    --accent:#5b9dff;   /* CPU / 磁盘 */
+    --purple:#b18cff;   /* 内存 */
+    --teal:#3ad1c6;     /* 流量 */
+    --green:#3fb950;    /* 在线 */
+    --red:#f85149;      /* 离线 / 危险 */
+    --yellow:#d9a52b;   /* 警告 */
+    --track:#1c2128;
+    --radius:8px;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  [hidden]{ display:none !important; }
+
+  html,body{
+    background:var(--bg);
+    color:var(--text);
+    min-height:100%;
+  }
+
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
+    font-size:14px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* 数值与百分比使用等宽字体，便于多卡片纵向扫读对齐，呼应"监控终端"的气质 */
+  .mono{
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+  }
+
+  a{ color:var(--accent); }
+
+  /* ---------- 顶部栏 ---------- */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:20;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px 16px;
+    padding:16px 20px;
+    background:var(--bg-elevated);
+    border-bottom:1px solid var(--border);
+  }
+  .topbar-left{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .topbar h1{
+    font-size:1.15rem;
+    font-weight:700;
+    letter-spacing:.01em;
+  }
+  .summary{ display:flex; gap:8px; }
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:.82rem;
+    font-weight:600;
+    padding:4px 11px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .badge .dot{ width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .badge.online{ color:var(--green); background:rgba(63,185,80,.13); }
+  .badge.offline{ color:var(--red); background:rgba(248,81,73,.13); }
+
+  .topbar-right{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .server-time{ font-size:.76rem; color:var(--text-dim); }
+  .server-time .mono{ color:var(--text-dim); }
+
+  /* ---------- 状态条 / 空状态 ---------- */
+  .status-bar{
+    margin:14px 20px 0;
+    padding:9px 14px;
+    background:rgba(248,81,73,.1);
+    border:1px solid rgba(248,81,73,.3);
+    color:var(--red);
+    border-radius:8px;
+    font-size:.84rem;
+  }
+  .empty-state{
+    padding:80px 20px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:.95rem;
+  }
+
+  /* ---------- 卡片网格 ---------- */
+  main.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:16px;
+    padding:20px;
+  }
+
+  .card{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-top:3px solid var(--green);
+    border-radius:var(--radius);
+    padding:16px 16px 18px;
+    transition:border-color .3s ease;
+  }
+  .card.offline{ border-top-color:var(--red); }
+  .card.offline .card-body{ opacity:.72; }
+
+  .card-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .node-name{
+    font-size:1.02rem;
+    font-weight:700;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    min-width:0;
+  }
+  .status-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:.74rem;
+    font-weight:600;
+    padding:3px 10px;
+    border-radius:20px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .status-badge .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .status-badge.online{ color:var(--green); background:rgba(63,185,80,.13); }
+  .status-badge.offline{ color:var(--red); background:rgba(248,81,73,.13); }
+
+  .card-body{ display:flex; flex-direction:column; gap:14px; transition:opacity .3s ease; }
+
+  /* ---------- 双列小指标（CPU / 运行时间，上行 / 下行） ---------- */
+  .stat-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px 14px;
+  }
+  .stat-item{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .stat-label{
+    font-size:.7rem;
+    font-weight:600;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    white-space:nowrap;
+  }
+  .stat-value{
+    font-size:1.05rem;
+    font-weight:700;
+    word-break:break-word;
+  }
+
+  .mini-track{
+    height:4px;
+    border-radius:3px;
+    background:var(--track);
+    overflow:hidden;
+  }
+  .mini-fill{
+    height:100%;
+    border-radius:3px;
+    background:var(--accent);
+    transition:width .5s ease, background-color .3s ease;
+  }
+
+  /* ---------- 磁盘 / 内存 / 流量 大指标块 ---------- */
+  .metric-block{ display:flex; flex-direction:column; gap:7px; }
+  .metric-label{
+    font-size:.76rem;
+    font-weight:600;
+    color:var(--text-dim);
+    white-space:nowrap;
+  }
+  .metric-value{
+    font-size:1.5rem;
+    font-weight:700;
+    line-height:1.25;
+    word-break:break-word;
+  }
+  .metric-value .metric-limit{
+    font-size:.82rem;
+    font-weight:500;
+    color:var(--text-faint);
+    margin-left:5px;
+  }
+  .metric-detail{
+    font-size:.84rem;
+    color:var(--text-dim);
+    line-height:1.5;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+
+  .track{
+    height:8px;
+    border-radius:4px;
+    background:var(--track);
+    overflow:hidden;
+  }
+  .fill{
+    height:100%;
+    border-radius:4px;
+    transition:width .5s ease, background-color .3s ease;
+  }
+  .fill.disk{ background:var(--accent); }
+  .fill.mem{ background:var(--purple); }
+  .fill.traffic{ background:var(--teal); }
+  .fill.level-warn{ background:var(--yellow) !important; }
+  .fill.level-danger{ background:var(--red) !important; }
+  .mini-fill.level-warn{ background:var(--yellow) !important; }
+  .mini-fill.level-danger{ background:var(--red) !important; }
+
+  .divider{ height:1px; background:var(--border-soft); border:none; }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width:480px){
+    main.grid{ grid-template-columns:1fr; padding:14px; gap:14px; }
+    .topbar{ padding:13px 14px; }
+    .topbar-right{ align-items:flex-start; }
+  }
+  @media (max-width:360px){
+    .stat-row{ grid-template-columns:1fr; }
+  }
+</style>
 </head>
 <body>
-  <main>
-    <header>
-      <div>
-        <div class="eyebrow">Live Monitor</div>
-        <h1>VPS Monitor</h1>
-        <div class="sub">轻量服务器状态面板，自动刷新 CPU、内存、磁盘、网络和流量状态。</div>
-      </div>
-      <div class="summary">
-        <div class="badge"><strong id="online-count">0</strong><span>在线</span></div>
-        <div class="badge"><strong id="offline-count">0</strong><span>离线</span></div>
-      </div>
-    </header>
-    <section id="content" class="grid"></section>
-  </main>
-  <script>
-    const content = document.querySelector("#content");
-    const onlineCount = document.querySelector("#online-count");
-    const offlineCount = document.querySelector("#offline-count");
 
-    function fmtPercent(value) {
-      return value === null || value === undefined || Number.isNaN(Number(value)) ? "-" : `${Number(value).toFixed(1)}%`;
+<header class="topbar">
+  <div class="topbar-left">
+    <h1>VPS Monitor</h1>
+    <div class="summary">
+      <span class="badge online"><span class="dot"></span>在线 <span id="onlineCount" class="mono">0</span></span>
+      <span class="badge offline"><span class="dot"></span>离线 <span id="offlineCount" class="mono">0</span></span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="server-time" id="serverTime">&nbsp;</div>
+  </div>
+</header>
+
+<div class="status-bar" id="statusBar" hidden></div>
+<div class="empty-state" id="loadingState">正在加载节点数据…</div>
+<div class="empty-state" id="emptyState" hidden>暂无节点数据</div>
+
+<main class="grid" id="nodesGrid"></main>
+
+<noscript>
+  <div class="empty-state">请启用 JavaScript 以查看实时监控数据。</div>
+</noscript>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+   * 数据单位假设（如后端实际单位不同，请调整此处逻辑）：
+   * - disk_used / disk_total / memory_used / memory_total      → 字节 (Byte)
+   * - net_upload_bps / net_download_bps                        → 字节/秒 (Byte/s)
+   * - net_tx_month / net_rx_month                               → 字节 (Byte)，本月累计上/下行
+   * - traffic_offset_gb / traffic_limit_gb                     → GiB（1024^3 字节），与月流量字节数合并计算
+   * ========================================================= */
+
+  var GiB = Math.pow(1024, 3);
+
+  /* ---------------- 格式化函数 ---------------- */
+
+  function fmtPercent(value, decimals){
+    decimals = (decimals === undefined) ? 1 : decimals;
+    var n = Number(value);
+    if (value === null || value === undefined || isNaN(n)) return "--";
+    return n.toFixed(decimals) + "%";
+  }
+
+  function fmtBytes(bytes, decimals){
+    decimals = (decimals === undefined) ? 1 : decimals;
+    var n = Number(bytes);
+    if (bytes === null || bytes === undefined || isNaN(n)) return "--";
+    if (n === 0) return "0 B";
+    var units = ["B","KB","MB","GB","TB","PB"];
+    var negative = n < 0;
+    var abs = Math.abs(n);
+    var i = Math.floor(Math.log(abs) / Math.log(1024));
+    i = Math.max(0, Math.min(i, units.length - 1));
+    var val = abs / Math.pow(1024, i);
+    var str = val.toFixed(decimals) + " " + units[i];
+    return negative ? "-" + str : str;
+  }
+
+  function fmtSpeed(bytesPerSec, decimals){
+    decimals = (decimals === undefined) ? 1 : decimals;
+    var n = Number(bytesPerSec);
+    if (bytesPerSec === null || bytesPerSec === undefined || isNaN(n)) return "--";
+    return fmtBytes(n, decimals) + "/s";
+  }
+
+  function fmtDuration(seconds){
+    var n = Number(seconds);
+    if (seconds === null || seconds === undefined || isNaN(n) || n < 0) return "--";
+    n = Math.floor(n);
+    var day = 86400, hour = 3600, minute = 60;
+    var d = Math.floor(n / day);
+    var h = Math.floor((n % day) / hour);
+    var m = Math.floor((n % hour) / minute);
+    var s = n % minute;
+    if (d > 0) return d + " 天 " + h + " 时";
+    if (h > 0) return h + " 时 " + m + " 分";
+    if (m > 0) return m + " 分 " + s + " 秒";
+    return s + " 秒";
+  }
+
+  function fmtUsage(used, total, decimals){
+    decimals = (decimals === undefined) ? 1 : decimals;
+    return fmtBytes(used, decimals) + " / " + fmtBytes(total, decimals);
+  }
+
+  function fmtTrafficCycle(value){
+    if (!value || value === "never") return "";
+    var match = String(value).match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!match) return value;
+    return "每月 " + Number(match[2]) + " 日 " + match[3] + ":" + match[4];
+  }
+
+  function clampPercent(n){
+    if (n === null || n === undefined || isNaN(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function levelClass(percent){
+    var n = Number(percent);
+    if (percent === null || percent === undefined || isNaN(n)) return "";
+    if (n >= 90) return "level-danger";
+    if (n >= 75) return "level-warn";
+    return "";
+  }
+
+  /* ---------------- 卡片构建与更新 ---------------- */
+
+  var cards = new Map(); // id -> refs
+
+  function buildCard(){
+    var el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML =
+      '<div class="card-header">' +
+        '<div class="node-name"></div>' +
+        '<div class="status-badge"><span class="dot"></span><span class="status-text"></span></div>' +
+      '</div>' +
+      '<div class="card-body">' +
+        '<div class="stat-row">' +
+          '<div class="stat-item">' +
+            '<div class="stat-label">CPU</div>' +
+            '<div class="stat-value mono cpu-value">--</div>' +
+            '<div class="mini-track"><div class="mini-fill cpu-fill" style="width:0%"></div></div>' +
+          '</div>' +
+          '<div class="stat-item">' +
+            '<div class="stat-label">运行时间</div>' +
+            '<div class="stat-value mono uptime-value">--</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<hr class="divider">' +
+
+        '<div class="metric-block">' +
+          '<div class="metric-label">磁盘</div>' +
+          '<div class="metric-value mono disk-value">--</div>' +
+          '<div class="metric-detail mono disk-detail">--</div>' +
+          '<div class="track"><div class="fill disk disk-fill" style="width:0%"></div></div>' +
+        '</div>' +
+
+        '<div class="metric-block">' +
+          '<div class="metric-label">内存</div>' +
+          '<div class="metric-value mono mem-value">--</div>' +
+          '<div class="metric-detail mono mem-detail">--</div>' +
+          '<div class="track"><div class="fill mem mem-fill" style="width:0%"></div></div>' +
+        '</div>' +
+
+        '<hr class="divider">' +
+
+        '<div class="stat-row">' +
+          '<div class="stat-item">' +
+            '<div class="stat-label">↑ 上行</div>' +
+            '<div class="stat-value mono up-value">--</div>' +
+          '</div>' +
+          '<div class="stat-item">' +
+            '<div class="stat-label">↓ 下行</div>' +
+            '<div class="stat-value mono down-value">--</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="metric-block">' +
+          '<div class="metric-label traffic-label">流量</div>' +
+          '<div class="metric-value mono traffic-value">--</div>' +
+          '<div class="metric-detail mono traffic-detail">--</div>' +
+          '<div class="track traffic-track"><div class="fill traffic traffic-fill" style="width:0%"></div></div>' +
+        '</div>' +
+      '</div>';
+
+    return {
+      el: el,
+      name: el.querySelector(".node-name"),
+      statusBadge: el.querySelector(".status-badge"),
+      statusText: el.querySelector(".status-text"),
+      body: el.querySelector(".card-body"),
+
+      cpuValue: el.querySelector(".cpu-value"),
+      cpuFill: el.querySelector(".cpu-fill"),
+      uptimeValue: el.querySelector(".uptime-value"),
+
+      diskValue: el.querySelector(".disk-value"),
+      diskDetail: el.querySelector(".disk-detail"),
+      diskFill: el.querySelector(".disk-fill"),
+
+      memValue: el.querySelector(".mem-value"),
+      memDetail: el.querySelector(".mem-detail"),
+      memFill: el.querySelector(".mem-fill"),
+
+      upValue: el.querySelector(".up-value"),
+      downValue: el.querySelector(".down-value"),
+
+      trafficLabel: el.querySelector(".traffic-label"),
+      trafficValue: el.querySelector(".traffic-value"),
+      trafficDetail: el.querySelector(".traffic-detail"),
+      trafficFill: el.querySelector(".traffic-fill"),
+      trafficTrack: el.querySelector(".traffic-track")
+    };
+  }
+
+  function setFill(fillEl, percent, baseClass, online){
+    var pct = online ? clampPercent(percent) : 0;
+    fillEl.style.width = pct + "%";
+    var lvl = online ? levelClass(percent) : "";
+    fillEl.className = ("fill " + baseClass + " " + lvl).trim();
+  }
+
+  function setMiniFill(fillEl, percent, online){
+    var pct = online ? clampPercent(percent) : 0;
+    fillEl.style.width = pct + "%";
+    var lvl = online ? levelClass(percent) : "";
+    fillEl.className = ("mini-fill cpu-fill " + lvl).trim();
+  }
+
+  function updateCard(refs, node){
+    var online = node.status === "online";
+    var hasMetric = !!node.latest_metric;
+
+    refs.el.classList.toggle("offline", !online);
+    refs.statusBadge.classList.toggle("online", online);
+    refs.statusBadge.classList.toggle("offline", !online);
+    refs.statusText.textContent = online ? "在线" : "离线";
+    refs.name.textContent = node.name || node.id || "未命名节点";
+
+    var m = node.latest_metric || {};
+
+    // CPU
+    refs.cpuValue.textContent = hasMetric ? fmtPercent(m.cpu_percent) : "--";
+    setMiniFill(refs.cpuFill, m.cpu_percent, hasMetric);
+
+    // 运行时间
+    refs.uptimeValue.textContent = hasMetric ? fmtDuration(m.uptime_seconds) : "--";
+
+    // 磁盘
+    refs.diskValue.textContent = hasMetric ? fmtPercent(m.disk_percent) : "--";
+    refs.diskDetail.textContent = hasMetric ? fmtUsage(m.disk_used, m.disk_total) : "--";
+    setFill(refs.diskFill, m.disk_percent, "disk", hasMetric);
+
+    // 内存
+    refs.memValue.textContent = hasMetric ? fmtPercent(m.memory_percent) : "--";
+    refs.memDetail.textContent = hasMetric ? fmtUsage(m.memory_used, m.memory_total) : "--";
+    setFill(refs.memFill, m.memory_percent, "mem", hasMetric);
+
+    // 上 / 下行速度
+    refs.upValue.textContent = hasMetric ? fmtSpeed(m.net_upload_bps) : "--";
+    refs.downValue.textContent = hasMetric ? fmtSpeed(m.net_download_bps) : "--";
+
+    // 流量（月流量 或 累计流量）
+    var offsetBytes = (Number(node.traffic_offset_gb) || 0) * GiB;
+    var txBytes = Number(m.net_tx_month) || 0;
+    var rxBytes = Number(m.net_rx_month) || 0;
+    var usedBytes = txBytes + rxBytes + offsetBytes;
+    var hasLimit = !!m.traffic_reset_enabled && Number(m.traffic_limit_gb) > 0;
+
+    if (!hasMetric) {
+      refs.trafficLabel.textContent = "流量";
+      refs.trafficValue.textContent = "--";
+      refs.trafficDetail.textContent = "--";
+      refs.trafficTrack.style.display = "none";
+    } else if (hasLimit) {
+      var limitBytes = Number(m.traffic_limit_gb) * GiB;
+      var pct = limitBytes > 0 ? (usedBytes / limitBytes) * 100 : 0;
+      var cycleText = fmtTrafficCycle(m.traffic_cycle);
+      refs.trafficLabel.textContent = "月流量" + (cycleText ? "（" + cycleText + "）" : "");
+      refs.trafficValue.innerHTML = fmtBytes(usedBytes) +
+        ' <span class="metric-limit">/ ' + fmtBytes(limitBytes) + '</span>';
+      refs.trafficDetail.textContent = "↑ " + fmtBytes(txBytes) + "   ↓ " + fmtBytes(rxBytes);
+      refs.trafficTrack.style.display = "";
+      setFill(refs.trafficFill, pct, "traffic", true);
+    } else {
+      refs.trafficLabel.textContent = "累计流量";
+      refs.trafficValue.textContent = fmtBytes(usedBytes);
+      refs.trafficDetail.textContent = "↑ " + fmtBytes(txBytes) + "   ↓ " + fmtBytes(rxBytes);
+      refs.trafficTrack.style.display = "none";
     }
+  }
 
-    function fmtBytes(value) {
-      if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
-      let size = Number(value);
-      const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-      let unit = 0;
-      while (Math.abs(size) >= 1024 && unit < units.length - 1) {
-        size /= 1024;
-        unit += 1;
+  /* ---------------- 渲染 ---------------- */
+
+  function setCounts(nodes){
+    var online = 0;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].status === "online") online++;
+    }
+    document.getElementById("onlineCount").textContent = online;
+    document.getElementById("offlineCount").textContent = nodes.length - online;
+  }
+
+  function updateServerTime(iso){
+    var el = document.getElementById("serverTime");
+    if (!iso) { el.innerHTML = "&nbsp;"; return; }
+    try {
+      var d = new Date(iso);
+      var text = d.toLocaleString("zh-CN", { hour12: false });
+      el.innerHTML = '服务器时间：<span class="mono">' + text + '</span>';
+    } catch (e) {
+      el.innerHTML = "&nbsp;";
+    }
+  }
+
+  function render(data){
+    var nodes = (data && Array.isArray(data.nodes)) ? data.nodes : [];
+
+    document.getElementById("loadingState").hidden = true;
+    setCounts(nodes);
+    updateServerTime(data && data.server_now);
+
+    var grid = document.getElementById("nodesGrid");
+    var seen = new Set();
+
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      seen.add(node.id);
+      var refs = cards.get(node.id);
+      if (!refs) {
+        refs = buildCard();
+        cards.set(node.id, refs);
+        grid.appendChild(refs.el);
       }
-      return `${unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+      updateCard(refs, node);
     }
 
-    function fmtGB(value) {
-      if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
-      return `${(Number(value) / 1073741824).toFixed(1)} GB`;
-    }
-
-    function fmtCompactBytes(value) {
-      if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
-      let size = Number(value);
-      const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-      let unit = 0;
-      while (Math.abs(size) >= 1024 && unit < units.length - 1) {
-        size /= 1024;
-        unit += 1;
+    // 移除已不存在的节点卡片
+    cards.forEach(function(refs, id){
+      if (!seen.has(id)) {
+        refs.el.remove();
+        cards.delete(id);
       }
-      return `${unit === 0 ? size.toFixed(0) : size.toFixed(1)}${units[unit]}`;
+    });
+
+    document.getElementById("emptyState").hidden = nodes.length > 0;
+  }
+
+  function setConnError(message){
+    var bar = document.getElementById("statusBar");
+    if (!message) {
+      bar.hidden = true;
+      return;
     }
+    bar.hidden = false;
+    bar.textContent = message;
+  }
 
-    function fmtUsage(used, total) {
-      if (
-        used === null || used === undefined || Number.isNaN(Number(used)) ||
-        total === null || total === undefined || Number.isNaN(Number(total))
-      ) {
-        return "-";
-      }
-      return `${fmtCompactBytes(used)}/${fmtCompactBytes(total)}`;
-    }
+  /* ---------------- 拉取数据 ---------------- */
 
-    function fmtSpeed(value) {
-      return `${fmtBytes(value)}/s`;
-    }
+  var inFlight = false;
 
-    function fmtDuration(seconds) {
-      if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return "-";
-      const total = Math.max(0, Math.floor(Number(seconds)));
-      const days = Math.floor(total / 86400);
-      const hours = Math.floor((total % 86400) / 3600);
-      const minutes = Math.floor((total % 3600) / 60);
-      if (days > 0) return `${days}d ${hours}h`;
-      if (hours > 0) return `${hours}h ${minutes}m`;
-      return `${minutes}m`;
-    }
+  function refresh(){
+    if (inFlight) return; // 避免请求堆积导致的并发问题
+    inFlight = true;
 
-    function element(tag, className, text) {
-      const node = document.createElement(tag);
-      if (className) node.className = className;
-      if (text !== undefined) node.textContent = text;
-      return node;
-    }
+    fetch("/api/nodes", { cache: "no-store" })
+      .then(function(res){
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function(data){
+        render(data);
+        setConnError(null);
+      })
+      .catch(function(err){
+        console.error("获取节点数据失败：", err);
+        setConnError("数据获取失败，正在重试…");
+      })
+      .finally(function(){
+        inFlight = false;
+      });
+  }
 
-    function colorClass(percent) {
-      if (percent >= 90) return "danger";
-      if (percent >= 75) return "warn";
-      return "";
-    }
-
-    function fmtTrafficCycle(value) {
-      if (!value || value === "never") return "";
-      const match = String(value).match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!match) return `重置周期：${value}`;
-      return `重置规则：每月 ${Number(match[2])} 日 ${match[3]}:${match[4]}`;
-    }
-
-    function metricBlock(label, value, percent, detail) {
-      const wrap = element("div", "metric");
-      const labelEl = element("div", "label");
-      labelEl.append(element("span", "label-text", label));
-      const valueEl = element("div", "value", value);
-      if (detail !== undefined && detail !== null && detail !== "") {
-        labelEl.append(element("span", "detail", detail));
-      }
-      wrap.append(labelEl, valueEl);
-      if (percent !== undefined && percent !== null && !Number.isNaN(Number(percent))) {
-        const bar = element("div", "bar");
-        const fill = element("div", `fill ${colorClass(Number(percent))}`.trim());
-        fill.style.width = `${Math.max(0, Math.min(100, Number(percent)))}%`;
-        bar.append(fill);
-        wrap.append(bar);
-      }
-      return wrap;
-    }
-
-    function trafficBlock(metric, node) {
-      const reportedTraffic = Number(metric.net_tx_month || 0) + Number(metric.net_rx_month || 0);
-      const totalTraffic = reportedTraffic + (Number(node.traffic_offset_gb || 0) * 1073741824);
-      const limitGB = Number(metric.traffic_limit_gb || 0);
-      const label = metric.traffic_reset_enabled ? "月流量" : "累计流量";
-      const wrap = element("div", "metric wide");
-      const line = element("div", "traffic-line");
-      const title = element("div", "traffic-title", label);
-      const value = element("div", "traffic-value");
-      const meta = element("div", "traffic-meta");
-      const bar = element("div", "bar");
-      const fill = element("div", "fill");
-      const cycleText = metric.traffic_reset_enabled ? fmtTrafficCycle(metric.traffic_cycle) : "";
-
-      if (limitGB > 0) {
-        const actualGB = totalTraffic / 1073741824;
-        const pctNumber = Math.min(100, Math.max(0, (actualGB / limitGB) * 100));
-        value.textContent = `${actualGB.toFixed(1)} / ${limitGB.toFixed(1)} GB`;
-        fill.style.width = `${pctNumber}%`;
-        fill.className = `fill ${colorClass(pctNumber)}`.trim();
-      } else {
-        value.textContent = fmtGB(totalTraffic);
-        fill.style.width = "100%";
-      }
-
-      line.append(title, value);
-      bar.append(fill);
-      wrap.append(line);
-      if (cycleText) {
-        meta.textContent = cycleText;
-        wrap.append(meta);
-      }
-      wrap.append(bar);
-      return wrap;
-    }
-
-    function render(nodes) {
-      content.innerHTML = "";
-      if (!nodes.length) {
-        const empty = element("div", "empty", "还没有节点上报。启动 Agent 后这里会显示 VPS 状态。");
-        content.append(empty);
-        onlineCount.textContent = "0";
-        offlineCount.textContent = "0";
-        return;
-      }
-
-      let online = 0;
-      let offline = 0;
-      for (const node of nodes) {
-        if (node.status === "online") online += 1;
-        else offline += 1;
-
-        const metric = node.latest_metric || {};
-        const card = element("article", "card");
-        const head = element("div", "card-head");
-        const title = element("div");
-        const name = element("div", "name", node.name || node.id);
-        const status = element("div", `status ${node.status === "online" ? "online" : "offline"}`, node.status === "online" ? "在线" : "离线");
-
-        title.append(name);
-        head.append(title, status);
-
-        const metrics = element("div", "metrics");
-        metrics.append(
-          metricBlock("CPU", fmtPercent(metric.cpu_percent)),
-          metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
-          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent, fmtUsage(metric.disk_used, metric.disk_total)),
-          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent, fmtUsage(metric.memory_used, metric.memory_total)),
-          metricBlock("上行", fmtSpeed(metric.net_upload_bps)),
-          metricBlock("下行", fmtSpeed(metric.net_download_bps)),
-          trafficBlock(metric, node)
-        );
-
-        card.append(head, metrics);
-        content.append(card);
-      }
-
-      onlineCount.textContent = online;
-      offlineCount.textContent = offline;
-    }
-
-    async function refresh() {
-      try {
-        const res = await fetch("/api/nodes", { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        render(data.nodes || []);
-      } catch (err) {
-        content.innerHTML = "";
-        content.append(element("div", "error", `无法加载节点数据：${err.message}`));
-      }
-    }
-
-    refresh();
-    setInterval(refresh, 1000);
-  </script>
+  refresh();
+  setInterval(refresh, 1000);
+})();
+</script>
 </body>
-</html>
-"""
+</html>"""
 
 
 class NodePayload(BaseModel):
