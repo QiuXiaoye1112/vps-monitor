@@ -237,6 +237,14 @@ DASHBOARD_HTML = """<!doctype html>
       overflow-wrap: anywhere;
     }
     .value.small { font-size: 15px; letter-spacing: -0.015em; }
+    .detail {
+      margin-top: 6px;
+      color: var(--subtle);
+      font-size: 12px;
+      font-weight: 640;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
     .bar {
       height: 8px;
       overflow: hidden;
@@ -372,6 +380,16 @@ DASHBOARD_HTML = """<!doctype html>
       return `${(Number(value) / 1073741824).toFixed(1)} GB`;
     }
 
+    function fmtUsage(used, total) {
+      if (
+        used === null || used === undefined || Number.isNaN(Number(used)) ||
+        total === null || total === undefined || Number.isNaN(Number(total))
+      ) {
+        return "-";
+      }
+      return `已用 ${fmtBytes(used)} / ${fmtBytes(total)}`;
+    }
+
     function fmtSpeed(value) {
       return `${fmtBytes(value)}/s`;
     }
@@ -407,11 +425,14 @@ DASHBOARD_HTML = """<!doctype html>
       return `重置规则：每月 ${Number(match[2])} 日 ${match[3]}:${match[4]}`;
     }
 
-    function metricBlock(label, value, percent) {
+    function metricBlock(label, value, percent, detail) {
       const wrap = element("div", "metric");
       const labelEl = element("div", "label", label);
       const valueEl = element("div", "value", value);
       wrap.append(labelEl, valueEl);
+      if (detail !== undefined && detail !== null && detail !== "") {
+        wrap.append(element("div", "detail", detail));
+      }
       if (percent !== undefined && percent !== null && !Number.isNaN(Number(percent))) {
         const bar = element("div", "bar");
         const fill = element("div", `fill ${colorClass(Number(percent))}`.trim());
@@ -488,8 +509,8 @@ DASHBOARD_HTML = """<!doctype html>
         metrics.append(
           metricBlock("CPU", fmtPercent(metric.cpu_percent)),
           metricBlock("运行时间", fmtDuration(metric.uptime_seconds)),
-          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent),
-          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent),
+          metricBlock("磁盘", fmtPercent(metric.disk_percent), metric.disk_percent, fmtUsage(metric.disk_used, metric.disk_total)),
+          metricBlock("内存", fmtPercent(metric.memory_percent), metric.memory_percent, fmtUsage(metric.memory_used, metric.memory_total)),
           metricBlock("上行", fmtSpeed(metric.net_upload_bps)),
           metricBlock("下行", fmtSpeed(metric.net_download_bps)),
           trafficBlock(metric, node)
