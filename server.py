@@ -244,7 +244,7 @@ DASHBOARD_HTML = """<!doctype html>
     .value.small { font-size: 15px; letter-spacing: -0.015em; }
     .detail {
       color: var(--subtle);
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 640;
       line-height: 1;
       min-width: 0;
