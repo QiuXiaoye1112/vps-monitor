@@ -222,12 +222,17 @@ DASHBOARD_HTML = """<!doctype html>
     .metric.wide { grid-column: 1 / -1; }
     .label {
       display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 10px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 680;
       margin-bottom: 7px;
+    }
+    .label-text {
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .value {
       font-size: 21px;
@@ -242,6 +247,7 @@ DASHBOARD_HTML = """<!doctype html>
       font-size: 10px;
       font-weight: 640;
       line-height: 1;
+      min-width: 0;
       text-align: right;
       white-space: nowrap;
       overflow: hidden;
@@ -382,6 +388,18 @@ DASHBOARD_HTML = """<!doctype html>
       return `${(Number(value) / 1073741824).toFixed(1)} GB`;
     }
 
+    function fmtCompactBytes(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+      let size = Number(value);
+      const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+      let unit = 0;
+      while (Math.abs(size) >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit += 1;
+      }
+      return `${unit === 0 ? size.toFixed(0) : size.toFixed(1)}${units[unit]}`;
+    }
+
     function fmtUsage(used, total) {
       if (
         used === null || used === undefined || Number.isNaN(Number(used)) ||
@@ -389,7 +407,7 @@ DASHBOARD_HTML = """<!doctype html>
       ) {
         return "-";
       }
-      return `已用 ${fmtBytes(used)} / ${fmtBytes(total)}`;
+      return `${fmtCompactBytes(used)}/${fmtCompactBytes(total)}`;
     }
 
     function fmtSpeed(value) {
@@ -429,7 +447,8 @@ DASHBOARD_HTML = """<!doctype html>
 
     function metricBlock(label, value, percent, detail) {
       const wrap = element("div", "metric");
-      const labelEl = element("div", "label", label);
+      const labelEl = element("div", "label");
+      labelEl.append(element("span", "label-text", label));
       const valueEl = element("div", "value", value);
       if (detail !== undefined && detail !== null && detail !== "") {
         labelEl.append(element("span", "detail", detail));
