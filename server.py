@@ -238,12 +238,14 @@ DASHBOARD_HTML = """<!doctype html>
     }
     .value.small { font-size: 15px; letter-spacing: -0.015em; }
     .detail {
-      margin-top: 6px;
       color: var(--subtle);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 640;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
+      line-height: 1;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .bar {
       height: 8px;
@@ -429,10 +431,10 @@ DASHBOARD_HTML = """<!doctype html>
       const wrap = element("div", "metric");
       const labelEl = element("div", "label", label);
       const valueEl = element("div", "value", value);
-      wrap.append(labelEl, valueEl);
       if (detail !== undefined && detail !== null && detail !== "") {
-        wrap.append(element("div", "detail", detail));
+        labelEl.append(element("span", "detail", detail));
       }
+      wrap.append(labelEl, valueEl);
       if (percent !== undefined && percent !== null && !Number.isNaN(Number(percent))) {
         const bar = element("div", "bar");
         const fill = element("div", `fill ${colorClass(Number(percent))}`.trim());
