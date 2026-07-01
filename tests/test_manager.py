@@ -19,6 +19,15 @@ def test_dashboard_domain_validation_rejects_invalid_names() -> None:
     assert not manager.is_valid_domain("-bad.example.com")
 
 
+def test_cloudflare_credentials_use_global_api_key_mode() -> None:
+    rendered = manager.render_cloudflare_credentials("user@example.com", "global-key")
+    assert rendered == (
+        "dns_cloudflare_email = user@example.com\n"
+        "dns_cloudflare_api_key = global-key\n"
+    )
+    assert "dns_cloudflare_api_token" not in rendered
+
+
 def test_reset_agent_settings_skips_installation_and_resets_traffic_state(tmp_path, monkeypatch) -> None:
     config_path = tmp_path / "agent.toml"
     config_path.write_text('server_url = "http://192.0.2.10:8080"\n', encoding="utf-8")

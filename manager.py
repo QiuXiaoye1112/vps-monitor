@@ -864,19 +864,25 @@ def _show_cf_ssl_steps(domain: str) -> None:
     print(color("CF 会自动签发证书，无需在 VPS 上操作。", DIM))
     pause()
 
+
+def render_cloudflare_credentials(email: str, api_key: str) -> str:
+    return f"dns_cloudflare_email = {email}\ndns_cloudflare_api_key = {api_key}\n"
+
+
 def apply_cf_ssl(domain: str) -> None:
     print()
     print(color("=== 通过 Cloudflare API 申请证书 ===", BOLD + CYAN))
     print()
-    print("需要 CF API Token（Zone:DNS:Edit 权限）")
-    print("获取：cloudflare.com → 个人资料 → API 令牌 → 创建令牌")
+    print("需要 Cloudflare 账户邮箱和 Global API Key。")
+    print("获取：cloudflare.com → 个人资料 → API 令牌 → Global API Key")
     print()
-    token = ask("CF API Token", secret=True)
-    if not token:
+    email = ask("Cloudflare 账户邮箱")
+    api_key = ask("Cloudflare Global API Key", secret=True)
+    if not email or not api_key:
         return
-    cred_file = Path("/root/.cloudflare.ini")
-    write_text_secure(cred_file, f"dns_cloudflare_api_token = {token}\n")
-    print(color("凭据已保存。", GREEN))
+    cred_file = Path("/etc/letsencrypt/cloudflare.ini")
+    write_text_secure(cred_file, render_cloudflare_credentials(email, api_key))
+    print(color(f"凭据已保存：{cred_file}（权限 600）", GREEN))
     try:
         ensure_apt_packages(["python3-certbot-dns-cloudflare"])
     except Exception:
@@ -888,7 +894,7 @@ def apply_cf_ssl(domain: str) -> None:
         "--dns-cloudflare-credentials", str(cred_file),
         "-d", domain,
         "--non-interactive", "--agree-tos",
-        "--register-unsafely-without-email",
+        "--email", email,
     ], check=False)
     if result.returncode == 0:
         site_conf = Path("/etc/nginx/sites-available/vps-monitor.conf")
@@ -904,7 +910,7 @@ def apply_cf_ssl(domain: str) -> None:
         print(color(f"证书已安装：https://{domain}", GREEN))
         subprocess.run(["systemctl", "enable", "--now", "certbot.timer"], check=False, capture_output=True)
     else:
-        print(color("证书申请失败，请确认 Token 权限和域名解析。", RED))
+        print(color("证书申请失败，请确认 Cloudflare 邮箱、Global API Key 和域名解析。", RED))
     pause()
 
 def disable_https() -> None:

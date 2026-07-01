@@ -47,11 +47,22 @@ curl http://127.0.0.1:8000/api/health
 
 ## 4. HTTPS
 
-部署完成后可通过 `sudo vm` → SSL 证书设置配置证书，或手动执行：
+部署完成后可通过 `sudo vm` → SSL 证书设置配置证书。该菜单使用 Cloudflare Email + Global API Key 申请 DNS 证书。
+
+手动执行示例：
 
 ```bash
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d monitor.example.com
+sudo apt-get install -y certbot python3-certbot-dns-cloudflare
+sudo install -m 600 /dev/null /etc/letsencrypt/cloudflare.ini
+sudo tee /etc/letsencrypt/cloudflare.ini >/dev/null <<'EOF'
+dns_cloudflare_email = your-email@example.com
+dns_cloudflare_api_key = your-cloudflare-global-api-key
+EOF
+sudo chmod 600 /etc/letsencrypt/cloudflare.ini
+sudo certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
+  -d monitor.example.com
 ```
 
 ## 5. 本机 Agent 配置
