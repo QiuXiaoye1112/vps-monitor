@@ -536,6 +536,7 @@ def install_panel() -> None:
         remove_path(backup)
     remove_path(SERVER_ENV)
     remove_path(AGENT_CONFIG)
+    remove_path(AGENT_TRAFFIC_STATE)
     print(color("已清理干净，开始全新部署。", GREEN))
     print()
     try:
@@ -666,17 +667,17 @@ def configure_agent(local: bool, *, install: bool = True) -> None:
         print("\n即将停止 Agent、重写配置、重置流量统计并重启服务，不会重新安装。")
     try:
         if install:
+            run(["systemctl", "stop", AGENT_SERVICE], check=False)
             ensure_apt_packages(["python3", "python3-venv", "python3-pip"])
             ensure_venv("requirements-agent.txt")
         else:
             run(["systemctl", "stop", AGENT_SERVICE], check=False)
         write_text_secure(AGENT_CONFIG, render_agent_config(values))
+        remove_path(AGENT_TRAFFIC_STATE)
         if install:
             write_text_secure(SYSTEMD_DIR / f"{AGENT_SERVICE}.service", agent_unit(), 0o644)
             install_launcher()
             run(["systemctl", "daemon-reload"])
-        else:
-            remove_path(AGENT_TRAFFIC_STATE)
         print("\n正在测试一次上报...")
         test = run(
             [str(VENV_DIR / "bin/python"), str(PROJECT_DIR / "agent.py"), "--config", str(AGENT_CONFIG), "--once"],
@@ -964,6 +965,7 @@ def remove_agent() -> None:
     node_id = agent_config_value("node_id")
     remove_service(AGENT_SERVICE)
     remove_path(AGENT_CONFIG)
+    remove_path(AGENT_TRAFFIC_STATE)
     if installation_role() == "agent":
         remove_path(ROLE_FILE)
     if node_id:
@@ -1036,6 +1038,7 @@ def full_uninstall() -> None:
     remove_service(API_SERVICE)
     for path in (
         AGENT_CONFIG,
+        AGENT_TRAFFIC_STATE,
         SERVER_ENV,
         ROLE_FILE,
         LAUNCHER,
