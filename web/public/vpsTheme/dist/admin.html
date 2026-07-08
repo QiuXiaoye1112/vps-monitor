@@ -440,8 +440,7 @@ async function showInstall(uuid){
     '<div class="sec-title">可选配置</div>'+
     '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns'+id+'" placeholder="如 114.114.114.114"></div><div class="form-group"><label>包含网卡</label><input id="includeNic'+id+'" placeholder="如 eth0"></div></div>'+
     '<div class="modal-grid"><div class="form-group"><label>排除网卡</label><input id="excludeNic'+id+'" placeholder="如 lo"></div><div class="form-group"><label>包含挂载点</label><input id="mountpoints'+id+'" placeholder="如 /data"></div></div>'+
-    '<div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="gpu'+id+'" style="width:auto"> 启用 GPU 监控</label></div>'+
-    '<button class="btn btn-primary w-full mt-2" id="gen'+id+'">生成安装命令</button>'+
+        '<button class="btn btn-primary w-full mt-2" id="gen'+id+'">生成安装命令</button>'+
     '<div id="cmdArea'+id+'" style="display:none;margin-top:12px"><div class="token-box mb-2" style="white-space:pre-wrap;font-size:11px" id="cmd'+id+'"></div><p class="text-xs text-muted">点击上方命令复制，在目标服务器上执行</p></div>');
   document.getElementById("gen"+id).onclick=function(){
     var ip=document.getElementById("ip"+id).value.trim();
@@ -452,13 +451,13 @@ async function showInstall(uuid){
     var inNic=document.getElementById("includeNic"+id).value.trim();
     var exNic=document.getElementById("excludeNic"+id).value.trim();
     var mps=document.getElementById("mountpoints"+id).value.trim();
-    var gpu=document.getElementById("gpu"+id).checked;
+    
     var args="-e "+endpoint+" -t "+token+" -i "+interval;
     if(dns)args+=" --custom-dns "+dns;
     if(inNic)args+=" --include-nics "+inNic;
     if(exNic)args+=" --exclude-nics "+exNic;
     if(mps)args+=" --include-mountpoint "+mps;
-    if(gpu)args+=" --gpu";
+    
     var cmd="ssh root@"+ip+" \"curl -fsSL https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64 -o "+path+" && chmod +x "+path+" && "+path+" "+args+"\"";
     var el=document.getElementById("cmd"+id);
     el.textContent=cmd;
