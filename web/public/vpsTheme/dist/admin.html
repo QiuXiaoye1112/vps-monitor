@@ -203,7 +203,7 @@ async function dashPage(){
   var online=nodes.filter(function(n){return n.online}).length;
   var size=await RPC("admin:getDatabaseSize")||{};
   var tasks=await RPC("admin:getTasks")||[];
-  var h='<h2 class="mb-3">总览</h2><div class="grid-3 mb-4">';
+  var h='<div class="flex justify-between items-center mb-3"><h2>总览 ('+nodes.length+')</h2><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div><div class="grid-3 mb-4">';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+nodes.length+'</div><div class="text-xs text-muted mt-1">节点总数</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700;color:var(--green)">'+online+'</div><div class="text-xs text-muted mt-1">在线节点</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
@@ -414,9 +414,7 @@ async function showInstall(uuid){
   var token=r.token||r||"";
   var id=uid();
   openModal(id,"生成安装命令",
-    '<div class="sec-title">目标服务器</div>'+
-    '<div class="form-group"><label>服务器 IP 或主机名</label><input id="ip'+id+'" placeholder="例如: 1.2.3.4" required></div>'+
-    '<div class="sec-title">安装配置</div>'+
+    ''+
     '<div class="modal-grid"><div class="form-group"><label>安装路径</label><input id="path'+id+'" value="/usr/local/bin/monitor-agent"></div><div class="form-group"><label>上报间隔(秒)</label><input id="interval'+id+'" type="number" value="1"></div></div>'+
     '<div class="sec-title">可选配置</div>'+
     '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns'+id+'" placeholder="如 114.114.114.114"></div><div class="form-group"><label>包含网卡</label><input id="includeNic'+id+'" placeholder="如 eth0"></div></div>'+
@@ -424,7 +422,7 @@ async function showInstall(uuid){
         '<button class="btn btn-primary w-full mt-2" id="gen'+id+'">生成安装命令</button>'+
     '<div id="cmdArea'+id+'" style="display:none;margin-top:12px"><div class="token-box mb-2" style="white-space:pre-wrap;font-size:11px" id="cmd'+id+'"></div><p class="text-xs text-muted">点击上方命令复制，在目标服务器上执行</p></div>');
   document.getElementById("gen"+id).onclick=function(){
-    var ip=document.getElementById("ip"+id).value.trim();
+    
     if(!ip){toast("请输入服务器 IP");return}
     var path=document.getElementById("path"+id).value.trim()||"/usr/local/bin/monitor-agent";
     var interval=document.getElementById("interval"+id).value||"1";
@@ -439,7 +437,7 @@ async function showInstall(uuid){
     if(exNic)args+=" --exclude-nics "+exNic;
     if(mps)args+=" --include-mountpoint "+mps;
     
-    var cmd="ssh root@"+ip+" \"curl -fsSL https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64 -o "+path+" && chmod +x "+path+" && "+path+" "+args+"\"";
+    var cmd="curl -fsSL https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64 -o "+path+" && chmod +x "+path+" && "+path+" "+args;
     var el=document.getElementById("cmd"+id);
     el.textContent=cmd;
     el.onclick=function(){copy(this.textContent)};
@@ -460,13 +458,13 @@ async function editNode(uuid){
     '<div class="modal-grid"><div class="form-group"><label>名称</label><input name="name" value="'+nn+'" required></div><div class="form-group"><label>分组</label><input name="group" value="'+ng+'"></div></div>'+
     '<div class="modal-grid"><div class="form-group"><label>权重</label><input name="weight" type="number" value="'+nw+'"></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" '+(nh?'':'selected')+'>否</option><option value="true" '+(nh?'selected':'')+'>是</option></select></div></div>'+
     '<h4 class="sec-title">流量</h4>'+
-    '<div class="modal-grid"><div class="form-group"><label>流量阈值</label><input name="traffic_limit" type="number" value="'+ntl+'"></div><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" '+(ntt==="sum"?"selected":"")+'>合计</option><option value="up" '+(ntt==="up"?"selected":"")+'>上行</option><option value="down" '+(ntt==="down"?"selected":"")+'>下行</option></select></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="'+ntl+'"></div><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" '+(ntt==="sum"?"selected":"")+'>合计</option><option value="up" '+(ntt==="up"?"selected":"")+'>上行</option><option value="down" '+(ntt==="down"?"selected":"")+'>下行</option></select></div></div>'+
     '<div class="modal-grid"><div class="form-group"><label>重置日(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="'+nrd+'"></div><div class="form-group"><label>重置小时(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="'+nrh+'"></div></div>'+
     '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>');
   document.getElementById("ef"+id).onsubmit=async function(e){
     e.preventDefault();
     var f=new FormData(e.target);
-    var data={uuid:uuid,name:f.get("name"),group:f.get("group"),weight:parseInt(f.get("weight"))||0,hidden:f.get("hidden")==="true",traffic_limit:parseInt(f.get("traffic_limit"))||0,traffic_limit_type:f.get("traffic_limit_type"),traffic_reset_day:parseInt(f.get("traffic_reset_day"))||1,traffic_reset_hour:parseInt(f.get("traffic_reset_hour"))||0};
+    var data={uuid:uuid,name:f.get("name"),group:f.get("group"),weight:parseInt(f.get("weight"))||0,hidden:f.get("hidden")==="true",traffic_limit:(parseInt(f.get("traffic_limit"))||0)*1073741824,traffic_limit_type:f.get("traffic_limit_type"),traffic_reset_day:parseInt(f.get("traffic_reset_day"))||1,traffic_reset_hour:parseInt(f.get("traffic_reset_hour"))||0};
     await RPC("admin:editClient",data);
     closeModal(id);toast("已保存");navigate("nodes");
   };
@@ -536,7 +534,8 @@ async function delClip(id){await RPC("admin:deleteClipboard",{id:id});toast("已
 function bindEvents(){
   var _d=document;
 
-  var pbtn=_d.getElementById("addPingBtn");
+  var abtn=_d.getElementById("addNodeBtn");if(abtn)abtn.onclick=async function(){var id=uid();openModal(id,"\u6dfb\u52a0\u8282\u70b9",'<form id="anf'+id+'"><div class="form-group"><label>\u540d\u79f0</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>\u5206\u7ec4</label><input name="group" placeholder="\u4f8b\u5982: \u65e5\u672c\u8282\u70b9"></div><button class="btn btn-primary w-full mt-3" type="submit">\u521b\u5efa</button></form>');_d.getElementById("anf"+id).onsubmit=async function(e){e.preventDefault();var f=new FormData(e.target);var r=await RPC("admin:addClient",{name:f.get("name"),group:f.get("group"),weight:1,traffic_limit:0});closeModal(id);if(r&&r.token){var id2=uid();openModal(id2,"\u5df2\u521b\u5efa",'<div class="token-box mb-3" id="ntk'+id2+'">'+E(r.token)+'</div><p class="text-xs text-muted mb-1">UUID: '+E(r.uuid||"")+'</p><p class="text-xs text-muted">\u70b9\u51fb Token \u590d\u5236</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\''+id2+'\')">\u5b8c\u6210</button>');_d.getElementById("ntk"+id2).onclick=function(){copy(this.textContent)}}navigate("dashboard")};};
+var pbtn=_d.getElementById("addPingBtn");
   if(pbtn)pbtn.onclick=async function(){
     var nodes=await RPC("admin:listClients")||[];
     var id=uid();
@@ -584,6 +583,7 @@ function bindEvents(){
   };
 
   var ai=_d.getElementById("avatarInput");if(ai)ai.onchange=async function(){var f=ai.files[0];if(!f||!f.type.startsWith("image/"))return;var c=document.createElement("canvas");c.width=c.height=512;var ctx=c.getContext("2d");var img=new Image();img.onload=function(){var s=Math.min(512/img.width,512/img.height);var w=Math.round(img.width*s);var h=Math.round(img.height*s);ctx.clearRect(0,0,512,512);ctx.drawImage(img,Math.round((512-w)/2),Math.round((512-h)/2),w,h);c.toBlob(async function(b){var fd=new FormData();fd.append("image",b,"avatar.png");var r=await fetch("/api/avatar",{method:"POST",credentials:"include",body:fd});if(r.ok){toast("头像已更新");var ap=_d.getElementById("avatarPreview");if(ap)ap.src=c.toDataURL()}else toast("上传失败")},"image/png")};img.src=URL.createObjectURL(f)};
+var ai=_d.getElementById("avatarInput");if(ai)ai.onchange=async function(){var f=ai.files[0];if(!f||!f.type.startsWith("image/"))return;var c=document.createElement("canvas");c.width=c.height=512;var ctx=c.getContext("2d");var img=new Image();img.onload=function(){var s=Math.min(512/img.width,512/img.height);var w=Math.round(img.width*s);var h=Math.round(img.height*s);ctx.clearRect(0,0,512,512);ctx.drawImage(img,Math.round((512-w)/2),Math.round((512-h)/2),w,h);c.toBlob(async function(b){var fd=new FormData();fd.append("image",b,"avatar.png");var r=await fetch("/api/avatar",{method:"POST",credentials:"include",body:fd});if(r.ok){toast("头像已更新");var ap=_d.getElementById("avatarPreview");if(ap)ap.src=c.toDataURL()}else toast("上传失败")},"image/png")};img.src=URL.createObjectURL(f)};
 var uf=_d.getElementById("changeUserForm");
   if(uf)uf.onsubmit=async function(e){
     e.preventDefault();
