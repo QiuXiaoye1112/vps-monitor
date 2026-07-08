@@ -459,7 +459,7 @@ async function showInstall(uuid){
     if(exNic)args+=" --exclude-nics "+exNic;
     if(mps)args+=" --include-mountpoint "+mps;
     if(gpu)args+=" --gpu";
-    var cmd="scp monitor-agent-linux-amd64 root@"+ip+":"+path+"\nssh root@"+ip+"\nchmod +x "+path+"\n"+path+" "+args;
+    var cmd="ssh root@"+ip+" \"curl -fsSL https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64 -o "+path+" && chmod +x "+path+" && "+path+" "+args+"\"";
     var el=document.getElementById("cmd"+id);
     el.textContent=cmd;
     el.onclick=function(){copy(this.textContent)};
