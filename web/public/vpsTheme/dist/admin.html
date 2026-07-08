@@ -212,7 +212,7 @@ async function dashPage(){
     h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>操作</th></tr></thead><tbody>';
     for(var i=0;i<Math.min(nodes.length,10);i++){
       var n=nodes[i];
-      h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></td></tr>';
+      h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button></td></tr>';
     }
     h+='</tbody></table></div>';
   }

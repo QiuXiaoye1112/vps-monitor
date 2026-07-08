@@ -84,7 +84,10 @@ func executePingTask(ctx context.Context, task models.PingTask) {
 
 // targetPingClientUUIDs 根据任务配置计算本次调度需要下发的在线服务器列表。
 func targetPingClientUUIDs(task models.PingTask) []string {
-	return task.Clients
+	if len(task.Clients) > 0 {
+		return task.Clients
+	}
+	return agent_runtime.GetAllOnlineUUIDs()
 }
 
 // ReloadPingSchedule 加载或重载时间表
