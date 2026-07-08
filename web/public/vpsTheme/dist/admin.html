@@ -197,6 +197,9 @@ async function render(){
 // ====== PAGES ======
 async function dashPage(){
   var nodes=await RPC("admin:listClients")||[];
+  var status=await RPC("common:getNodesLatestStatus")||{};
+  var liveData=status.data||status||{};
+  for(var i=0;i<nodes.length;i++){var s=liveData[nodes[i].uuid];if(s){nodes[i].online=s.online;nodes[i].cpu=s.cpu;nodes[i].ram=s.ram;nodes[i].disk=s.disk;nodes[i].net_out=s.network_up;nodes[i].net_in=s.network_down;nodes[i].net_total_up=s.total_up;nodes[i].net_total_down=s.total_down;nodes[i].uptime=s.uptime}}
   var online=nodes.filter(function(n){return n.online}).length;
   var size=await RPC("admin:getDatabaseSize")||{};
   var tasks=await RPC("admin:getTasks")||[];
@@ -218,6 +221,9 @@ async function dashPage(){
 
 async function nodesPage(){
   var nodes=await RPC("admin:listClients")||[];
+  var status=await RPC("common:getNodesLatestStatus")||{};
+  var liveData=status.data||status||{};
+  for(var i=0;i<nodes.length;i++){var s=liveData[nodes[i].uuid];if(s){nodes[i].online=s.online;nodes[i].cpu=s.cpu;nodes[i].ram=s.ram;nodes[i].disk=s.disk;nodes[i].net_out=s.network_up;nodes[i].net_in=s.network_down;nodes[i].net_total_up=s.total_up;nodes[i].net_total_down=s.total_down;nodes[i].uptime=s.uptime}}
   var h='<div class="flex justify-between items-center mb-3"><h2>节点管理 ('+nodes.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" id="reorderBtn">排序</button><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div></div>';
   if(!nodes.length)return h+'<div class="card empty-state">暂无节点，点击上方按钮添加</div>';
   h+='<div class="grid-2">';
