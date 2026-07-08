@@ -212,10 +212,6 @@ func serveLoginPage(c *gin.Context, siteName string) {
 <body>
   <main>
     <div class="brand">
-      <button class="avatar-button" id="avatar-button" type="button" title="点击更换头像">
-        <img id="avatar-image" src="/images/ethan-avatar.png" alt="" />
-      </button>
-      <input id="avatar-input" type="file" accept="image/*" hidden />
       <h1>` + escapedSiteName + `</h1>
     </div>
     <form id="login-form">
@@ -228,79 +224,15 @@ func serveLoginPage(c *gin.Context, siteName string) {
     </form>
   </main>
   <script>
-    const avatarButton = document.getElementById('avatar-button');
-    const avatarInput = document.getElementById('avatar-input');
-    const avatarImage = document.getElementById('avatar-image');
     const form = document.getElementById('login-form');
     const button = document.getElementById('submit');
-	    const error = document.getElementById('error');
-	    let pendingAvatar = '';
-
-	    async function clearOldFrontendCache() {
-	      try {
-	        if ('serviceWorker' in navigator) {
-	          const registrations = await navigator.serviceWorker.getRegistrations();
-	          await Promise.all(registrations.map((registration) => registration.unregister()));
-	        }
-	        if ('caches' in window) {
-	          const keys = await caches.keys();
-	          await Promise.all(keys.map((key) => caches.delete(key)));
-	        }
-	      } catch {
-	        // Best effort only. Login should not be blocked by browser cache cleanup.
-	      }
-	    }
-
-	    clearOldFrontendCache();
-
-    function resizeAvatar(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        const image = new Image();
-        reader.onload = () => {
-          image.onload = () => {
-            const size = 512;
-            const scale = Math.min(size / image.width, size / image.height);
-            const width = Math.max(1, Math.round(image.width * scale));
-            const height = Math.max(1, Math.round(image.height * scale));
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('无法处理头像'));
-              return;
-            }
-            ctx.clearRect(0, 0, size, size);
-            ctx.drawImage(image, Math.round((size - width) / 2), Math.round((size - height) / 2), width, height);
-            resolve(canvas.toDataURL('image/png'));
-          };
-          image.onerror = () => reject(new Error('头像读取失败'));
-          image.src = reader.result || '';
-        };
-        reader.onerror = () => reject(new Error('头像读取失败'));
-        reader.readAsDataURL(file);
-      });
-    }
-
-    avatarButton.addEventListener('click', () => avatarInput.click());
-    avatarInput.addEventListener('change', async () => {
-      const file = avatarInput.files && avatarInput.files[0];
-      avatarInput.value = '';
-      if (!file || !file.type.startsWith('image/')) return;
-      try {
-        pendingAvatar = await resizeAvatar(file);
-        avatarImage.src = pendingAvatar;
-      } catch (err) {
-        error.textContent = err && err.message ? err.message : '头像读取失败';
-      }
-    });
+    const error = document.getElementById('error');
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       error.textContent = '';
-	      button.disabled = true;
-	      try {
+      button.disabled = true;
+      try {
         const response = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -311,15 +243,6 @@ func serveLoginPage(c *gin.Context, siteName string) {
           })
         });
         if (!response.ok) throw new Error('用户名或密码不正确');
-        if (pendingAvatar) {
-          const avatarResponse = await fetch('/api/avatar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ image: pendingAvatar })
-          });
-          if (!avatarResponse.ok) throw new Error('登录成功，但头像保存失败');
-        }
         const target = location.pathname.startsWith('/admin') ? '/admin' : '/';
         location.replace(target);
       } catch (err) {

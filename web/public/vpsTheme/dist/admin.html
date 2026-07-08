@@ -111,7 +111,7 @@ function closeModal(id){var m=document.getElementById(id);if(m)m.remove()}
 // ====== NAV ======
 var NAV=[
   {id:"dashboard",icon:"📊",label:"总览"},
-  {id:"nodes",icon:"🖥",label:"节点管理"},
+  
   {id:"ping",icon:"📡",label:"Ping 任务"},
   {id:"settings",icon:"⚙",label:"站点设置"},
   {id:"theme",icon:"🎨",label:"主题"},
@@ -178,7 +178,7 @@ async function render(){
   try{
     switch(page){
       case"dashboard":m.innerHTML=await dashPage();break;
-      case"nodes":m.innerHTML=await nodesPage();break;
+      
       case"ping":m.innerHTML=await pingPage();break;
       case"settings":m.innerHTML=await settingsPage();break;
       case"theme":m.innerHTML=await themePage();break;
@@ -209,39 +209,14 @@ async function dashPage(){
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+tasks.length+'</div><div class="text-xs text-muted mt-1">任务记录</div></div></div>';
   if(nodes.length){
-    h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>CPU</th><th>内存</th><th>磁盘</th><th>网络 ↑/↓</th></tr></thead><tbody>';
+    h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>CPU</th><th>内存</th><th>磁盘</th><th>网络 ↑/↓</th><th>操作</th></tr></thead><tbody>';
     for(var i=0;i<Math.min(nodes.length,10);i++){
       var n=nodes[i];
-      h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td>'+(n.cpu||0).toFixed(1)+'%</td><td>'+B(n.ram||0)+'</td><td>'+B(n.disk||0)+'</td><td>'+bps(n.net_out||0)+' / '+bps(n.net_in||0)+'</td></tr>';
+      var cpuT=n.online?((n.cpu||0).toFixed(1)+'%'):'-';var ramT=n.online?B(n.ram||0):'-';var diskT=n.online?B(n.disk||0):'-';var netT=n.online?(bps(n.net_out||0)+' / '+bps(n.net_in||0)):'-';h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td>'+cpuT+'</td><td>'+ramT+'</td><td>'+diskT+'</td><td>'+netT+'</td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></td></tr>';
     }
     h+='</tbody></table></div>';
   }
   return h;
-}
-
-async function nodesPage(){
-  var nodes=await RPC("admin:listClients")||[];
-  var status=await RPC("common:getNodesLatestStatus")||{};
-  var liveData=status.data||status||{};
-  for(var i=0;i<nodes.length;i++){var s=liveData[nodes[i].uuid];if(s){nodes[i].online=s.online;nodes[i].cpu=s.cpu;nodes[i].ram=s.ram;nodes[i].disk=s.disk;nodes[i].net_out=s.network_up;nodes[i].net_in=s.network_down;nodes[i].net_total_up=s.total_up;nodes[i].net_total_down=s.total_down;nodes[i].uptime=s.uptime}}
-  var h='<div class="flex justify-between items-center mb-3"><h2>节点管理 ('+nodes.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" id="reorderBtn">排序</button><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div></div>';
-  if(!nodes.length)return h+'<div class="card empty-state">暂无节点，点击上方按钮添加</div>';
-  h+='<div class="grid-2">';
-  for(var i=0;i<nodes.length;i++){
-    var n=nodes[i];
-    var cpu=n.cpu||0;
-    var ramPct=n.mem_total>0?((n.ram||0)/n.mem_total*100):0;
-    var diskPct=n.disk_total>0?((n.disk||0)/n.disk_total*100):0;
-    var name=E(n.name||"").replace(/'/g,"&#39;");
-    h+='<div class="card"><div class="flex justify-between items-center mb-2"><div class="flex items-center gap-2"><span class="status-dot '+(n.online?"status-online":"status-offline")+'"></span><span class="font-bold truncate" style="max-width:150px" title="'+E(n.name||"")+'">'+E(n.name||"")+'</span></div><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></div>';
-    h+='<div class="text-xs text-muted mb-2">'+E(n.os||"?")+" · "+E(n.arch||"")+" · "+(n.cpu_cores||0)+'核 · '+E(n.virtualization||"")+'</div>';
-    h+='<div class="mb-1"><div class="flex justify-between text-xs mb-1"><span>CPU</span><span>'+cpu.toFixed(1)+'%</span></div><div class="progress"><div class="progress-bar pb-blue" style="width:'+cpu+'%"></div></div></div>';
-    h+='<div class="mb-1"><div class="flex justify-between text-xs mb-1"><span>内存</span><span>'+B(n.ram||0)+'/'+B(n.mem_total||0)+'</span></div><div class="progress"><div class="progress-bar '+(ramPct>80?"pb-red":ramPct>60?"pb-yellow":"pb-green")+'" style="width:'+ramPct+'%"></div></div></div>';
-    h+='<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>磁盘</span><span>'+B(n.disk||0)+'/'+B(n.disk_total||0)+'</span></div><div class="progress"><div class="progress-bar '+(diskPct>80?"pb-red":diskPct>60?"pb-yellow":"pb-green")+'" style="width:'+diskPct+'%"></div></div></div>';
-    h+='<div class="text-xs text-muted mb-2">↑'+bps(n.net_out||0)+' ↓'+bps(n.net_in||0)+" · 累计 ↑"+B(n.net_total_up||0)+' ↓'+B(n.net_total_down||0)+'</div>';
-    h+='<div class="flex gap-2 flex-wrap"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></div></div>';
-  }
-  h+='</div>';return h;
 }
 
 async function pingPage(){
@@ -561,23 +536,6 @@ async function delClip(id){await RPC("admin:deleteClipboard",{id:id});toast("已
 function bindEvents(){
   var _d=document;
 
-  var abtn=_d.getElementById("addNodeBtn");
-  if(abtn)abtn.onclick=async function(){
-    var id=uid();
-    openModal(id,"添加节点",'<form id="anf'+id+'"><div class="form-group"><label>名称</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>分组</label><input name="group" placeholder="例如: 日本节点"></div><button class="btn btn-primary w-full mt-3" type="submit">创建</button></form>');
-    _d.getElementById("anf"+id).onsubmit=async function(e){
-      e.preventDefault();var f=new FormData(e.target);
-      var r=await RPC("admin:addClient",{name:f.get("name"),group:f.get("group"),weight:1,traffic_limit:0});
-      closeModal(id);
-      if(r&&r.token){
-        var id2=uid();
-        openModal(id2,"✅ 已创建",'<div class="token-box mb-3" id="ntk'+id2+'">'+E(r.token)+'</div><p class="text-xs text-muted mb-1">UUID: '+E(r.uuid||"")+'</p><p class="text-xs text-muted">点击 Token 复制，关闭后不可再次查看</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\''+id2+'\')">完成</button>');
-        _d.getElementById("ntk"+id2).onclick=function(){copy(this.textContent)};
-      }
-      navigate("nodes");
-    };
-  };
-
   var pbtn=_d.getElementById("addPingBtn");
   if(pbtn)pbtn.onclick=async function(){
     var nodes=await RPC("admin:listClients")||[];
@@ -596,8 +554,7 @@ function bindEvents(){
     };
   };
 
-  var rbtn=_d.getElementById("reorderBtn");
-  if(rbtn)rbtn.onclick=reorderNodes;
+    if(rbtn)rbtn.onclick=reorderNodes;
 
   var sf=_d.getElementById("settingsForm");
   if(sf)sf.onsubmit=async function(e){
@@ -626,7 +583,8 @@ function bindEvents(){
     toast("主题已保存");
   };
 
-  var uf=_d.getElementById("changeUserForm");
+  var ai=_d.getElementById("avatarInput");if(ai)ai.onchange=async function(){var f=ai.files[0];if(!f||!f.type.startsWith("image/"))return;var c=document.createElement("canvas");c.width=c.height=512;var ctx=c.getContext("2d");var img=new Image();img.onload=function(){var s=Math.min(512/img.width,512/img.height);var w=Math.round(img.width*s);var h=Math.round(img.height*s);ctx.clearRect(0,0,512,512);ctx.drawImage(img,Math.round((512-w)/2),Math.round((512-h)/2),w,h);c.toBlob(async function(b){var fd=new FormData();fd.append("image",b,"avatar.png");var r=await fetch("/api/avatar",{method:"POST",credentials:"include",body:fd});if(r.ok){toast("头像已更新");var ap=_d.getElementById("avatarPreview");if(ap)ap.src=c.toDataURL()}else toast("上传失败")},"image/png")};img.src=URL.createObjectURL(f)};
+var uf=_d.getElementById("changeUserForm");
   if(uf)uf.onsubmit=async function(e){
     e.preventDefault();
     await fetch("/api/admin/update/user",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({username:e.target.username.value})});
