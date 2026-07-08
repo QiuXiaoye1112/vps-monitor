@@ -100,7 +100,7 @@ func GetAllPingTasks() ([]models.PingTask, error) {
 func GetPingTasksByClient(uuid string) []models.PingTask {
 	db := dbcore.GetDBInstance()
 	var tasks []models.PingTask
-	if err := db.Where("clients LIKE ?", `%"`+uuid+`"%`).Find(&tasks).Error; err != nil {
+	if err := db.Where("all_clients = ? OR clients LIKE ?", true, `%"`+uuid+`"%`).Find(&tasks).Error; err != nil {
 		return nil
 	}
 	return tasks
@@ -169,39 +169,7 @@ func ReloadPingSchedule() error {
 
 // AddDefaultOnClientUUID 在新客户端注册后，把该 UUID 追加到所有 default_on=true 的任务的 clients 中（去重）。
 func AddDefaultOnClientUUID(uuid string) error {
-	if uuid == "" {
-		return nil
-	}
-	db := dbcore.GetDBInstance()
-	var tasks []models.PingTask
-	if err := db.Where("all_clients = ?", true).Find(&tasks).Error; err != nil {
-		return err
-	}
-	if len(tasks) == 0 {
-		return nil
-	}
-	changed := false
-	for _, task := range tasks {
-		exists := false
-		for _, c := range task.Clients {
-			if c == uuid {
-				exists = true
-				break
-			}
-		}
-		if exists {
-			continue
-		}
-		next := append(models.StringArray{}, task.Clients...)
-		next = append(next, uuid)
-		if err := db.Model(&models.PingTask{}).Where("id = ?", task.Id).Update("clients", next).Error; err != nil {
-			return err
-		}
-		changed = true
-	}
-	if changed {
-		return ReloadPingSchedule()
-	}
+	// 因为现在 default_on/all_clients 任务能动态应用到所有客户端，不再需要物理追加到 clients 数组。
 	return nil
 }
 

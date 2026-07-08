@@ -212,6 +212,7 @@ func serveLoginPage(c *gin.Context, siteName string) {
 <body>
   <main>
     <div class="brand">
+      <img src="/images/ethan-avatar.png" alt="logo" onerror="this.style.display='none'" />
       <h1>` + escapedSiteName + `</h1>
     </div>
     <form id="login-form">

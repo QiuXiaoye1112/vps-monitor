@@ -822,15 +822,21 @@ func UpdateThemeSettings(c *gin.Context) {
 	}
 	db := dbcore.GetDBInstance()
 
-	data, err := json.Marshal(&req)
+	var themeCfg models.ThemeConfiguration
+	err = db.Where("short = ?", theme).First(&themeCfg).Error
 	if err != nil {
-		api.RespondError(c, http.StatusInternalServerError, "生成主题配置失败: "+err.Error())
+		themeCfg = models.ThemeConfiguration{Short: theme}
+	}
+	// 合并已有配置和新提交的配置
+	var existing map[string]any
+	if themeCfg.Data != "" { json.Unmarshal([]byte(themeCfg.Data), &existing) }
+	if existing == nil { existing = map[string]any{} }
+	for k, v := range req { existing[k] = v }
+	merged, _ := json.Marshal(existing)
+	themeCfg.Data = string(merged)
+	if err := db.Save(&themeCfg).Error; err != nil {
+		api.RespondError(c, http.StatusInternalServerError, "保存主题配置失败: "+err.Error())
 		return
 	}
-
-	var themeCfg models.ThemeConfiguration
-	db.Where("short = ?", theme).
-		Assign(models.ThemeConfiguration{Short: theme, Data: string(data)}).
-		FirstOrCreate(&themeCfg)
 	api.RespondSuccess(c, nil)
 }

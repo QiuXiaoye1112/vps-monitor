@@ -1,6 +1,29 @@
 package public
 
-import "testing"
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/komari-monitor/komari/cmd/flags"
+	"github.com/komari-monitor/komari/database/dbcore"
+)
+
+func TestMain(m *testing.M) {
+	flags.DatabaseType = flags.DatabaseTypeSQLite
+	flags.DatabaseFile = "file:web_public_test?mode=memory&cache=shared"
+
+	db := dbcore.GetDBInstance()
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
+
+	os.Exit(m.Run())
+}
 
 func TestNormalizeHTMLLanguage(t *testing.T) {
 	tests := map[string]struct {
@@ -61,5 +84,31 @@ func TestReplaceHTMLLanguage(t *testing.T) {
 				t.Fatalf("replaceHTMLLanguage() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestServeAvatar(t *testing.T) {
+	avatarDir := "./data/avatar"
+	_ = os.MkdirAll(avatarDir, 0755)
+	avatarFile := filepath.Join(avatarDir, "ethan-avatar.png")
+	testContent := []byte("fake png content")
+	_ = os.WriteFile(avatarFile, testContent, 0644)
+	defer os.Remove(avatarFile)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	Static(r.Group("/"), func(handlers ...gin.HandlerFunc) {
+		r.NoRoute(handlers...)
+	})
+
+	req, _ := http.NewRequest("GET", "/images/ethan-avatar.png", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+	if !bytes.Equal(w.Body.Bytes(), testContent) {
+		t.Fatalf("Expected body to match testContent")
 	}
 }

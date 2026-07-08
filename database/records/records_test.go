@@ -319,3 +319,26 @@ func TestCompactRecordOnlyMigratesCompleteFifteenMinuteBuckets(t *testing.T) {
 	assert.NoError(t, db.Table("records").Where("time = ?", partialSlot.Time).Count(&rawCount).Error)
 	assert.Equal(t, int64(1), rawCount)
 }
+
+func TestTrafficWindowEdgeCases(t *testing.T) {
+	loc := trafficLocation()
+	client := models.Client{
+		TrafficResetDay:  31,
+		TrafficResetHour: 0,
+	}
+
+	// Case 1: March 30, 2026.
+	// Expected: Cycle starts Feb 28, ends March 31.
+	now1 := time.Date(2026, 3, 30, 12, 0, 0, 0, loc)
+	start1, end1 := TrafficWindow(client, now1)
+	assert.True(t, start1.Equal(time.Date(2026, 2, 28, 0, 0, 0, 0, loc)), "start1 was %v", start1)
+	assert.True(t, end1.Equal(time.Date(2026, 3, 31, 0, 0, 0, 0, loc)), "end1 was %v", end1)
+
+	// Case 2: March 31, 2026.
+	// Expected: Cycle starts March 31, ends April 30.
+	now2 := time.Date(2026, 3, 31, 12, 0, 0, 0, loc)
+	start2, end2 := TrafficWindow(client, now2)
+	assert.True(t, start2.Equal(time.Date(2026, 3, 31, 0, 0, 0, 0, loc)), "start2 was %v", start2)
+	assert.True(t, end2.Equal(time.Date(2026, 4, 30, 0, 0, 0, 0, loc)), "end2 was %v", end2)
+}
+

@@ -605,7 +605,6 @@ type NodeInfo struct {
 	BillingCycle   int
 	Currency       string
 	ExpiredAt      time.Time
-	AutoRenewal    bool
 	Hidden         bool
 	Weight         int
 	MemTotal       int64
@@ -773,7 +772,7 @@ func renderStatusTable(ctx context.Context, lang string, tzOffset *int, fontErr 
 		x += colWidths[11]
 
 		// 剩余时间
-		remainStr := formatRemainingL(node.ExpiredAt, node.AutoRenewal, lp)
+		remainStr := formatRemainingL(node.ExpiredAt, lp)
 		drawString(img, remainStr, x, textY, color.Black, normalFace)
 
 		y += rowHeight
@@ -937,7 +936,7 @@ func renderStatusTableWithBasicFont(ctx context.Context, lang string, tzOffset *
 		x += colWidths[11]
 
 		// 剩余时间
-		remainStr := formatRemainingL(node.ExpiredAt, node.AutoRenewal, lp)
+		remainStr := formatRemainingL(node.ExpiredAt, lp)
 		drawStringBasic(img, remainStr, x, textY, color.Black)
 
 		y += rowHeight
@@ -1071,7 +1070,6 @@ func nodeInfoFromClient(client models.Client) NodeInfo {
 		BillingCycle:   client.BillingCycle,
 		Currency:       client.Currency,
 		ExpiredAt:      client.ExpiredAt.ToTime(),
-		AutoRenewal:    client.AutoRenewal,
 		Hidden:         client.Hidden,
 		Weight:         client.Weight,
 		MemTotal:       client.MemTotal,
@@ -1107,9 +1105,6 @@ func parseNodeInfo(data map[string]interface{}) NodeInfo {
 	}
 	if v, ok := data["currency"].(string); ok {
 		node.Currency = v
-	}
-	if v, ok := data["auto_renewal"].(bool); ok {
-		node.AutoRenewal = v
 	}
 	if v, ok := data["hidden"].(bool); ok {
 		node.Hidden = v
@@ -1475,7 +1470,7 @@ func formatRemaining(expiredAt time.Time, autoRenewal bool) string {
 	return fmt.Sprintf("%d天", days)
 }
 
-func formatRemainingL(expiredAt time.Time, autoRenewal bool, lp langPack) string {
+func formatRemainingL(expiredAt time.Time, lp langPack) string {
 	now := time.Now()
 	if expiredAt.IsZero() || expiredAt.Year() > 2200 {
 		return lp.LongTerm

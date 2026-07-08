@@ -26,6 +26,9 @@ func (task PingTask) AppliesToClient(uuid string) bool {
 	if uuid == "" {
 		return false
 	}
+	if task.DefaultOn {
+		return true
+	}
 	for _, client := range task.Clients {
 		if client == uuid {
 			return true

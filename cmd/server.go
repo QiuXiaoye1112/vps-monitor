@@ -21,6 +21,7 @@ import (
 	"github.com/komari-monitor/komari/database/dbcore"
 	"github.com/komari-monitor/komari/database/metricstore"
 	"github.com/komari-monitor/komari/database/models"
+	"github.com/komari-monitor/komari/database/clients"
 	"github.com/komari-monitor/komari/database/records"
 	"github.com/komari-monitor/komari/database/tasks"
 	"github.com/komari-monitor/komari/pkg/config"
@@ -186,6 +187,7 @@ func minuteScheduledWork() {
 		records.DeleteAll()
 		tasks.DeleteAllPingRecords()
 	}
+	clients.ResetTrafficCompensationForDueClients()
 }
 
 func OnShutdown() {

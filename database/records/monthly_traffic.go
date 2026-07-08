@@ -58,12 +58,23 @@ func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
 	var start time.Time
 	var end time.Time
 	if localNow.Before(this) {
-		start = monthlyBoundary(localNow.AddDate(0, -1, 0).Year(), localNow.AddDate(0, -1, 0).Month(), day, hour, loc)
+		prevYear := localNow.Year()
+		prevMonth := localNow.Month() - 1
+		if prevMonth == 0 {
+			prevMonth = 12
+			prevYear--
+		}
+		start = monthlyBoundary(prevYear, prevMonth, day, hour, loc)
 		end = this
 	} else {
 		start = this
-		next := localNow.AddDate(0, 1, 0)
-		end = monthlyBoundary(next.Year(), next.Month(), day, hour, loc)
+		nextYear := localNow.Year()
+		nextMonth := localNow.Month() + 1
+		if nextMonth == 13 {
+			nextMonth = 1
+			nextYear++
+		}
+		end = monthlyBoundary(nextYear, nextMonth, day, hour, loc)
 	}
 	return start, end
 }

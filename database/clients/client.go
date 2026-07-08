@@ -235,12 +235,83 @@ func GetClientTokenByUUID(uuid string) (token string, err error) {
 
 func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	db := dbcore.GetDBInstance()
-	err = db.Find(&clients).Error
+	err = db.Order("weight ASC").Find(&clients).Error
 	if err != nil {
 		return nil, err
 	}
 	return clients, nil
 }
+
+// ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将 traffic_compensation 清零。
+// 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 updated_at 早于该起始时间且
+// traffic_compensation != 0，则视为上一周期的补偿值，直接清零。
+func ResetTrafficCompensationForDueClients() {
+	db := dbcore.GetDBInstance()
+	allClients, err := GetAllClientBasicInfo()
+	if err != nil {
+		log.Printf("[traffic_comp_reset] failed to get clients: %v", err)
+		return
+	}
+	now := time.Now()
+	for _, c := range allClients {
+		if c.TrafficComp == 0 {
+			continue
+		}
+		start := trafficResetStart(c, now)
+		// UpdatedAt 在上一周期内（早于本周期起点）=> 补偿值是上个周期遗留的，需清零
+		if c.UpdatedAt.ToTime().Before(start) {
+			if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
+				Updates(map[string]interface{}{
+					"traffic_compensation": int64(0),
+					"updated_at":           now,
+				}).Error; err != nil {
+				log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
+			} else {
+				log.Printf("[traffic_comp_reset] reset compensation for %s (was %d)", c.UUID, c.TrafficComp)
+			}
+		}
+	}
+}
+
+// trafficResetStart 返回当前计费周期的起始时间（Asia/Shanghai 时区）。
+func trafficResetStart(client models.Client, now time.Time) time.Time {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	localNow := now.In(loc)
+	day := client.TrafficResetDay
+	if day <= 0 {
+		day = 1
+	}
+	hour := client.TrafficResetHour
+	if hour < 0 || hour > 23 {
+		hour = 0
+	}
+	// 本月重置时间点
+	lastDayOfMonth := time.Date(localNow.Year(), localNow.Month()+1, 0, 0, 0, 0, 0, loc).Day()
+	resetDay := day
+	if resetDay > lastDayOfMonth {
+		resetDay = lastDayOfMonth
+	}
+	thisReset := time.Date(localNow.Year(), localNow.Month(), resetDay, hour, 0, 0, 0, loc)
+	if localNow.Before(thisReset) {
+		// 当前时刻还没到本月重置点，周期起点是上个月的重置点
+		prevYear, prevMonth := localNow.Year(), localNow.Month()-1
+		if prevMonth == 0 {
+			prevMonth = 12
+			prevYear--
+		}
+		lastDayPrev := time.Date(prevYear, prevMonth+1, 0, 0, 0, 0, 0, loc).Day()
+		prevDay := day
+		if prevDay > lastDayPrev {
+			prevDay = lastDayPrev
+		}
+		return time.Date(prevYear, prevMonth, prevDay, hour, 0, 0, 0, loc)
+	}
+	return thisReset
+}
+
 
 func SaveClient(updates map[string]interface{}) error {
 	db := dbcore.GetDBInstance()
