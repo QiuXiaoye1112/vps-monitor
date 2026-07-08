@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor Admin</title>
+<style>
+:root{--bg:#0b1120;--card:#131b2e;--border:#1e2a45;--text:#e2e8f0;--muted:#94a3b8;--accent:#3b82f6;--red:#ef4444;--green:#22c55e;--yellow:#eab308;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.sidebar{width:210px;min-height:100vh;background:var(--card);border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column}
+.sidebar h2{padding:0 16px 16px;font-size:15px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .12s;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-item.active{color:var(--text);background:rgba(59,130,246,.1);border-left-color:var(--accent)}
+.main{flex:1;padding:24px;max-width:calc(100vw - 210px);min-height:100vh}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card h3,.card h2{margin-bottom:14px;font-size:16px}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;padding:9px 11px;background:#0f172a;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:60px;font-family:monospace}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 15px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.85}
+.btn-danger{background:var(--red);color:#fff}.btn-danger:hover{opacity:.85}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-outline:hover{background:rgba(255,255,255,.05)}
+.btn-ghost{background:transparent;color:var(--muted);border:none;padding:4px 8px}.btn-ghost:hover{color:var(--text)}
+.btn-sm{padding:5px 11px;font-size:12px}.btn-xs{padding:3px 7px;font-size:11px}.btn-block{width:100%;justify-content:center}
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap-1{gap:4px}.gap-2{gap:8px}.gap-3{gap:12px}.gap-4{gap:16px}
+.mb-1{margin-bottom:4px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}
+.mt-2{margin-top:8px}.mt-4{margin-top:16px}
+.text-sm{font-size:12px}.text-xs{font-size:10px}.text-muted{color:var(--muted)}
+.font-bold{font-weight:700}.w-full{width:100%}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600}
+.badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+.progress{width:100%;height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+.progress-bar{height:100%;border-radius:99px;transition:width .3s}
+.pb-green{background:var(--green)}.pb-yellow{background:var(--yellow)}.pb-red{background:var(--red)}.pb-blue{background:var(--accent)}
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.status-online{background:var(--green)}.status-offline{background:var(--red)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--border)}
+th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+td{font-size:13px}
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.token-box{font-family:monospace;background:#0f172a;padding:10px 14px;border-radius:6px;font-size:12px;word-break:break-all;cursor:pointer}
+.token-box:hover{background:#1e293b}
+.toast{position:fixed;top:20px;right:20px;background:var(--green);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;animation:fadeout 1.8s forwards}
+@keyframes fadeout{0%,60%{opacity:1}100%{opacity:0}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;width:min(540px,93vw);max-height:90vh;overflow-y:auto}
+.sec-title{color:var(--accent);font-size:13px;border-bottom:1px solid var(--border);padding-bottom:6px;margin:18px 0 10px}
+.sec-title:first-child{margin-top:0}
+@media(max-width:768px){body{flex-direction:column}.sidebar{width:100%;min-height:auto;position:static;flex-direction:row;overflow-x:auto;padding:8px}.sidebar h2{display:none}.nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;padding:6px 10px;font-size:12px}.nav-item.active{border-left:none;border-bottom-color:var(--accent)}.main{max-width:100%;padding:10px}.grid-2,.grid-3{grid-template-columns:1fr}.modal-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar"><h2>Monitor</h2></div>
+<div class="main" id="main"></div>
+<div id="modals"></div>
+<script>
+"use strict";
+var A="/api/rpc2";
+var page="dashboard";
+var session=null;
+var logsPage=1;
+
+function $(s){return document.querySelector(s)}
+function $$(s){return document.querySelectorAll(s)}
+function H(s){var d=document.createElement("div");d.innerHTML=s;return d.firstElementChild}
+function E(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function B(v){if(!v||v===0)return"0 B";var u=["B","KB","MB","GB","TB"];var i=0;while(v>=1024&&i<u.length-1){v/=1024;i++}return v.toFixed(i>1?2:0)+" "+u[i]}
+function bps(v){return B(v)+"/s"}
+function ago(ts){if(!ts)return"-";var s=(Date.now()-new Date(ts).getTime())/1000;if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d"}
+
+async function RPC(method,params){
+  params=params||{};
+  try{
+    var r=await fetch(A,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({jsonrpc:"2.0",method:method,params:params,id:Date.now()})});
+    if(r.status===401){logout();return null}
+    var d=await r.json();
+    if(d.error)throw new Error(d.error.message||"RPC error");
+    return d.result;
+  }catch(e){console.error(method,e);return null}
+}
+
+function toast(msg){
+  var t=H('<div class="toast">'+msg+"</div>");
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove()},2000);
+}
+
+function openModal(id,title,html){
+  var ov=H('<div class="modal-overlay" id="'+id+'"><div class="modal"><div class="flex justify-between items-center mb-3"><h3>'+title+'</h3><button class="btn-ghost" style="font-size:18px" onclick="document.getElementById(\''+id+'\').remove()">×</button></div>'+html+"</div></div>");
+  ov.onclick=function(e){if(e.target===ov)ov.remove()};
+  document.getElementById("modals").appendChild(ov);
+}
+
+function closeModal(id){var m=document.getElementById(id);if(m)m.remove()}
+
+// ====== NAV ======
+var NAV=[
+  {id:"dashboard",icon:"📊",label:"总览"},
+  {id:"nodes",icon:"🖥",label:"节点管理"},
+  {id:"ping",icon:"📡",label:"Ping 任务"},
+  {id:"settings",icon:"⚙",label:"站点设置"},
+  {id:"theme",icon:"🎨",label:"主题"},
+  {id:"account",icon:"👤",label:"账户"},
+  {id:"sessions",icon:"🔑",label:"会话"},
+  {id:"database",icon:"🗄",label:"数据库"},
+  {id:"logs",icon:"📋",label:"日志"},
+  {id:"tasks",icon:"📝",label:"任务记录"},
+  {id:"clipboard",icon:"📎",label:"剪贴板"},
+  {id:"backup",icon:"💾",label:"备份"}
+];
+
+function buildSidebar(){
+  var s=document.getElementById("sidebar");
+  NAV.forEach(function(n){
+    var el=H('<div class="nav-item" data-page="'+n.id+'"><span style="width:18px;text-align:center">'+n.icon+'</span>'+n.label+"</div>");
+    el.onclick=function(){navigate(n.id)};
+    s.appendChild(el);
+  });
+  var b=H('<div style="margin-top:auto;padding:10px 16px;border-top:1px solid var(--border)"><a href="/" target="_blank" style="color:var(--muted);text-decoration:none;font-size:12px;display:block;padding:6px 0">🏠 前台首页</a><div style="color:var(--muted);cursor:pointer;font-size:12px;padding:6px 0" onclick="logout()">🚪 退出</div></div>');
+  s.appendChild(b);
+}
+
+function navigate(p){
+  page=p;
+  var items=document.querySelectorAll(".nav-item");
+  for(var i=0;i<items.length;i++)items[i].classList.toggle("active",items[i].dataset.page===p);
+  render();
+}
+
+// ====== AUTH ======
+async function checkSession(){
+  var me=await RPC("public:getMe");
+  session=me&&me.logged_in?me:null;
+  if(!session){
+    document.getElementById("sidebar").style.display="none";
+    document.getElementById("main").innerHTML='<div class="card empty-state" style="max-width:400px;margin:80px auto"><h2 style="margin-bottom:20px;text-align:center">Monitor Admin</h2><form id="loginForm"><input name="user" placeholder="用户名" class="mb-3" autofocus required><input name="pass" type="password" placeholder="密码" class="mb-3" required><button class="btn btn-primary w-full" id="loginBtn">登录</button><div id="loginErr" style="color:var(--red);margin-top:10px;font-size:12px"></div></form></div>';
+    document.getElementById("loginForm").onsubmit=async function(e){
+      e.preventDefault();
+      var f=new FormData(e.target);
+      var btn=document.getElementById("loginBtn");
+      btn.disabled=true;btn.textContent="...";
+      try{
+        var r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({username:f.get("user"),password:f.get("pass")})});
+        if(!r.ok)throw new Error("用户名或密码错误");
+        location.reload();
+      }catch(err){
+        document.getElementById("loginErr").textContent=err.message;
+      }finally{btn.disabled=false;btn.textContent="登录"}
+    };
+  }
+}
+
+async function logout(){
+  await fetch("/api/logout",{credentials:"include"});
+  session=null;location.reload();
+}
+
+// ====== RENDER ======
+function loading(){return'<div style="text-align:center;padding:40px;color:var(--muted)">加载中...</div>'}
+
+async function render(){
+  var m=document.getElementById("main");m.innerHTML=loading();
+  try{
+    switch(page){
+      case"dashboard":m.innerHTML=await dashPage();break;
+      case"nodes":m.innerHTML=await nodesPage();break;
+      case"ping":m.innerHTML=await pingPage();break;
+      case"settings":m.innerHTML=await settingsPage();break;
+      case"theme":m.innerHTML=await themePage();break;
+      case"account":m.innerHTML=await accountPage();break;
+      case"sessions":m.innerHTML=await sessionsPage();break;
+      case"database":m.innerHTML=await databasePage();break;
+      case"logs":m.innerHTML=await logsPage();break;
+      case"tasks":m.innerHTML=await tasksPage();break;
+      case"clipboard":m.innerHTML=await clipboardPage();break;
+      case"backup":m.innerHTML=await backupPage();break;
+    }
+  }catch(e){m.innerHTML='<div class="card empty-state">错误: '+E(e.message)+"</div>"}
+  bindEvents();
+}
+
+// ====== PAGES ======
+async function dashPage(){
+  var nodes=await RPC("admin:listClients")||[];
+  var online=nodes.filter(function(n){return n.online}).length;
+  var size=await RPC("admin:getDatabaseSize")||{};
+  var tasks=await RPC("admin:getTasks")||[];
+  var h='<h2 class="mb-3">总览</h2><div class="grid-3 mb-4">';
+  h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+nodes.length+'</div><div class="text-xs text-muted mt-1">节点总数</div></div>';
+  h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700;color:var(--green)">'+online+'</div><div class="text-xs text-muted mt-1">在线节点</div></div>';
+  h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
+  h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+tasks.length+'</div><div class="text-xs text-muted mt-1">任务记录</div></div></div>';
+  if(nodes.length){
+    h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>CPU</th><th>内存</th><th>磁盘</th><th>网络 ↑/↓</th></tr></thead><tbody>';
+    for(var i=0;i<Math.min(nodes.length,10);i++){
+      var n=nodes[i];
+      h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td>'+(n.cpu||0).toFixed(1)+'%</td><td>'+B(n.ram||0)+'</td><td>'+B(n.disk||0)+'</td><td>'+bps(n.net_out||0)+' / '+bps(n.net_in||0)+'</td></tr>';
+    }
+    h+='</tbody></table></div>';
+  }
+  return h;
+}
+
+async function nodesPage(){
+  var nodes=await RPC("admin:listClients")||[];
+  var h='<div class="flex justify-between items-center mb-3"><h2>节点管理 ('+nodes.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" id="reorderBtn">排序</button><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div></div>';
+  if(!nodes.length)return h+'<div class="card empty-state">暂无节点，点击上方按钮添加</div>';
+  h+='<div class="grid-2">';
+  for(var i=0;i<nodes.length;i++){
+    var n=nodes[i];
+    var cpu=n.cpu||0;
+    var ramPct=n.mem_total>0?((n.ram||0)/n.mem_total*100):0;
+    var diskPct=n.disk_total>0?((n.disk||0)/n.disk_total*100):0;
+    var name=E(n.name||"").replace(/'/g,"&#39;");
+    h+='<div class="card"><div class="flex justify-between items-center mb-2"><div class="flex items-center gap-2"><span class="status-dot '+(n.online?"status-online":"status-offline")+'"></span><span class="font-bold truncate" style="max-width:150px" title="'+E(n.name||"")+'">'+E(n.name||"")+'</span></div><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></div>';
+    h+='<div class="text-xs text-muted mb-2">'+E(n.os||"?")+" · "+E(n.arch||"")+" · "+(n.cpu_cores||0)+'核 · '+E(n.virtualization||"")+'</div>';
+    h+='<div class="mb-1"><div class="flex justify-between text-xs mb-1"><span>CPU</span><span>'+cpu.toFixed(1)+'%</span></div><div class="progress"><div class="progress-bar pb-blue" style="width:'+cpu+'%"></div></div></div>';
+    h+='<div class="mb-1"><div class="flex justify-between text-xs mb-1"><span>内存</span><span>'+B(n.ram||0)+'/'+B(n.mem_total||0)+'</span></div><div class="progress"><div class="progress-bar '+(ramPct>80?"pb-red":ramPct>60?"pb-yellow":"pb-green")+'" style="width:'+ramPct+'%"></div></div></div>';
+    h+='<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>磁盘</span><span>'+B(n.disk||0)+'/'+B(n.disk_total||0)+'</span></div><div class="progress"><div class="progress-bar '+(diskPct>80?"pb-red":diskPct>60?"pb-yellow":"pb-green")+'" style="width:'+diskPct+'%"></div></div></div>';
+    h+='<div class="text-xs text-muted mb-2">↑'+bps(n.net_out||0)+' ↓'+bps(n.net_in||0)+" · 累计 ↑"+B(n.net_total_up||0)+' ↓'+B(n.net_total_down||0)+'</div>';
+    h+='<div class="flex gap-2 flex-wrap"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></div></div>';
+  }
+  h+='</div>';return h;
+}
+
+async function pingPage(){
+  var tasks=await RPC("admin:getAllPingTasks")||[];
+  var h='<div class="flex justify-between items-center mb-3"><h2>Ping 任务 ('+tasks.length+')</h2><button class="btn btn-primary btn-sm" id="addPingBtn">+ 添加任务</button></div>';
+  if(!tasks.length)return h+'<div class="card empty-state">暂无 Ping 任务</div>';
+  h+='<div class="card"><table><thead><tr><th>ID</th><th>名称</th><th>目标</th><th>类型</th><th>间隔(s)</th><th>节点数</th><th>新节点自动</th><th>操作</th></tr></thead><tbody>';
+  for(var i=0;i<tasks.length;i++){
+    var t=tasks[i];
+    h+='<tr><td>'+t.id+'</td><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td>'+(t.clients||[]).length+'</td><td><span class="badge '+(t.default_on?"badge-green":"badge-yellow")+'">'+(t.default_on?"是":"否")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
+  }
+  h+='</tbody></table></div>';return h;
+}
+
+async function settingsPage(){
+  var s=await RPC("admin:getSettings")||{};
+  var sections=[
+    {title:"基本",fields:[
+      {k:"sitename",l:"站点名称"},
+      {k:"auto_discovery_key",l:"自动发现 Key"},
+      {k:"script_domain",l:"Agent 连接地址"}
+    ]},
+    {title:"功能",fields:[
+      {k:"geo_ip_enabled",l:"GeoIP",t:"bool"},
+      {k:"geo_ip_provider",l:"GeoIP 提供商",t:"select",o:["ipinfo","mmdb","ip-api","geojs"]}
+    ]}
+  ];
+  var h='<div class="card"><h3>站点设置</h3><form id="settingsForm">';
+  for(var si=0;si<sections.length;si++){
+    var sec=sections[si];
+    h+='<h4 class="sec-title">'+sec.title+'</h4>';
+    for(var fi=0;fi<sec.fields.length;fi++){
+      var f=sec.fields[fi];
+      var v=s[f.k]!==undefined?s[f.k]:"";
+      h+='<div class="form-group"><label>'+f.l+'</label>';
+      if(f.t==="bool"){
+        h+='<select name="'+f.k+'"><option value="true" '+(v===true?'selected':'')+'>开启</option><option value="false" '+(v===false?'selected':'')+'>关闭</option></select>';
+      }else if(f.t==="select"&&f.o){
+        h+='<select name="'+f.k+'">';
+        for(var oi=0;oi<f.o.length;oi++)h+='<option value="'+f.o[oi]+'" '+(v===f.o[oi]?'selected':'')+'>'+f.o[oi]+'</option>';
+        h+='</select>';
+      }else if(f.t==="num"){
+        h+='<input name="'+f.k+'" type="number" value="'+(parseInt(v)||0)+'">';
+      }else{
+        h+='<input name="'+f.k+'" value="'+E(String(v||""))+'">';
+      }
+      if(f.h)h+='<div class="text-xs text-muted mt-1">'+f.h+'</div>';
+      h+='</div>';
+    }
+  }
+  h+='<button class="btn btn-primary mt-2" type="submit">保存</button></form></div>';
+  return h;
+}
+
+async function themePage(){
+  var r=await fetch("/api/admin/theme/settings?theme=VPS",{credentials:"include"});
+  var s=r.ok?await r.json():{};
+  var secs=[
+    {title:"通用",fields:[
+      {k:"themeMode",l:"默认主题模式",t:"select",o:["beijing","light","dark"],h:"beijing=按北京时间自动切换"},
+      {k:"dataUpdateInterval",l:"数据更新间隔(秒)",t:"num"},
+      {k:"rpcTransportMode",l:"RPC 连接模式",t:"select",o:["http","websocket"],h:"HTTP兼容性最好;确认反代支持WS可切websocket"},
+      {k:"nodeCardSize",l:"节点卡片尺寸",t:"select",o:["compact","comfortable","large"]}
+    ]},
+    {title:"首页模块",fields:[
+      {k:"stopEarth",l:"停止地球旋转",t:"bool",h:"开启后地球不自动旋转，用户仍可手动拖拽"},
+      {k:"earthRenderer",l:"地球样式",t:"select",o:["realistic","cobe","tiled"],h:"realistic=真实贴图 cobe=点阵 tiled=平铺"},
+      {k:"hideEarth",l:"隐藏地球",t:"bool"},
+      {k:"hideGeneralCard",l:"隐藏头部总览卡片",t:"bool"},
+      {k:"generalCardKeys",l:"自定义头部卡片",h:"逗号分隔,可选: onlineNodes,totalTraffic,uploadSpeed,downloadSpeed"},
+      {k:"hideAdminEntryWhenLoggedOut",l:"未登录时隐藏后台入口",t:"bool"},
+      {k:"disablePageAnimation",l:"减弱过渡动画",t:"bool"}
+    ]},
+    {title:"自定义背景",fields:[
+      {k:"backgroundEnabled",l:"启用自定义背景",t:"bool"},
+      {k:"backgroundType",l:"背景类型",t:"select",o:["image","video"]},
+      {k:"lightBackgroundUrl",l:"亮色背景 URL",h:"亮色模式下的背景地址"},
+      {k:"darkBackgroundUrl",l:"暗色背景 URL",h:"暗色模式下的背景地址，为空则用亮色背景"},
+      {k:"backgroundBlur",l:"背景模糊(px)",t:"num"},
+      {k:"backgroundOverlay",l:"背景遮罩(-100~100)",t:"num"}
+    ]}
+  ];
+  var h='<div class="card"><h3>VPS 主题设置</h3><form id="themeForm">';
+  for(var si=0;si<secs.length;si++){
+    var sec=secs[si];
+    h+='<h4 class="sec-title">'+sec.title+'</h4>';
+    for(var fi=0;fi<sec.fields.length;fi++){
+      var f=sec.fields[fi];
+      var v=s[f.k]!==undefined?s[f.k]:"";
+      h+='<div class="form-group"><label>'+f.l+'</label>';
+      if(f.t==="bool"){
+        h+='<select name="'+f.k+'"><option value="true" '+(v===true?'selected':'')+'>开启</option><option value="false" '+(v===false?'selected':'')+'>关闭</option></select>';
+      }else if(f.t==="select"&&f.o){
+        h+='<select name="'+f.k+'">';
+        for(var oi=0;oi<f.o.length;oi++)h+='<option value="'+f.o[oi]+'" '+(v===f.o[oi]?'selected':'')+'>'+f.o[oi]+'</option>';
+        h+='</select>';
+      }else if(f.t==="num"){
+        h+='<input name="'+f.k+'" type="number" value="'+(parseInt(v)||0)+'">';
+      }else{
+        h+='<input name="'+f.k+'" value="'+E(String(v||""))+'">';
+      }
+      if(f.h)h+='<div class="text-xs text-muted mt-1">'+f.h+'</div>';
+      h+='</div>';
+    }
+  }
+  h+='<button class="btn btn-primary mt-2" type="submit">保存</button></form></div>';
+  return h;
+}
+
+function accountPage(){
+  return'<div class="card"><h3>账户设置</h3><form id="changeUserForm"><div class="form-group"><label>修改用户名</label><div class="flex gap-2"><input name="username" required><button class="btn btn-primary btn-sm" type="submit">修改</button></div></div></form><form id="changePassForm" class="mt-4"><div class="form-group"><label>新密码</label><input name="password" type="password" required minlength="8"></div><div class="form-group"><label>重复新密码</label><input name="password_repeat" type="password" required></div><button class="btn btn-primary btn-sm" type="submit">修改密码</button></form></div>';
+}
+
+async function sessionsPage(){
+  var s=await RPC("admin:getSessions")||{sessions:[],current:""};
+  var list=s.sessions||s.data||[];
+  var cur=s.current||"";
+  var h='<div class="flex justify-between items-center mb-3"><h2>活跃会话 ('+list.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" id="delOtherSessions">清除其他</button><button class="btn btn-danger btn-sm" id="delAllSessions">清除全部</button></div></div>';
+  if(!list.length)return h+'<div class="card empty-state">暂无活跃会话</div>';
+  h+='<div class="card"><table><thead><tr><th>会话ID</th><th>IP</th><th>UA</th><th>方式</th><th>最近</th><th>过期</th><th>操作</th></tr></thead><tbody>';
+  for(var i=0;i<list.length;i++){
+    var s=list[i];
+    var isCur=s.session===cur;
+    var sid=E((s.session||"").substring(0,16));
+    h+='<tr'+(isCur?' style="background:rgba(59,130,246,.08)"':'')+'><td class="text-xs" style="max-width:100px;overflow:hidden;text-overflow:ellipsis">'+sid+(isCur?' <span class="badge badge-blue">当前</span>':'')+'</td><td>'+E(s.ip||s.latest_ip||"")+'</td><td class="text-xs" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">'+E((s.latest_user_agent||s.user_agent||"").substring(0,60))+'</td><td>'+E(s.login_method||"")+'</td><td>'+ago(s.latest_online||s.created_at)+'</td><td>'+new Date(s.expires).toLocaleString()+'</td><td>'+(isCur?"":'<button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delSession(\''+E(s.session).replace(/'/g,"\\'")+'\')">删除</button>')+'</td></tr>';
+  }
+  h+='</tbody></table></div>';return h;
+}
+
+async function databasePage(){
+  var size=await RPC("admin:getDatabaseSize")||{};
+  return'<div class="card"><h3>数据库信息</h3><div class="grid-3 mb-4"><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">当前大小</div></div><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+(size.type||"sqlite")+'</div><div class="text-xs text-muted mt-1">类型</div></div></div><div class="flex gap-2 mb-4"><button class="btn btn-primary btn-sm" id="vacuumBtn">Vacuum 压缩</button><button class="btn btn-outline btn-sm" id="clearRecordsBtn">清空监控记录</button><button class="btn btn-danger btn-sm" id="clearAllRecordsBtn">清空全部记录</button></div></div>';
+}
+
+async function logsPage(){
+  var r=await RPC("admin:getLogs",{limit:"50",page:String(logsPage)})||{logs:[],total:0};
+  var list=r.logs||r.data||[];
+  var h='<h2 class="mb-3">审计日志 ('+(r.total||list.length)+')</h2>';
+  if(!list.length)return h+'<div class="card empty-state">暂无日志</div>';
+  h+='<div class="card"><table><thead><tr><th>时间</th><th>级别</th><th>消息</th></tr></thead><tbody>';
+  for(var i=0;i<list.length;i++){
+    var l=list[i];
+    var lvl=l.level||l.msg_type||"info";
+    h+='<tr><td class="text-xs" style="white-space:nowrap">'+ago(l.time||l.created_at)+'</td><td><span class="badge '+(lvl==="error"?"badge-red":lvl==="warning"?"badge-yellow":"badge-blue")+'">'+E(lvl)+'</span></td><td class="text-sm">'+E(l.message||l.msg||"")+'</td></tr>';
+  }
+  h+='</tbody></table><div class="flex items-center gap-3 mt-4"><button class="btn btn-outline btn-sm" onclick="pageLogs('+(Math.max(1,logsPage-1))+')" '+(logsPage<=1?"disabled":"")+'>上一页</button><span class="text-sm text-muted">第 '+logsPage+' 页</span><button class="btn btn-outline btn-sm" onclick="pageLogs('+(logsPage+1)+')">下一页</button></div></div>';
+  return h;
+}
+function pageLogs(p){logsPage=p;navigate("logs")}
+
+async function tasksPage(){
+  var tasks=await RPC("admin:getTasks")||[];
+  var h='<h2 class="mb-3">任务记录 ('+tasks.length+')</h2>';
+  if(!tasks.length)return h+'<div class="card empty-state">暂无任务</div>';
+  h+='<div class="card"><table><thead><tr><th>ID</th><th>命令</th><th>创建时间</th></tr></thead><tbody>';
+  for(var i=0;i<Math.min(tasks.length,50);i++){
+    var t=tasks[i];
+    h+='<tr><td>'+(t.task_id||t.id)+'</td><td class="code" style="max-width:400px;overflow:hidden;text-overflow:ellipsis">'+E(t.command||"")+'</td><td>'+ago(t.created_at)+'</td></tr>';
+  }
+  h+='</tbody></table></div>';return h;
+}
+
+async function clipboardPage(){
+  var items=await RPC("admin:listClipboard")||[];
+  var h='<div class="flex justify-between items-center mb-3"><h2>剪贴板 ('+items.length+')</h2><button class="btn btn-primary btn-sm" id="addClipBtn">+ 新建</button></div>';
+  if(!items.length)return h+'<div class="card empty-state">暂无</div>';
+  h+='<div class="grid-2">';
+  for(var i=0;i<items.length;i++){
+    var c=items[i];
+    var txt=(c.text||c.content||"");var preview=txt.substring(0,300)+(txt.length>300?"...":"");
+    h+='<div class="card"><div class="flex justify-between items-center mb-2"><span class="font-bold">'+E(c.name||c.title||"无标题")+'</span><span class="text-xs text-muted">'+ago(c.updated_at||c.created_at)+'</span></div><div class="text-sm mb-3" style="white-space:pre-wrap;word-break:break-all">'+E(preview)+'</div><div class="flex gap-1"><button class="btn btn-outline btn-xs" id="clipCopy'+c.id+'">复制</button><button class="btn btn-outline btn-xs" onclick="editClip('+c.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delClip('+c.id+')">删除</button></div></div>';
+  }
+  h+='</div>';return h;
+}
+
+function backupPage(){
+  return'<div class="card"><h3>备份管理</h3><div class="flex gap-3 mb-4"><a href="/api/admin/download/backup" class="btn btn-primary btn-sm">下载备份</a></div><div class="card" style="background:rgba(255,255,255,.02)"><h4>上传恢复</h4><form id="backupForm" enctype="multipart/form-data"><input type="file" name="file" accept=".zip,.json" class="mb-2"><button class="btn btn-outline btn-sm" type="submit">上传恢复</button></form></div></div>';
+}
+
+// ====== ACTIONS ======
+function uid(){return"m"+Date.now()+"_"+Math.random().toString(36).substr(2,4)}
+
+async function showToken(uuid){
+  var r=await RPC("admin:getClientToken",{uuid:uuid});
+  var t=r.token||r||"";
+  var id=uid();
+  openModal(id,"Token",'<div class="token-box mb-3" id="tk'+id+'">'+E(t)+'</div><p class="text-xs text-muted mb-3">点击 Token 复制到剪贴板</p><button class="btn btn-outline btn-sm w-full" onclick="closeModal(\''+id+'\')">关闭</button>');
+  document.getElementById("tk"+id).onclick=function(){copy(this.textContent)};
+}
+
+async function showInstall(uuid){
+  var s=await RPC("admin:getSettings")||{};
+  var endpoint=s.script_domain||location.origin;
+  var r=await RPC("admin:getClientToken",{uuid:uuid});
+  var token=r.token||r||"";
+  var id=uid();
+  openModal(id,"生成安装命令",
+    '<div class="sec-title">目标服务器</div>'+
+    '<div class="form-group"><label>服务器 IP 或主机名</label><input id="ip'+id+'" placeholder="例如: 1.2.3.4" required></div>'+
+    '<div class="sec-title">安装配置</div>'+
+    '<div class="modal-grid"><div class="form-group"><label>安装路径</label><input id="path'+id+'" value="/usr/local/bin/monitor-agent"></div><div class="form-group"><label>上报间隔(秒)</label><input id="interval'+id+'" type="number" value="1"></div></div>'+
+    '<div class="sec-title">可选配置</div>'+
+    '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns'+id+'" placeholder="如 114.114.114.114"></div><div class="form-group"><label>包含网卡</label><input id="includeNic'+id+'" placeholder="如 eth0"></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>排除网卡</label><input id="excludeNic'+id+'" placeholder="如 lo"></div><div class="form-group"><label>包含挂载点</label><input id="mountpoints'+id+'" placeholder="如 /data"></div></div>'+
+    '<div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="gpu'+id+'" style="width:auto"> 启用 GPU 监控</label></div>'+
+    '<button class="btn btn-primary w-full mt-2" id="gen'+id+'">生成安装命令</button>'+
+    '<div id="cmdArea'+id+'" style="display:none;margin-top:12px"><div class="token-box mb-2" style="white-space:pre-wrap;font-size:11px" id="cmd'+id+'"></div><p class="text-xs text-muted">点击上方命令复制，在目标服务器上执行</p></div>');
+  document.getElementById("gen"+id).onclick=function(){
+    var ip=document.getElementById("ip"+id).value.trim();
+    if(!ip){toast("请输入服务器 IP");return}
+    var path=document.getElementById("path"+id).value.trim()||"/usr/local/bin/monitor-agent";
+    var interval=document.getElementById("interval"+id).value||"1";
+    var dns=document.getElementById("dns"+id).value.trim();
+    var inNic=document.getElementById("includeNic"+id).value.trim();
+    var exNic=document.getElementById("excludeNic"+id).value.trim();
+    var mps=document.getElementById("mountpoints"+id).value.trim();
+    var gpu=document.getElementById("gpu"+id).checked;
+    var args="-e "+endpoint+" -t "+token+" -i "+interval;
+    if(dns)args+=" --custom-dns "+dns;
+    if(inNic)args+=" --include-nics "+inNic;
+    if(exNic)args+=" --exclude-nics "+exNic;
+    if(mps)args+=" --include-mountpoint "+mps;
+    if(gpu)args+=" --gpu";
+    var cmd="scp monitor-agent-linux-amd64 root@"+ip+":"+path+"\nssh root@"+ip+"\nchmod +x "+path+"\n"+path+" "+args;
+    var el=document.getElementById("cmd"+id);
+    el.textContent=cmd;
+    el.onclick=function(){copy(this.textContent)};
+    document.getElementById("cmdArea"+id).style.display="block";
+  };
+}
+
+async function editNode(uuid){
+  var nodes=await RPC("admin:listClients");
+  var n=(nodes||[]).find(function(x){return x.uuid===uuid});
+  if(!n)return;
+  var id=uid();
+  var nn=E(n.name||"");var ng=E(n.group||"");var nw=n.weight||0;var nh=n.hidden||false;
+  var ntl=n.traffic_limit||0;var ntt=n.traffic_limit_type||"sum";var nrd=n.traffic_reset_day||1;var nrh=n.traffic_reset_hour||0;
+  openModal(id,"编辑节点",
+    '<form id="ef'+id+'">'+
+    '<h4 class="sec-title">基本</h4>'+
+    '<div class="modal-grid"><div class="form-group"><label>名称</label><input name="name" value="'+nn+'" required></div><div class="form-group"><label>分组</label><input name="group" value="'+ng+'"></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>权重</label><input name="weight" type="number" value="'+nw+'"></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" '+(nh?'':'selected')+'>否</option><option value="true" '+(nh?'selected':'')+'>是</option></select></div></div>'+
+    '<h4 class="sec-title">流量</h4>'+
+    '<div class="modal-grid"><div class="form-group"><label>流量阈值</label><input name="traffic_limit" type="number" value="'+ntl+'"></div><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" '+(ntt==="sum"?"selected":"")+'>合计</option><option value="up" '+(ntt==="up"?"selected":"")+'>上行</option><option value="down" '+(ntt==="down"?"selected":"")+'>下行</option></select></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>重置日(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="'+nrd+'"></div><div class="form-group"><label>重置小时(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="'+nrh+'"></div></div>'+
+    '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>');
+  document.getElementById("ef"+id).onsubmit=async function(e){
+    e.preventDefault();
+    var f=new FormData(e.target);
+    var data={uuid:uuid,name:f.get("name"),group:f.get("group"),weight:parseInt(f.get("weight"))||0,hidden:f.get("hidden")==="true",traffic_limit:parseInt(f.get("traffic_limit"))||0,traffic_limit_type:f.get("traffic_limit_type"),traffic_reset_day:parseInt(f.get("traffic_reset_day"))||1,traffic_reset_hour:parseInt(f.get("traffic_reset_hour"))||0};
+    await RPC("admin:editClient",data);
+    closeModal(id);toast("已保存");navigate("nodes");
+  };
+}
+
+async function deleteNode(uuid){
+  var id=uid();
+  openModal(id,"删除节点",'<p>确定要删除此节点吗？此操作不可撤销，将删除该节点所有历史数据。</p><div class="flex gap-2 mt-4"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\''+id+'\')">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="btn'+id+'">确认删除</button></div>');
+  document.getElementById("btn"+id).onclick=async function(){await RPC("admin:removeClient",{uuid:uuid});closeModal(id);toast("已删除");navigate("nodes")};
+}
+
+async function reorderNodes(){
+  var nodes=await RPC("admin:listClients")||[];
+  var id=uid();
+  var rows="";
+  for(var i=0;i<nodes.length;i++)rows+='<div class="form-group"><label>'+E(nodes[i].name)+'</label><input name="'+nodes[i].uuid+'" type="number" value="'+(nodes[i].weight||i)+'"></div>';
+  openModal(id,"节点排序",'<p class="text-sm text-muted mb-3">数字越大越靠前</p><form id="rf'+id+'">'+rows+'<button class="btn btn-primary w-full mt-3" type="submit">保存排序</button></form>');
+  document.getElementById("rf"+id).onsubmit=async function(e){
+    e.preventDefault();var f=new FormData(e.target);var m={};
+    for(var pair of f.entries())m[pair[0]]=parseInt(pair[1])||0;
+    await RPC("admin:orderClients",m);closeModal(id);toast("已保存");navigate("nodes");
+  };
+}
+
+async function editPing(id){
+  var tasks=await RPC("admin:getAllPingTasks");
+  var t=(tasks||[]).find(function(x){return x.id===id});
+  if(!t)return;
+  var nodes=await RPC("admin:listClients")||[];
+  var cids=(t.clients||[]).join(",");
+  var mid=uid();
+  openModal(mid,"编辑 Ping",
+    '<form id="epf'+mid+'"><div class="form-group"><label>名称</label><input name="name" value="'+E(t.name||"")+'" required></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" value="'+E(t.target||"")+'" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp" '+(t.type==="icmp"?"selected":"")+'>ICMP</option><option value="tcp" '+(t.type==="tcp"?"selected":"")+'>TCP</option><option value="http" '+(t.type==="http"?"selected":"")+'>HTTP</option></select></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="'+(t.interval||60)+'" required></div><div class="form-group"><label>新节点自动</label><select name="default_on"><option value="true" '+(t.default_on?"selected":"")+'>是</option><option value="false" '+(!t.default_on?"selected":"")+'>否</option></select></div></div>'+
+    '<div class="form-group"><label>执行节点 UUID (逗号分隔)</label><textarea name="clients" rows="2">'+cids+'</textarea><div class="text-xs text-muted mt-1">可用: '+nodes.map(function(n){return n.uuid.substring(0,8)+" ("+E(n.name)+")"}).join(", ")+'</div></div>'+
+    '<button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
+  document.getElementById("epf"+mid).onsubmit=async function(e){
+    e.preventDefault();var f=new FormData(e.target);
+    await RPC("admin:editPingTask",{id:id,name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:f.get("clients").split(",").map(function(s){return s.trim()}).filter(Boolean),default_on:f.get("default_on")==="true"});
+    closeModal(mid);toast("已保存");navigate("ping");
+  };
+}
+
+async function deletePing(id){
+  var mid=uid();
+  openModal(mid,"删除任务",'<p>确定删除此 Ping 任务？</p><div class="flex gap-2 mt-4"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\''+mid+'\')">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="dp'+mid+'">确认</button></div>');
+  document.getElementById("dp"+mid).onclick=async function(){await RPC("admin:deletePingTask",{id:[id]});closeModal(mid);toast("已删除");navigate("ping")};
+}
+
+async function delSession(id){await RPC("admin:deleteSession",{session:id});toast("已删除");navigate("sessions")}
+
+async function editClip(id){
+  var items=await RPC("admin:listClipboard");
+  var c=(items||[]).find(function(x){return x.id===id});
+  if(!c)return;
+  var mid=uid();
+  openModal(mid,"编辑",'<form id="ecf'+mid+'"><div class="form-group"><label>标题</label><input name="name" value="'+E(c.name||c.title||"")+'"></div><div class="form-group"><label>内容</label><textarea name="text" rows="6">'+E(c.text||c.content||"")+'</textarea></div><div class="form-group"><label>备注</label><input name="remark" value="'+E(c.remark||"")+'"></div><button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
+  document.getElementById("ecf"+mid).onsubmit=async function(e){
+    e.preventDefault();var f=new FormData(e.target);
+    await RPC("admin:updateClipboard",{id:id,name:f.get("name"),text:f.get("text"),remark:f.get("remark")});
+    closeModal(mid);toast("已保存");navigate("clipboard");
+  };
+}
+async function delClip(id){await RPC("admin:deleteClipboard",{id:id});toast("已删除");navigate("clipboard")}
+
+function bindEvents(){
+  var _d=document;
+
+  var abtn=_d.getElementById("addNodeBtn");
+  if(abtn)abtn.onclick=async function(){
+    var id=uid();
+    openModal(id,"添加节点",'<form id="anf'+id+'"><div class="form-group"><label>名称</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>分组</label><input name="group" placeholder="例如: 日本节点"></div><button class="btn btn-primary w-full mt-3" type="submit">创建</button></form>');
+    _d.getElementById("anf"+id).onsubmit=async function(e){
+      e.preventDefault();var f=new FormData(e.target);
+      var r=await RPC("admin:addClient",{name:f.get("name"),group:f.get("group"),weight:1,traffic_limit:0});
+      closeModal(id);
+      if(r&&r.token){
+        var id2=uid();
+        openModal(id2,"✅ 已创建",'<div class="token-box mb-3" id="ntk'+id2+'">'+E(r.token)+'</div><p class="text-xs text-muted mb-1">UUID: '+E(r.uuid||"")+'</p><p class="text-xs text-muted">点击 Token 复制，关闭后不可再次查看</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\''+id2+'\')">完成</button>');
+        _d.getElementById("ntk"+id2).onclick=function(){copy(this.textContent)};
+      }
+      navigate("nodes");
+    };
+  };
+
+  var pbtn=_d.getElementById("addPingBtn");
+  if(pbtn)pbtn.onclick=async function(){
+    var nodes=await RPC("admin:listClients")||[];
+    var id=uid();
+    openModal(id,"添加 Ping 任务",
+      '<form id="apf'+id+'"><div class="form-group"><label>名称</label><input name="name" required></div>'+
+      '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp">ICMP</option><option value="tcp">TCP</option><option value="http">HTTP</option></select></div></div>'+
+      '<div class="modal-grid"><div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="60" required></div><div class="form-group"><label>新节点自动</label><select name="default_on"><option value="true">是</option><option value="false" selected>否</option></select></div></div>'+
+      '<div class="form-group"><label>执行节点 UUID (逗号分隔,留空=全部)</label><textarea name="clients" rows="2"></textarea><div class="text-xs text-muted mt-1">可用: '+nodes.map(function(n){return n.uuid.substring(0,8)+" ("+E(n.name)+")"}).join(", ")+'</div></div>'+
+      '<button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>');
+    _d.getElementById("apf"+id).onsubmit=async function(e){
+      e.preventDefault();var f=new FormData(e.target);
+      var cs=f.get("clients").split(",").map(function(s){return s.trim()}).filter(Boolean);
+      await RPC("admin:addPingTask",{name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:cs,default_on:f.get("default_on")==="true"});
+      closeModal(id);toast("已创建");navigate("ping");
+    };
+  };
+
+  var rbtn=_d.getElementById("reorderBtn");
+  if(rbtn)rbtn.onclick=reorderNodes;
+
+  var sf=_d.getElementById("settingsForm");
+  if(sf)sf.onsubmit=async function(e){
+    e.preventDefault();var f=new FormData(e.target);var cfg={};
+    for(var pair of f.entries()){
+      var v=pair[1];
+      if(v==="true")cfg[pair[0]]=true;
+      else if(v==="false")cfg[pair[0]]=false;
+      else if(!isNaN(Number(v))&&v!=="")cfg[pair[0]]=Number(v);
+      else cfg[pair[0]]=v;
+    }
+    await RPC("admin:editSettings",cfg);toast("设置已保存");
+  };
+
+  var tf=_d.getElementById("themeForm");
+  if(tf)tf.onsubmit=async function(e){
+    e.preventDefault();var f=new FormData(e.target);var cfg={};
+    for(var pair of f.entries()){
+      var v=pair[1];
+      if(v==="true")cfg[pair[0]]=true;
+      else if(v==="false")cfg[pair[0]]=false;
+      else if(!isNaN(Number(v))&&v!=="")cfg[pair[0]]=Number(v);
+      else cfg[pair[0]]=v;
+    }
+    await fetch("/api/admin/theme/settings?theme=VPS",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify(cfg)});
+    toast("主题已保存");
+  };
+
+  var uf=_d.getElementById("changeUserForm");
+  if(uf)uf.onsubmit=async function(e){
+    e.preventDefault();
+    await fetch("/api/admin/update/user",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({username:e.target.username.value})});
+    toast("用户名已更新");
+  };
+
+  var pf=_d.getElementById("changePassForm");
+  if(pf)pf.onsubmit=async function(e){
+    e.preventDefault();
+    if(e.target.password.value!==e.target.password_repeat.value){toast("两次密码不一致");return}
+    await fetch("/api/admin/update/user",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({password:e.target.password.value})});
+    toast("密码已更新");e.target.reset();
+  };
+
+  var dob=_d.getElementById("delOtherSessions");
+  if(dob)dob.onclick=async function(){
+    var s=await RPC("admin:getSessions")||{sessions:[],current:""};
+    var list=s.sessions||s.data||[];
+    for(var i=0;i<list.length;i++){if(list[i].session!==s.current)await RPC("admin:deleteSession",{session:list[i].session})}
+    toast("已清除其他会话");navigate("sessions");
+  };
+
+  var dab=_d.getElementById("delAllSessions");
+  if(dab)dab.onclick=async function(){await RPC("admin:deleteAllSessions");toast("全部会话已清除，请重新登录");setTimeout(logout,1500)};
+
+  var vb=_d.getElementById("vacuumBtn");
+  if(vb)vb.onclick=async function(){var r=await RPC("admin:vacuumDatabase");if(r)toast("压缩完成: "+B(r.before||0)+" → "+B(r.after||r.size||0));else toast("已压缩")};
+
+  var crb=_d.getElementById("clearRecordsBtn");
+  if(crb)crb.onclick=async function(){await RPC("admin:clearRecords");toast("监控记录已清空")};
+
+  var cab=_d.getElementById("clearAllRecordsBtn");
+  if(cab)cab.onclick=async function(){if(confirm("确定清空所有记录？此操作不可恢复！")){await RPC("admin:clearAllRecords");toast("全部记录已清空")}};
+
+  var acb=_d.getElementById("addClipBtn");
+  if(acb)acb.onclick=async function(){
+    var id=uid();
+    openModal(id,"新建",'<form id="ncf'+id+'"><div class="form-group"><label>标题</label><input name="name" required></div><div class="form-group"><label>内容</label><textarea name="text" rows="6" required></textarea></div><div class="form-group"><label>备注</label><input name="remark"></div><button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>');
+    _d.getElementById("ncf"+id).onsubmit=async function(e){
+      e.preventDefault();var f=new FormData(e.target);
+      await RPC("admin:createClipboard",{name:f.get("name"),text:f.get("text"),remark:f.get("remark")});
+      closeModal(id);toast("已创建");navigate("clipboard");
+    };
+  };
+
+  var bf=_d.getElementById("backupForm");
+  if(bf)bf.onsubmit=async function(e){
+    e.preventDefault();
+    var fd=new FormData(e.target);
+    var r=await fetch("/api/admin/upload/backup",{method:"POST",credentials:"include",body:fd});
+    if(r.ok)toast("备份已上传恢复");else toast("上传失败");
+  };
+
+  // Clipboard copy buttons
+  var copyBtns=_d.querySelectorAll("[id^='clipCopy']");
+  for(var i=0;i<copyBtns.length;i++){(function(btn){
+    var cid=parseInt(btn.id.replace("clipCopy",""));
+    btn.onclick=async function(){
+      var items=await RPC("admin:listClipboard");
+      var c=(items||[]).find(function(x){return x.id===cid});
+      if(c)copy(c.text||c.content||"");
+    };
+  })(copyBtns[i])}
+}
+
+async function init(){buildSidebar();await checkSession();if(session){navigate("dashboard")}}
+init();
+</script>
+</body>
+</html>

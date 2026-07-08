@@ -1,0 +1,137 @@
+package records
+
+import (
+	"time"
+
+	"github.com/komari-monitor/komari/database/dbcore"
+	"github.com/komari-monitor/komari/database/metricstore"
+	"github.com/komari-monitor/komari/database/models"
+)
+
+type MonthlyTraffic struct {
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
+	Up           int64     `json:"up"`
+	Down         int64     `json:"down"`
+	RawTotal     int64     `json:"raw_total"`
+	Compensation int64     `json:"compensation"`
+	Total        int64     `json:"total"`
+}
+
+func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic, error) {
+	start, end := TrafficWindow(client, now)
+	up, down, err := sumTrafficDeltas(client.UUID, start, now)
+	if err != nil {
+		return MonthlyTraffic{}, err
+	}
+
+	raw := up + down
+	total := raw + client.TrafficComp
+	if total < 0 {
+		total = 0
+	}
+
+	return MonthlyTraffic{
+		Start:        start,
+		End:          end,
+		Up:           up,
+		Down:         down,
+		RawTotal:     raw,
+		Compensation: client.TrafficComp,
+		Total:        total,
+	}, nil
+}
+
+func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
+	loc := trafficLocation()
+	localNow := now.In(loc)
+	day := client.TrafficResetDay
+	if day <= 0 {
+		day = 1
+	}
+	hour := client.TrafficResetHour
+	if hour < 0 || hour > 23 {
+		hour = 0
+	}
+
+	this := monthlyBoundary(localNow.Year(), localNow.Month(), day, hour, loc)
+	var start time.Time
+	var end time.Time
+	if localNow.Before(this) {
+		start = monthlyBoundary(localNow.AddDate(0, -1, 0).Year(), localNow.AddDate(0, -1, 0).Month(), day, hour, loc)
+		end = this
+	} else {
+		start = this
+		next := localNow.AddDate(0, 1, 0)
+		end = monthlyBoundary(next.Year(), next.Month(), day, hour, loc)
+	}
+	return start, end
+}
+
+func monthlyBoundary(year int, month time.Month, day, hour int, loc *time.Location) time.Time {
+	lastDay := time.Date(year, month+1, 0, hour, 0, 0, 0, loc).Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(year, month, day, hour, 0, 0, 0, loc)
+}
+
+func trafficLocation() *time.Location {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	return loc
+}
+
+func sumTrafficDeltas(uuid string, start, end time.Time) (int64, int64, error) {
+	if metricstore.IsEnabled() {
+		recs, err := GetRecordsByClientAndTime(uuid, start, end)
+		if err != nil {
+			return 0, 0, err
+		}
+		var up, down int64
+		for _, rec := range recs {
+			if rec.TrafficUp > 0 {
+				up += rec.TrafficUp
+			}
+			if rec.TrafficDown > 0 {
+				down += rec.TrafficDown
+			}
+		}
+		return up, down, nil
+	}
+
+	db := dbcore.GetDBInstance()
+	fourHoursAgo := time.Now().Add(-4*time.Hour - time.Minute)
+	recentStart := start
+	if end.After(fourHoursAgo) && recentStart.Before(fourHoursAgo) {
+		recentStart = fourHoursAgo
+	}
+
+	var recent struct {
+		Up   int64
+		Down int64
+	}
+	if end.After(fourHoursAgo) {
+		if err := db.Table("records").
+			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
+			Where("client = ? AND time >= ? AND time <= ?", uuid, recentStart, end).
+			Scan(&recent).Error; err != nil {
+			return 0, 0, err
+		}
+	}
+
+	var archived struct {
+		Up   int64
+		Down int64
+	}
+	if err := db.Table("records_long_term").
+		Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
+		Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
+		Scan(&archived).Error; err != nil {
+		return 0, 0, err
+	}
+
+	return recent.Up + archived.Up, recent.Down + archived.Down, nil
+}
