@@ -531,7 +531,7 @@ async function editPing(id){
     '<button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
   document.getElementById("epf"+mid).onsubmit=async function(e){
     e.preventDefault();var f=new FormData(e.target);
-    await RPC("admin:editPingTask",{id:id,name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:f.get("clients").split(",").map(function(s){return s.trim()}).filter(Boolean),default_on:f.get("default_on")==="true"});
+    await RPC("admin:editPingTask",{tasks:[{id:id,name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:f.get("clients").split(",").map(function(s){return s.trim()}).filter(Boolean),default_on:f.get("default_on")==="true"}]});
     closeModal(mid);toast("已保存");navigate("ping");
   };
 }
