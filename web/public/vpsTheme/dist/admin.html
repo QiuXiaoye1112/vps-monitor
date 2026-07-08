@@ -209,10 +209,10 @@ async function dashPage(){
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+tasks.length+'</div><div class="text-xs text-muted mt-1">任务记录</div></div></div>';
   if(nodes.length){
-    h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>CPU</th><th>内存</th><th>磁盘</th><th>网络 ↑/↓</th><th>操作</th></tr></thead><tbody>';
+    h+='<div class="card"><h3>节点状态</h3><table><thead><tr><th>名称</th><th>状态</th><th>操作</th></tr></thead><tbody>';
     for(var i=0;i<Math.min(nodes.length,10);i++){
       var n=nodes[i];
-      var cpuT=n.online?((n.cpu||0).toFixed(1)+'%'):'-';var ramT=n.online?B(n.ram||0):'-';var diskT=n.online?B(n.disk||0):'-';var netT=n.online?(bps(n.net_out||0)+' / '+bps(n.net_in||0)):'-';h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td>'+cpuT+'</td><td>'+ramT+'</td><td>'+diskT+'</td><td>'+netT+'</td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></td></tr>';
+      h+='<tr><td class="font-bold">'+E(n.name)+'</td><td><span class="badge '+(n.online?"badge-green":"badge-red")+'">'+(n.online?"在线":"离线")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\''+n.uuid+'\')">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\''+n.uuid+'\')">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\''+n.uuid+'\')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\''+n.uuid+'\')">删除</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid='+n.uuid+'\',\'_blank\')">终端</button></td></tr>';
     }
     h+='</tbody></table></div>';
   }
