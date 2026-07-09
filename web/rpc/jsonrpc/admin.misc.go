@@ -48,6 +48,9 @@ func init() {
 		Summary: "Update settings (partial)",
 		Returns: "null",
 	})
+	RegisterWithGroupAndMeta("clearPingRecords", rpc.RoleAdmin, adminClearPingRecords, &rpc.MethodMeta{
+		Name: "admin:clearPingRecords", Summary: "Clear all ping records",
+	})
 	RegisterWithGroupAndMeta("clearAllRecords", rpc.RoleAdmin, adminClearAllRecords, &rpc.MethodMeta{
 		Name:    "admin:clearAllRecords",
 		Summary: "Delete all load and ping records",
@@ -158,6 +161,13 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, message, "info")
+	return nil, nil
+}
+
+func adminClearPingRecords(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
+	tasks.DeleteAllPingRecords()
+	actor, ip := auditActor(ctx)
+	auditlog.Log(ip, actor, "clear ping records", "info")
 	return nil, nil
 }
 

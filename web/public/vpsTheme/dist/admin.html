@@ -87,7 +87,7 @@ h2{font-size:16px}h3{font-size:14px}
 .draggable-row{cursor:grab;transition:background .15s}.draggable-row:active{cursor:grabbing}.draggable-row.drag-over{background:rgba(59,130,246,.15);border-top:2px solid var(--accent)}</style>
 </head>
 <body>
-<div class="sidebar" id="sidebar"><h2>Monitor <span style="font-size:10px;color:var(--accent)">v2</span></h2></div>
+<div class="sidebar" id="sidebar"><h2>Monitor</h2></div>
 <div class="main" id="main"></div>
 <div id="modals"></div>
 <script>
@@ -247,14 +247,14 @@ async function dashPage(){
 
 async function pingPage(){
   var tasks=await RPC("admin:getAllPingTasks")||[];
-  var h='<div class="flex justify-between items-center mb-3"><h2>Ping 任务 ('+tasks.length+')</h2><button class="btn btn-primary btn-sm" id="addPingBtn">+ 添加任务</button></div>';
+  var h='<div class="flex justify-between items-center mb-3"><h2>Ping 任务 ('+tasks.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" style="color:var(--red)" id="clearPingBtn">清空记录</button><button class="btn btn-primary btn-sm" id="addPingBtn">+ 添加任务</button></div></div>';
   if(!tasks.length)return h+'<div class="card empty-state">暂无 Ping 任务</div>';
-  h+='<div class="card"><table><thead><tr><th>ID</th><th>名称</th><th>目标</th><th>类型</th><th>间隔(s)</th><th>节点数</th><th>新节点自动</th><th>操作</th></tr></thead><tbody>';
+  h+='<div class="card"><table><thead><tr><th>名称</th><th>目标</th><th>类型</th><th>间隔(s)</th><th>操作</th></tr></thead><tbody>';
   for(var i=0;i<tasks.length;i++){
     var t=tasks[i];
-    h+='<tr><td>'+t.id+'</td><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td>'+((t.clients||[]).length>0?(t.clients||[]).length:(t.default_on?'全部':'0'))+'</td>'<td><span class="badge '+(t.default_on?"badge-green":"badge-yellow")+'">'+(t.default_on?"是":"否")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
+    h+='<tr><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
   }
-  h+='</tbody></table><button class="btn btn-outline btn-sm mt-3" style="color:var(--red)" id="clearPingBtn">清空所有Ping记录</button></div>';return h;
+  h+='</tbody></table></div>';return h;
 }
 
 async function settingsPage(){
@@ -692,7 +692,7 @@ var uf=_d.getElementById("changeUserForm");
   var vb=_d.getElementById("vacuumBtn");
   if(vb)vb.onclick=async function(){var r=await RPC("admin:vacuumDatabase");if(r)toast("压缩完成: "+B(r.before||0)+" → "+B(r.after||r.size||0));else toast("已压缩")};
 
-  var cpb=_d.getElementById("clearPingBtn");if(cpb)cpb.onclick=async function(){if(confirm("确定清空所有Ping记录？")){await RPC("admin:deletePingTask",{id:[]});var tasks=await RPC("admin:getAllPingTasks")||[];for(var i=0;i<tasks.length;i++){await RPC("admin:deletePingTask",{id:[tasks[i].id]})};toast("Ping记录已清空")}};
+  var cpb=_d.getElementById("clearPingBtn");if(cpb)cpb.onclick=async function(){var mid=uid();var htm='<p class=\"mb-3\">确定要清空所有Ping记录吗？此操作不可撤销。</p><div class=\"flex gap-2\"><button class=\"btn btn-outline btn-sm\" style=\"flex:1\" onclick=\"closeModal(\\x27'+mid+'\\x27)\">取消</button><button class=\"btn btn-danger btn-sm\" style=\"flex:1\" id=\"btn'+mid+'\">确认清空</button></div>';openModal(mid,"清空Ping记录",htm);document.getElementById("btn"+mid).onclick=async function(){await RPC("admin:clearPingRecords");closeModal(mid);toast("Ping记录已清空")}};
 var crb=_d.getElementById("clearRecordsBtn");
   if(crb)crb.onclick=async function(){await RPC("admin:clearRecords");toast("监控记录已清空")};
 
