@@ -254,7 +254,7 @@ async function pingPage(){
     var t=tasks[i];
     h+='<tr><td>'+t.id+'</td><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td>'+((t.clients||[]).length>0?(t.clients||[]).length:(t.default_on?'全部':'0'))+'</td>'<td><span class="badge '+(t.default_on?"badge-green":"badge-yellow")+'">'+(t.default_on?"是":"否")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
   }
-  h+='</tbody></table></div>';return h;
+  h+='</tbody></table><button class="btn btn-outline btn-sm mt-3" style="color:var(--red)" id="clearPingBtn">清空所有Ping记录</button></div>';return h;
 }
 
 async function settingsPage(){
