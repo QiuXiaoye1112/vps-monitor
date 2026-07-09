@@ -104,6 +104,7 @@ function E(s){var d=document.createElement("div");d.textContent=s;return d.inner
 function B(v){if(!v||v===0)return"0 B";var u=["B","KB","MB","GB","TB"];var i=0;while(v>=1024&&i<u.length-1){v/=1024;i++}return v.toFixed(i>1?2:0)+" "+u[i]}
 function bps(v){return B(v)+"/s"}
 function ago(ts){if(!ts)return"-";var s=(Date.now()-new Date(ts).getTime())/1000;if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d"}
+async function copy(txt){try{await navigator.clipboard.writeText(txt);toast("已复制")}catch(e){var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();toast("已复制")}}
 
 async function RPC(method,params){
   params=params||{};
@@ -410,7 +411,7 @@ async function clipboardPage(){
   for(var i=0;i<items.length;i++){
     var c=items[i];
     var txt=(c.text||c.content||"");var preview=txt.substring(0,300)+(txt.length>300?"...":"");
-    h+='<div class="card"><div class="flex justify-between items-center mb-2"><span class="font-bold">'+E(c.name||c.title||"无标题")+'</span><span class="text-xs text-muted">'+ago(c.updated_at||c.created_at)+'</span></div><div class="text-sm mb-3" style="white-space:pre-wrap;word-break:break-all">'+E(preview)+'</div><div class="flex gap-1"><button class="btn btn-outline btn-xs" id="clipCopy'+c.id+'">复制</button><button class="btn btn-outline btn-xs" onclick="editClip('+c.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delClip('+c.id+')">删除</button></div></div>';
+    h+='<div class="card"><div class="flex justify-between items-center mb-2"><span class="font-bold">'+E(c.name||c.title||"无标题")+'</span></div><div class="text-sm mb-3" style="white-space:pre-wrap;word-break:break-all">'+E(preview)+'</div><div class="flex gap-1"><button class="btn btn-outline btn-xs" id="clipCopy'+c.id+'">复制</button><button class="btn btn-outline btn-xs" onclick="editClip('+c.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delClip('+c.id+')">删除</button></div></div>';
   }
   h+='</div>';return h;
 }
@@ -537,14 +538,14 @@ async function editClip(id){
   var c=(items||[]).find(function(x){return x.id===id});
   if(!c)return;
   var mid=uid();
-  openModal(mid,"编辑",'<form id="ecf'+mid+'"><div class="form-group"><label>标题</label><input name="name" value="'+E(c.name||c.title||"")+'"></div><div class="form-group"><label>内容</label><textarea name="text" rows="6">'+E(c.text||c.content||"")+'</textarea></div><div class="form-group"><label>备注</label><input name="remark" value="'+E(c.remark||"")+'"></div><button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
+  openModal(mid,"编辑",'<form id="ecf'+mid+'"><div class="form-group"><label>标题</label><input name="name" value="'+E(c.name||c.title||"")+'"></div><div class="form-group"><label>内容</label><textarea name="text" rows="6">'+E(c.text||c.content||"")+'</textarea></div><button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
   document.getElementById("ecf"+mid).onsubmit=async function(e){
     e.preventDefault();var f=new FormData(e.target);
-    await RPC("admin:updateClipboard",{id:id,name:f.get("name"),text:f.get("text"),remark:f.get("remark")});
+    await RPC("admin:updateClipboard",{id:String(id),name:f.get("name"),text:f.get("text")});
     closeModal(mid);toast("已保存");navigate("clipboard");
   };
 }
-async function delClip(id){await RPC("admin:deleteClipboard",{id:id});toast("已删除");navigate("clipboard")}
+async function delClip(id){await RPC("admin:deleteClipboard",{id:String(id)});toast("已删除");navigate("clipboard")}
 
 var dragSrc=null;
 function initDragDrop(){
@@ -702,10 +703,10 @@ var crb=_d.getElementById("clearRecordsBtn");
   var acb=_d.getElementById("addClipBtn");
   if(acb)acb.onclick=async function(){
     var id=uid();
-    openModal(id,"新建",'<form id="ncf'+id+'"><div class="form-group"><label>标题</label><input name="name" required></div><div class="form-group"><label>内容</label><textarea name="text" rows="6" required></textarea></div><div class="form-group"><label>备注</label><input name="remark"></div><button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>');
+    openModal(id,"新建",'<form id="ncf'+id+'"><div class="form-group"><label>标题</label><input name="name" required></div><div class="form-group"><label>内容</label><textarea name="text" rows="6" required></textarea></div><button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>');
     _d.getElementById("ncf"+id).onsubmit=async function(e){
       e.preventDefault();var f=new FormData(e.target);
-      await RPC("admin:createClipboard",{name:f.get("name"),text:f.get("text"),remark:f.get("remark")});
+      await RPC("admin:createClipboard",{name:f.get("name"),text:f.get("text")});
       closeModal(id);toast("已创建");navigate("clipboard");
     };
   };
