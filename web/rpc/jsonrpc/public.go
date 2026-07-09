@@ -87,6 +87,7 @@ func publicClientInfo(node models.Client) map[string]any {
 		"traffic_limit_type":   node.TrafficLimitType,
 		"traffic_reset_day":    node.TrafficResetDay,
 		"traffic_reset_hour":   node.TrafficResetHour,
+		"traffic_reset_enabled": node.TrafficResetEnabled,
 		"traffic_compensation": node.TrafficComp,
 		"created_at":           node.CreatedAt,
 		"updated_at":           node.UpdatedAt,

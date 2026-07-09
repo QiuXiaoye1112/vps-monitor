@@ -147,11 +147,12 @@ func CreateClient() (clientUUID, token string, err error) {
 	clientUUID = uuid.New().String()
 
 	client := models.Client{
-		UUID:      clientUUID,
-		Token:     token,
-		Name:      "client_" + clientUUID[0:8],
-		CreatedAt: models.FromTime(time.Now()),
-		UpdatedAt: models.FromTime(time.Now()),
+		UUID:                clientUUID,
+		Token:               token,
+		Name:                "client_" + clientUUID[0:8],
+		TrafficResetEnabled: true,
+		CreatedAt:           models.FromTime(time.Now()),
+		UpdatedAt:           models.FromTime(time.Now()),
 	}
 
 	err = db.Create(&client).Error
@@ -172,11 +173,12 @@ func CreateClientWithName(name string) (clientUUID, token string, err error) {
 	token = utils.GenerateToken()
 	clientUUID = uuid.New().String()
 	client := models.Client{
-		UUID:      clientUUID,
-		Token:     token,
-		Name:      name,
-		CreatedAt: models.FromTime(time.Now()),
-		UpdatedAt: models.FromTime(time.Now()),
+		UUID:                clientUUID,
+		Token:               token,
+		Name:                name,
+		TrafficResetEnabled: true,
+		CreatedAt:           models.FromTime(time.Now()),
+		UpdatedAt:           models.FromTime(time.Now()),
 	}
 
 	err = db.Create(&client).Error
@@ -255,6 +257,9 @@ func ResetTrafficCompensationForDueClients() {
 	now := time.Now()
 	for _, c := range allClients {
 		if c.TrafficComp == 0 {
+			continue
+		}
+		if !c.TrafficResetEnabled {
 			continue
 		}
 		start := trafficResetStart(c, now)

@@ -40,6 +40,7 @@ type Client struct {
 	TrafficLimitType string    `json:"traffic_limit_type" gorm:"type:varchar(10);default:'max'"` // 流量阈值类型：sum max min up down
 	TrafficResetDay  int       `json:"traffic_reset_day" gorm:"type:int;default:1"`
 	TrafficResetHour int       `json:"traffic_reset_hour" gorm:"type:int;default:0"`
+	TrafficResetEnabled bool      `json:"traffic_reset_enabled" gorm:"type:boolean;default:true"`
 	TrafficComp      int64     `json:"traffic_compensation" gorm:"column:traffic_compensation;type:bigint;default:0"`
 	TrafficCompResetAt LocalTime `json:"traffic_compensation_reset_at" gorm:"column:traffic_compensation_reset_at"`
 	CreatedAt        LocalTime `json:"created_at"`

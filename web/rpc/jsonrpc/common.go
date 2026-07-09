@@ -351,6 +351,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		TrafficCompensation int64               `json:"traffic_compensation"`
 		TrafficResetDay     int                 `json:"traffic_reset_day"`
 		TrafficResetHour    int                 `json:"traffic_reset_hour"`
+		TrafficResetEnabled bool                `json:"traffic_reset_enabled"`
 		Process             int                 `json:"process"`
 		Connections         int                 `json:"connections"`
 		ConnectionsUdp      int                 `json:"connections_udp"`
@@ -404,6 +405,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			TrafficCompensation: monthly.Compensation,
 			TrafficResetDay:     clientByUUID[uuid].TrafficResetDay,
 			TrafficResetHour:    clientByUUID[uuid].TrafficResetHour,
+			TrafficResetEnabled: clientByUUID[uuid].TrafficResetEnabled,
 			Process:             rep.Process,
 			Connections:         rep.Connections.TCP + rep.Connections.UDP,
 			ConnectionsUdp:      rep.Connections.UDP,

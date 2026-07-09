@@ -323,8 +323,9 @@ func TestCompactRecordOnlyMigratesCompleteFifteenMinuteBuckets(t *testing.T) {
 func TestTrafficWindowEdgeCases(t *testing.T) {
 	loc := trafficLocation()
 	client := models.Client{
-		TrafficResetDay:  31,
-		TrafficResetHour: 0,
+		TrafficResetDay:     31,
+		TrafficResetHour:    0,
+		TrafficResetEnabled: true,
 	}
 
 	// Case 1: March 30, 2026.
@@ -341,4 +342,30 @@ func TestTrafficWindowEdgeCases(t *testing.T) {
 	assert.True(t, start2.Equal(time.Date(2026, 3, 31, 0, 0, 0, 0, loc)), "start2 was %v", start2)
 	assert.True(t, end2.Equal(time.Date(2026, 4, 30, 0, 0, 0, 0, loc)), "end2 was %v", end2)
 }
+
+func TestTrafficResetSwitch(t *testing.T) {
+	loc := trafficLocation()
+	
+	// 测试 1: 开关开启
+	cEnabled := models.Client{
+		TrafficResetDay:     1,
+		TrafficResetHour:    0,
+		TrafficResetEnabled: true,
+	}
+	now := time.Date(2026, 7, 10, 12, 0, 0, 0, loc)
+	start, end := TrafficWindow(cEnabled, now)
+	assert.True(t, start.Equal(time.Date(2026, 7, 1, 0, 0, 0, 0, loc)))
+	assert.True(t, end.Equal(time.Date(2026, 8, 1, 0, 0, 0, 0, loc)))
+
+	// 测试 2: 开关关闭（不应重置，窗口需为大区间）
+	cDisabled := models.Client{
+		TrafficResetDay:     1,
+		TrafficResetHour:    0,
+		TrafficResetEnabled: false,
+	}
+	startD, endD := TrafficWindow(cDisabled, now)
+	assert.True(t, startD.IsZero(), "Start window should be zero when reset is disabled")
+	assert.True(t, endD.After(now.AddDate(50, 0, 0)), "End window should be in the far future")
+}
+
 

@@ -43,6 +43,9 @@ func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic,
 }
 
 func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
+	if !client.TrafficResetEnabled {
+		return time.Time{}, now.AddDate(100, 0, 0)
+	}
 	loc := trafficLocation()
 	localNow := now.In(loc)
 	day := client.TrafficResetDay
