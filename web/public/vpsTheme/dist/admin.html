@@ -371,7 +371,7 @@ async function sessionsPage(){
 
 async function databasePage(){
   var size=await RPC("admin:getDatabaseSize")||{};
-  return'<div class="card"><h3>数据库信息</h3><div class="grid-3 mb-4"><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">当前大小</div></div><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+(size.type||"sqlite")+'</div><div class="text-xs text-muted mt-1">类型</div></div></div><div class="flex gap-2 mb-4"><button class="btn btn-primary btn-sm" id="vacuumBtn">Vacuum 压缩</button><button class="btn btn-outline btn-sm" id="clearRecordsBtn">清空监控记录</button><button class="btn btn-danger btn-sm" id="clearAllRecordsBtn">清空全部记录</button></div></div>';
+  return'<div class="card"><h3>数据库信息</h3><div class="grid-3 mb-4"><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">当前大小</div></div><div style="padding:12px"><div style="font-size:24px;font-weight:700">'+(size.type||"sqlite")+'</div><div class="text-xs text-muted mt-1">类型</div></div></div><div class="flex gap-2 mb-4"><button class="btn btn-primary btn-sm" id="vacuumBtn">Vacuum 压缩</button><button class="btn btn-danger btn-sm" id="clearAllRecordsBtn">清空全部记录</button></div></div>';
 }
 
 async function logsPage(){
@@ -692,7 +692,8 @@ var uf=_d.getElementById("changeUserForm");
   var vb=_d.getElementById("vacuumBtn");
   if(vb)vb.onclick=async function(){var r=await RPC("admin:vacuumDatabase");if(r)toast("压缩完成: "+B(r.before||0)+" → "+B(r.after||r.size||0));else toast("已压缩")};
 
-  var crb=_d.getElementById("clearRecordsBtn");
+  var cpb=_d.getElementById("clearPingBtn");if(cpb)cpb.onclick=async function(){if(confirm("确定清空所有Ping记录？")){await RPC("admin:deletePingTask",{id:[]});var tasks=await RPC("admin:getAllPingTasks")||[];for(var i=0;i<tasks.length;i++){await RPC("admin:deletePingTask",{id:[tasks[i].id]})};toast("Ping记录已清空")}};
+var crb=_d.getElementById("clearRecordsBtn");
   if(crb)crb.onclick=async function(){await RPC("admin:clearRecords");toast("监控记录已清空")};
 
   var cab=_d.getElementById("clearAllRecordsBtn");
