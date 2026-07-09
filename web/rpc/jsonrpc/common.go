@@ -378,7 +378,8 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		if client, ok := clientByUUID[uuid]; ok {
 			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
 				monthly = mt
-				monthlyUp, monthlyDown = applyTrafficCompensation(mt.Up, mt.Down, mt.Compensation)
+				monthlyUp = mt.Up
+				monthlyDown = mt.Down
 			}
 		}
 		resetDay := clientByUUID[uuid].TrafficResetDay
@@ -406,7 +407,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			NetTotalDown:        monthlyDown,
 			RawNetTotalUp:       rep.Network.TotalUp,
 			RawNetTotalDown:     rep.Network.TotalDown,
-			MonthlyTraffic:      monthlyUp + monthlyDown,
+			MonthlyTraffic:      monthlyUp + monthlyDown + monthly.Compensation,
 			MonthlyTrafficRaw:   monthly.RawTotal,
 			TrafficCompensation: monthly.Compensation,
 			TrafficResetDay:     resetDay,
@@ -446,13 +447,9 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 }
 
 func applyTrafficCompensation(up, down, compensation int64) (int64, int64) {
-	if compensation >= 0 {
-		return up + compensation, down
-	}
-	if up >= -compensation {
-		return up + compensation, down
-	}
-	return 0, down
+	half := compensation / 2
+	rem := compensation % 2
+	return up + half + rem, down + half
 }
 
 func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
