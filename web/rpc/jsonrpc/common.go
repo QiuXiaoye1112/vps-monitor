@@ -447,20 +447,12 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 
 func applyTrafficCompensation(up, down, compensation int64) (int64, int64) {
 	if compensation >= 0 {
-		return up, down + compensation
+		return up + compensation, down
 	}
-	remaining := -compensation
-	if down >= remaining {
-		return up, down - remaining
+	if up >= -compensation {
+		return up + compensation, down
 	}
-	remaining -= down
-	down = 0
-	if up >= remaining {
-		up -= remaining
-	} else {
-		up = 0
-	}
-	return up, down
+	return 0, down
 }
 
 func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
