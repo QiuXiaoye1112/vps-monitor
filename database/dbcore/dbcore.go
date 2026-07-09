@@ -331,7 +331,7 @@ func GetDBInstance() *gorm.DB {
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_record_lt_client_time ON records_long_term(client, time)")
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_ping_record_client_time ON ping_records(client, time)")
 		}
-
+		instance.Exec("UPDATE clients SET traffic_reset_enabled = ? WHERE traffic_reset_enabled IS NULL", true)
 	})
 
 	return instance

@@ -64,6 +64,10 @@ func publicGetNodesInformation(ctx context.Context, _ *rpc.JsonRpcRequest) (any,
 }
 
 func publicClientInfo(node models.Client) map[string]any {
+	resetDay := node.TrafficResetDay
+	if !node.TrafficResetEnabled {
+		resetDay = 0
+	}
 	return map[string]any{
 		"uuid":                 node.UUID,
 		"name":                 node.Name,
@@ -85,7 +89,7 @@ func publicClientInfo(node models.Client) map[string]any {
 		"hidden":               node.Hidden,
 		"traffic_limit":        node.TrafficLimit,
 		"traffic_limit_type":   node.TrafficLimitType,
-		"traffic_reset_day":    node.TrafficResetDay,
+		"traffic_reset_day":    resetDay,
 		"traffic_reset_hour":   node.TrafficResetHour,
 		"traffic_reset_enabled": node.TrafficResetEnabled,
 		"traffic_compensation": node.TrafficComp,

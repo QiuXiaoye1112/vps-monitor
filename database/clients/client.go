@@ -241,6 +241,11 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	if err != nil {
 		return nil, err
 	}
+	for i := 0; i < len(clients); i++ {
+		if !clients[i].TrafficResetEnabled {
+			clients[i].TrafficResetDay = 0
+		}
+	}
 	return clients, nil
 }
 

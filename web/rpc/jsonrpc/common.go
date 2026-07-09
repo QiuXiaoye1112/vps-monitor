@@ -379,6 +379,10 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 				monthlyUp, monthlyDown = applyTrafficCompensation(mt.Up, mt.Down, mt.Compensation)
 			}
 		}
+		resetDay := clientByUUID[uuid].TrafficResetDay
+		if !clientByUUID[uuid].TrafficResetEnabled {
+			resetDay = 0
+		}
 		rl := recordLike{
 			Client:              uuid,
 			Time:                models.FromTime(rep.UpdatedAt),
@@ -403,7 +407,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			MonthlyTraffic:      monthlyUp + monthlyDown,
 			MonthlyTrafficRaw:   monthly.RawTotal,
 			TrafficCompensation: monthly.Compensation,
-			TrafficResetDay:     clientByUUID[uuid].TrafficResetDay,
+			TrafficResetDay:     resetDay,
 			TrafficResetHour:    clientByUUID[uuid].TrafficResetHour,
 			TrafficResetEnabled: clientByUUID[uuid].TrafficResetEnabled,
 			Process:             rep.Process,
