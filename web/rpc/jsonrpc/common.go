@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strings"
@@ -217,6 +218,7 @@ func init() {
 }
 
 func getNodes(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
+	log.Println("[DEBUG_ORDER] common:getNodes was called!")
 	var params struct {
 		UUID string `json:"uuid"`
 	}

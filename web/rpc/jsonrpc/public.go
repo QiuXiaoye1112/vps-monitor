@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"time"
 
@@ -45,6 +46,7 @@ func isLoginFromCtx(ctx context.Context) bool {
 }
 
 func publicGetNodesInformation(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
+	log.Println("[DEBUG_ORDER] publicGetNodesInformation was called!")
 	clientList, err := clients.GetAllClientBasicInfo()
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to retrieve client information: "+err.Error(), nil)

@@ -237,7 +237,7 @@ func GetClientTokenByUUID(uuid string) (token string, err error) {
 
 func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	db := dbcore.GetDBInstance()
-	err = db.Order("weight DESC, created_at ASC").Find(&clients).Error
+	err = db.Order("weight ASC, created_at ASC").Find(&clients).Error
 	if err != nil {
 		return nil, err
 	}
