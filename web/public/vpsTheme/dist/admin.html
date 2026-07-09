@@ -252,7 +252,7 @@ async function pingPage(){
   h+='<div class="card"><table><thead><tr><th>ID</th><th>名称</th><th>目标</th><th>类型</th><th>间隔(s)</th><th>节点数</th><th>新节点自动</th><th>操作</th></tr></thead><tbody>';
   for(var i=0;i<tasks.length;i++){
     var t=tasks[i];
-    h+='<tr><td>'+t.id+'</td><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td>'+(t.clients||[]).length+'</td><td><span class="badge '+(t.default_on?"badge-green":"badge-yellow")+'">'+(t.default_on?"是":"否")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
+    h+='<tr><td>'+t.id+'</td><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td>'+((t.clients||[]).length>0?(t.clients||[]).length:(t.default_on?'全部':'0'))+'</td>'<td><span class="badge '+(t.default_on?"badge-green":"badge-yellow")+'">'+(t.default_on?"是":"否")+'</span></td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
   }
   h+='</tbody></table></div>';return h;
 }
