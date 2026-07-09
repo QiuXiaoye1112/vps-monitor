@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/komari-monitor/komari/database/models"
 	"github.com/komari-monitor/komari/pkg/config"
 )
+
+var startTimeUnix = time.Now().Unix()
 
 //go:embed defaultTheme vpsTheme
 var PublicFS embed.FS
@@ -92,13 +95,23 @@ func hasValidSession(c *gin.Context) bool {
 	return !time.Now().After(session.Expires.ToTime())
 }
 
+func getFaviconTimestamp() string {
+	localFavicon := filepath.Join(DataDir, FaviconFile)
+	if info, err := os.Stat(localFavicon); err == nil {
+		return strconv.FormatInt(info.ModTime().Unix(), 10)
+	}
+	return strconv.FormatInt(startTimeUnix, 10)
+}
+
 func serveLoginPage(c *gin.Context, siteName string) {
 	escapedSiteName := html.EscapeString(siteName)
+	favTimestamp := getFaviconTimestamp()
 	page := `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="/favicon.ico?t=` + favTimestamp + `" />
   <title>` + escapedSiteName + `</title>
   <style>
     :root {
@@ -414,7 +427,15 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 		if strings.HasPrefix(reqPath, "/admin") && hasValidSession(c) {
 			if reqPath != "/admin" { c.Redirect(http.StatusFound, "/admin"); return }
 			adminHTML, _, exists := getFileContent(VpsTheme, path.Join(DistDir, "admin.html"))
-			if exists { c.Header("Cache-Control", "no-store"); c.Data(http.StatusOK, "text/html; charset=utf-8", adminHTML); return }
+			if exists {
+				c.Header("Cache-Control", "no-store")
+				adminHTMLStr := string(adminHTML)
+				favTimestamp := getFaviconTimestamp()
+				adminHTMLStr = strings.ReplaceAll(adminHTMLStr, `href="/favicon.ico"`, `href="/favicon.ico?t=`+favTimestamp+`"`)
+				adminHTMLStr = strings.ReplaceAll(adminHTMLStr, `href="favicon.ico"`, `href="/favicon.ico?t=`+favTimestamp+`"`)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(adminHTMLStr))
+				return
+			}
 		}
 
 		// 获取 dist/index.html (相对于主题根目录)
@@ -427,6 +448,9 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 		}
 
 		htmlStr := string(content)
+		favTimestamp := getFaviconTimestamp()
+		htmlStr = strings.ReplaceAll(htmlStr, `href="/favicon.ico"`, `href="/favicon.ico?t=`+favTimestamp+`"`)
+		htmlStr = strings.ReplaceAll(htmlStr, `href="favicon.ico"`, `href="/favicon.ico?t=`+favTimestamp+`"`)
 		if language, err := c.Cookie(LanguageCookieName); err == nil {
 			htmlStr = replaceHTMLLanguage(htmlStr, language)
 		}
@@ -486,6 +510,7 @@ self.addEventListener('activate', (event) => {
 
 	// 1. Favicon 优先策略
 	r.GET("/favicon.ico", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
 		// 优先：./data/favicon.ico
 		localFavicon := filepath.Join(DataDir, FaviconFile)
 		if _, err := os.Stat(localFavicon); err == nil {

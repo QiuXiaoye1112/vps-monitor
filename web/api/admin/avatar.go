@@ -112,5 +112,9 @@ func UploadAvatar(c *gin.Context) {
 		return
 	}
 
+	// 同步更新网站图标
+	src, _ := os.ReadFile(avatarPath)
+	if src != nil { os.WriteFile("./data/favicon.ico", src, 0644) }
+
 	api.RespondSuccessMessage(c, "头像已更新", gin.H{"path": "/images/ethan-avatar.png"})
 }

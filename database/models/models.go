@@ -41,6 +41,7 @@ type Client struct {
 	TrafficResetDay  int       `json:"traffic_reset_day" gorm:"type:int;default:1"`
 	TrafficResetHour int       `json:"traffic_reset_hour" gorm:"type:int;default:0"`
 	TrafficComp      int64     `json:"traffic_compensation" gorm:"column:traffic_compensation;type:bigint;default:0"`
+	TrafficCompResetAt LocalTime `json:"traffic_compensation_reset_at" gorm:"column:traffic_compensation_reset_at"`
 	CreatedAt        LocalTime `json:"created_at"`
 	UpdatedAt        LocalTime `json:"updated_at"`
 }

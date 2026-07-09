@@ -61,7 +61,28 @@ td{font-size:13px}
 .modal{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;width:min(540px,93vw);max-height:90vh;overflow-y:auto}
 .sec-title{color:var(--accent);font-size:13px;border-bottom:1px solid var(--border);padding-bottom:6px;margin:18px 0 10px}
 .sec-title:first-child{margin-top:0}
-@media(max-width:768px){body{flex-direction:column}.sidebar{width:100%;min-height:auto;position:static;flex-direction:row;overflow-x:auto;padding:8px}.sidebar h2{display:none}.nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;padding:6px 10px;font-size:12px}.nav-item.active{border-left:none;border-bottom-color:var(--accent)}.main{max-width:100%;padding:10px}.grid-2,.grid-3{grid-template-columns:1fr}.modal-grid{grid-template-columns:1fr}}
+@media(max-width:768px){
+body{flex-direction:column}
+.sidebar{width:100%;min-height:auto;position:sticky;top:0;z-index:10;flex-direction:row;overflow-x:auto;padding:2px 4px;gap:0;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+.sidebar h2{display:none}
+.nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;padding:6px 7px;font-size:10px;flex-shrink:0}
+.nav-item.active{border-left:none;border-bottom-color:var(--accent)}
+.main{max-width:100%;padding:8px}
+.grid-2,.grid-3{grid-template-columns:1fr;gap:8px}
+.modal-grid{grid-template-columns:1fr}
+.modal{width:96vw;padding:14px;margin:8px}
+.card{padding:12px;margin-bottom:8px}
+table{display:block;overflow-x:auto;white-space:nowrap}
+th,td{padding:6px 8px;font-size:11px}
+.btn{padding:6px 10px;font-size:11px}
+.btn-sm{padding:4px 8px;font-size:10px}
+.btn-xs{padding:2px 6px;font-size:9px}
+input,select,textarea{padding:8px;font-size:12px}
+h2{font-size:16px}h3{font-size:14px}
+.stat .val{font-size:18px}
+.token-box{font-size:10px;word-break:break-all}
+.flex.gap-1{flex-wrap:wrap}
+}
 .draggable-row{cursor:grab;transition:background .15s}.draggable-row:active{cursor:grabbing}.draggable-row.drag-over{background:rgba(59,130,246,.15);border-top:2px solid var(--accent)}</style>
 </head>
 <body>
@@ -120,18 +141,16 @@ var NAV=[
   {id:"database",icon:"🗄",label:"数据库"},
   {id:"tasks",icon:"📝",label:"任务记录"},
   {id:"clipboard",icon:"📎",label:"剪贴板"},
-  {id:"backup",icon:"💾",label:"备份"}
+  {id:"backup",icon:"💾",label:"备份"},{id:"home",icon:"🏠",label:"前台首页",external:true},{id:"logout",icon:"🚪",label:"退出",action:"logout"}
 ];
 
 function buildSidebar(){
   var s=document.getElementById("sidebar");
   NAV.forEach(function(n){
     var el=H('<div class="nav-item" data-page="'+n.id+'"><span style="width:18px;text-align:center">'+n.icon+'</span>'+n.label+"</div>");
-    el.onclick=function(){navigate(n.id)};
+    if(n.external){el.onclick=function(){window.open('/','_blank')}}else if(n.action==='logout'){el.onclick=function(){logout()}}else{el.onclick=function(){navigate(n.id)}};
     s.appendChild(el);
   });
-  var b=H('<div style="margin-top:auto;padding:10px 16px;border-top:1px solid var(--border)"><a href="/" target="_blank" style="color:var(--muted);text-decoration:none;font-size:12px;display:block;padding:6px 0">🏠 前台首页</a><div style="color:var(--muted);cursor:pointer;font-size:12px;padding:6px 0" onclick="logout()">🚪 退出</div></div>');
-  s.appendChild(b);
 }
 
 function navigate(p){

@@ -235,7 +235,7 @@ func GetClientTokenByUUID(uuid string) (token string, err error) {
 
 func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	db := dbcore.GetDBInstance()
-	err = db.Order("weight ASC").Find(&clients).Error
+	err = db.Order("weight DESC, created_at ASC").Find(&clients).Error
 	if err != nil {
 		return nil, err
 	}
@@ -243,8 +243,8 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 }
 
 // ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将 traffic_compensation 清零。
-// 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 updated_at 早于该起始时间且
-// traffic_compensation != 0，则视为上一周期的补偿值，直接清零。
+// 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 traffic_compensation_reset_at
+// 早于该起始时间且 traffic_compensation != 0，则视为上一周期的补偿值，直接清零。
 func ResetTrafficCompensationForDueClients() {
 	db := dbcore.GetDBInstance()
 	allClients, err := GetAllClientBasicInfo()
@@ -258,12 +258,17 @@ func ResetTrafficCompensationForDueClients() {
 			continue
 		}
 		start := trafficResetStart(c, now)
-		// UpdatedAt 在上一周期内（早于本周期起点）=> 补偿值是上个周期遗留的，需清零
-		if c.UpdatedAt.ToTime().Before(start) {
+		// 如果上次更新或重置补偿的时间在当前周期开始之前，则认为该补偿属于旧周期，需清零
+		compResetTime := c.TrafficCompResetAt.ToTime()
+		if compResetTime.IsZero() {
+			compResetTime = c.CreatedAt.ToTime()
+		}
+		if compResetTime.Before(start) {
 			if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
 				Updates(map[string]interface{}{
-					"traffic_compensation": int64(0),
-					"updated_at":           now,
+					"traffic_compensation":          int64(0),
+					"traffic_compensation_reset_at": now,
+					"updated_at":                    now,
 				}).Error; err != nil {
 				log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
 			} else {
@@ -352,6 +357,10 @@ func SaveClient(updates map[string]interface{}) error {
 				return fmt.Errorf("traffic_compensation must be a valid int64 value, got %v", val)
 			}
 		}
+	}
+
+	if _, exists := updates["traffic_compensation"]; exists {
+		updates["traffic_compensation_reset_at"] = time.Now()
 	}
 
 	updates["updated_at"] = time.Now()
