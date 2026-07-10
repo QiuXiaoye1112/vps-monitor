@@ -486,9 +486,9 @@ async function editNode(uuid){
     '<div class="modal-grid"><div class="form-group"><label>权重</label><input name="weight" type="number" value="'+nw+'"></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" '+(nh?'':'selected')+'>否</option><option value="true" '+(nh?'selected':'')+'>是</option></select></div></div>'+
     '<h4 class="sec-title">流量</h4>'+
     '<div class="modal-grid"><div class="form-group"><label>启用月度流量重置</label><select name="traffic_reset_enabled"><option value="true" '+(nre?'selected':'')+'>开启</option><option value="false" '+(nre?'':'selected')+'>关闭</option></select></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="'+ntl+'"></div></div>'+
-    '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" '+(ntt==="sum"?"selected":"")+'>合计</option><option value="up" '+(ntt==="up"?"selected":"")+'>上行</option><option value="down" '+(ntt==="down"?"selected":"")+'>下行</option></select></div><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.001" value="'+ncomp+'"></div></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" '+(ntt==="sum"?"selected":"")+'>合计</option><option value="up" '+(ntt==="up"?"selected":"")+'>上行</option><option value="down" '+(ntt==="down"?"selected":"")+'>下行</option></select></div><div class="form-group"><label></label></div></div>'+
     '<div class="modal-grid"><div class="form-group"><label>重置日(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="'+nrd+'"></div><div class="form-group"><label>重置小时(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="'+nrh+'"></div></div>'+
-    '<p class="text-xs text-muted" style="margin:-2px 0 14px">流量补偿支持负数；进入新的流量重置周期后自动清零。</p>'+
+    '<div class="form-group"><label>流量补偿 (GB，支持负数，每月重置日自动清零)</label><input name="traffic_compensation" type="number" step="0.001" value="'+ncomp+'"></div>'+
     '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>');
   document.getElementById("ef"+id).onsubmit=async function(e){
     e.preventDefault();
@@ -698,7 +698,7 @@ var crb=_d.getElementById("clearRecordsBtn");
   if(crb)crb.onclick=async function(){await RPC("admin:clearRecords");toast("监控记录已清空")};
 
   var cab=_d.getElementById("clearAllRecordsBtn");
-  if(cab)cab.onclick=function(){var mid=uid();var htm='<p class="mb-3">确定要清空所有监控与 Ping 记录吗？此操作不可恢复。</p><div class="flex gap-2"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\x27'+mid+'\x27)">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="btn'+mid+'">确认清空</button></div>';openModal(mid,"清空全部记录",htm);_d.getElementById("btn"+mid).onclick=async function(){await RPC("admin:clearAllRecords");closeModal(mid);toast("全部记录已清空");navigate("database")}};
+  if(cab)cab.onclick=async function(){if(confirm("确定清空所有记录？此操作不可恢复！")){await RPC("admin:clearAllRecords");toast("全部记录已清空")}};
 
   var acb=_d.getElementById("addClipBtn");
   if(acb)acb.onclick=async function(){
