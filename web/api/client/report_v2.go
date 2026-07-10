@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -19,17 +20,40 @@ import (
 	"github.com/monitor-monitor/monitor/web/connection"
 )
 
+const (
+	maxV2CompressedBodySize   = 1 << 20
+	maxV2DecompressedBodySize = 4 << 20
+)
+
 func readMaybeCompressedBody(r *http.Request) ([]byte, error) {
 	defer r.Body.Close()
 	if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
-		zr, err := gzip.NewReader(r.Body)
+		compressed, err := io.ReadAll(io.LimitReader(r.Body, maxV2CompressedBodySize+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(compressed) > maxV2CompressedBodySize {
+			return nil, errors.New("compressed body too large")
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(compressed))
 		if err != nil {
 			return nil, err
 		}
 		defer zr.Close()
-		return io.ReadAll(zr)
+		return readLimitedV2Body(zr)
 	}
-	return io.ReadAll(r.Body)
+	return readLimitedV2Body(r.Body)
+}
+
+func readLimitedV2Body(r io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxV2DecompressedBodySize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxV2DecompressedBodySize {
+		return nil, errors.New("body too large")
+	}
+	return data, nil
 }
 
 func bindV2Params[T any](raw any, target *T) error {
@@ -161,6 +185,10 @@ func WebSocketV2RPC(c *gin.Context) {
 			}
 			return
 		}
+		if len(message) > maxV2DecompressedBodySize {
+			conn.WriteJSON(v2.Error(nil, -32700, "message too large", nil))
+			continue
+		}
 		message = bytes.TrimSpace(message)
 		var req v2.Request
 		if err := json.Unmarshal(message, &req); err != nil {
@@ -182,17 +210,13 @@ func pushQueuedV2Events(conn *connection.SafeConn, uuid string) bool {
 	if len(events) == 0 {
 		return true
 	}
-	ackIDs := make([]string, 0, len(events))
 	for _, event := range events {
-		payload := v2.Request{JSONRPC: v2.Version, Method: event.Method, Params: event.Params}
+		payload := v2.Request{JSONRPC: v2.Version, Method: event.Method, Params: event.Params, EventID: event.ID}
 		if err := conn.WriteJSON(payload); err != nil {
-			agent_runtime.AckV2Events(uuid, ackIDs)
 			log.Printf("failed to push queued v2 event %s to client %s: %v", event.ID, uuid, err)
 			return false
 		}
-		ackIDs = append(ackIDs, event.ID)
 	}
-	agent_runtime.AckV2Events(uuid, ackIDs)
 	return true
 }
 

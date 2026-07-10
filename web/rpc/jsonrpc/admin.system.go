@@ -136,7 +136,7 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 	for _, uuid := range params.Clients {
 		if client := agent_runtime.GetConnectedClients()[uuid]; client != nil {
 			onlineClients = append(onlineClients, uuid)
-		} else if agent_runtime.IsAgentOnline(uuid) {
+		} else if agent_runtime.IsAgentOnline(uuid) && agent_runtime.IsV2Client(uuid) {
 			queuedClients = append(queuedClients, uuid)
 		} else {
 			offlineClients = append(offlineClients, uuid)
@@ -159,7 +159,10 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 		}{Message: "exec", Command: params.Command, TaskId: taskId}
 		payload, _ := json.Marshal(legacy)
 		if agent_runtime.IsV2Client(uuid) {
-			payload, _ = json.Marshal(v2.Request{JSONRPC: v2.Version, Method: v2.MethodAgentExec, Params: v2.ExecParams{TaskID: taskId, Command: params.Command}})
+			if !agent_runtime.DispatchV2Event(uuid, v2.MethodAgentExec, v2.ExecParams{TaskID: taskId, Command: params.Command}) {
+				return nil, rpc.MakeError(rpc.InvalidParams, "Client does not support v2 events: "+uuid, nil)
+			}
+			continue
 		}
 		client := agent_runtime.GetConnectedClients()[uuid]
 		if client == nil {
@@ -170,7 +173,9 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 		}
 	}
 	for _, uuid := range queuedClients {
-		agent_runtime.DispatchV2Event(uuid, v2.MethodAgentExec, v2.ExecParams{TaskID: taskId, Command: params.Command})
+		if !agent_runtime.DispatchV2Event(uuid, v2.MethodAgentExec, v2.ExecParams{TaskID: taskId, Command: params.Command}) {
+			tasks.SaveTaskResult(taskId, uuid, "Client offline!", -1, models.FromTime(time.Now()))
+		}
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "REC, task id: "+taskId, "warn")

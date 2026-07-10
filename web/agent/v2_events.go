@@ -37,28 +37,24 @@ func getV2EventQueueLocked(uuid string) *v2EventQueue {
 }
 
 func DispatchV2Event(uuid, method string, params any) bool {
-	if conn := GetConnectedClients()[uuid]; conn != nil {
-		payload := v2.Request{JSONRPC: v2.Version, Method: method, Params: params}
-		if conn.WriteJSON(payload) == nil {
-			return true
-		}
-	}
 	if !IsV2Client(uuid) {
 		return false
 	}
-	EnqueueV2Event(uuid, method, params)
+	event := EnqueueV2Event(uuid, method, params)
+	if conn := GetConnectedClients()[uuid]; conn != nil {
+		_ = conn.WriteJSON(v2EventRequest(event))
+	}
 	return true
 }
 
 func DispatchPing(uuid string, legacy any, params v2.PingParams) bool {
 	if conn := GetConnectedClients()[uuid]; conn != nil {
-		payload := legacy
 		if IsV2Client(uuid) {
-			payload = v2.Request{JSONRPC: v2.Version, Method: v2.MethodAgentPing, Params: params}
-		}
-		if conn.WriteJSON(payload) == nil {
+			event := EnqueueV2Event(uuid, v2.MethodAgentPing, params)
+			_ = conn.WriteJSON(v2EventRequest(event))
 			return true
 		}
+		return conn.WriteJSON(legacy) == nil
 	}
 	if !IsV2Client(uuid) {
 		return false
@@ -68,10 +64,15 @@ func DispatchPing(uuid string, legacy any, params v2.PingParams) bool {
 }
 
 func IsAgentOnline(uuid string) bool {
-	if GetConnectedClients()[uuid] != nil {
+	mu.RLock()
+	defer mu.RUnlock()
+	if connectedClients[uuid] != nil {
 		return true
 	}
-	return IsV2Client(uuid)
+	if presence, ok := presenceOnly[uuid]; ok && presence.expire.After(time.Now()) {
+		return true
+	}
+	return false
 }
 
 func EnqueueV2Event(uuid, method string, params any) v2.Event {
@@ -109,6 +110,15 @@ func newV2EventID() string {
 		return hex.EncodeToString(b[:])
 	}
 	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+func v2EventRequest(event v2.Event) v2.Request {
+	return v2.Request{
+		JSONRPC: v2.Version,
+		Method:  event.Method,
+		Params:  event.Params,
+		EventID: event.ID,
+	}
 }
 
 func coalesceV2EventLocked(q *v2EventQueue, event v2.Event) {

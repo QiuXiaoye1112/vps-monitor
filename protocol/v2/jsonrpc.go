@@ -21,6 +21,7 @@ type Request struct {
 	Method  string `json:"method"`
 	Params  any    `json:"params,omitempty"`
 	ID      any    `json:"id,omitempty"`
+	EventID string `json:"event_id,omitempty"`
 }
 
 type Response struct {
