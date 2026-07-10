@@ -1,2 +1,5 @@
 dist/*
 defaultTheme/*
+!defaultTheme/
+!defaultTheme/dist/
+!defaultTheme/dist/index.html
