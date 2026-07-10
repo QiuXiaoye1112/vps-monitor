@@ -10,11 +10,11 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/komari-monitor/komari/cmd/flags"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/metricstore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/utils"
+	"github.com/monitor-monitor/monitor/cmd/flags"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/metricstore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/utils"
 )
 
 func DeleteAll() error {

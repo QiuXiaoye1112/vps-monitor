@@ -13,12 +13,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/komari-monitor/komari/database/clients"
-	v1 "github.com/komari-monitor/komari/protocol/v1"
-	agent_runtime "github.com/komari-monitor/komari/web/agent"
-	"github.com/komari-monitor/komari/web/api"
-	"github.com/komari-monitor/komari/web/connection"
-	report_cache "github.com/komari-monitor/komari/web/report"
+	"github.com/monitor-monitor/monitor/database/clients"
+	v1 "github.com/monitor-monitor/monitor/protocol/v1"
+	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
+	"github.com/monitor-monitor/monitor/web/api"
+	"github.com/monitor-monitor/monitor/web/connection"
+	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
 
 const (

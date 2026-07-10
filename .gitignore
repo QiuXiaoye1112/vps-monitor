@@ -10,7 +10,7 @@
 __debug*
 
 # local development data
-komari.db
+monitor.db
 /data
 /utils/geoip/data
 .vscode/
@@ -33,5 +33,5 @@ go.work.sum
 .env
 
 # build
-komari
+monitor
 .codex

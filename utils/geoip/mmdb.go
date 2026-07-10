@@ -10,7 +10,7 @@ import (
 	"path/filepath" // 新增导入，用于处理文件路径
 	"sync"
 
-	"github.com/komari-monitor/komari/database/auditlog"
+	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/oschwald/maxminddb-golang"
 )
 

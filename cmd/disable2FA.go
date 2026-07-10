@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 )

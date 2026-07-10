@@ -14,11 +14,11 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/web/api"
-	"github.com/komari-monitor/komari/web/public"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/web/api"
+	"github.com/monitor-monitor/monitor/web/public"
 )
 
 // UploadTheme 上传主题
@@ -71,7 +71,7 @@ func ListThemes(c *gin.Context) {
 	}
 
 	var themes []models.Theme
-	vpsTheme, err := public.PublicFS.ReadFile("vpsTheme/komari-theme.json")
+	vpsTheme, err := public.PublicFS.ReadFile("vpsTheme/monitor-theme.json")
 	if err == nil {
 		vt := models.Theme{}
 		err := json.Unmarshal(vpsTheme, &vt)
@@ -81,7 +81,7 @@ func ListThemes(c *gin.Context) {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			themeConfigPath := filepath.Join(dataDir, entry.Name(), "komari-theme.json")
+			themeConfigPath := filepath.Join(dataDir, entry.Name(), "monitor-theme.json")
 			if themeInfo, err := loadThemeConfig(themeConfigPath); err == nil {
 				themes = append(themes, themeInfo)
 			}
@@ -149,7 +149,7 @@ func SetTheme(c *gin.Context) {
 			return
 		}
 		themeDir := filepath.Join("./data/theme", themeName)
-		themeConfigPath := filepath.Join(themeDir, "komari-theme.json")
+		themeConfigPath := filepath.Join(themeDir, "monitor-theme.json")
 
 		if _, err := os.Stat(themeConfigPath); os.IsNotExist(err) {
 			api.RespondError(c, http.StatusNotFound, "主题不存在")
@@ -176,17 +176,17 @@ func extractAndValidateTheme(zipPath string) (models.Theme, error) {
 	}
 	defer r.Close()
 
-	// 查找komari-theme.json文件
+	// 查找monitor-theme.json文件
 	var themeConfigFile *zip.File
 	for _, f := range r.File {
-		if f.Name == "komari-theme.json" {
+		if f.Name == "monitor-theme.json" {
 			themeConfigFile = f
 			break
 		}
 	}
 
 	if themeConfigFile == nil {
-		return themeInfo, fmt.Errorf("主题配置文件 komari-theme.json 不存在")
+		return themeInfo, fmt.Errorf("主题配置文件 monitor-theme.json 不存在")
 	}
 
 	// 读取主题配置
@@ -496,7 +496,7 @@ func UpdateTheme(c *gin.Context) {
 
 	// 检查主题是否存在
 	themeDir := filepath.Join("./data/theme", req.Short)
-	themeConfigPath := filepath.Join(themeDir, "komari-theme.json")
+	themeConfigPath := filepath.Join(themeDir, "monitor-theme.json")
 
 	if _, err := os.Stat(themeConfigPath); os.IsNotExist(err) {
 		api.RespondError(c, http.StatusNotFound, "主题不存在")
@@ -632,7 +632,7 @@ func UpdateTheme(c *gin.Context) {
 	// 	updatedThemeInfo.URL = downloadURL
 
 	// 	// 更新主题配置文件
-	// 	updatedConfigPath := filepath.Join("./data/theme", updatedThemeInfo.Short, "komari-theme.json")
+	// 	updatedConfigPath := filepath.Join("./data/theme", updatedThemeInfo.Short, "monitor-theme.json")
 	// 	updatedConfigData, err := json.MarshalIndent(updatedThemeInfo, "", "  ")
 	// 	if err != nil {
 	// 		api.RespondError(c, http.StatusInternalServerError, "生成主题配置失败: "+err.Error())
@@ -648,7 +648,7 @@ func UpdateTheme(c *gin.Context) {
 	api.RespondSuccessMessage(c, "主题更新成功", updatedThemeInfo)
 }
 
-// peekThemeFromZip 仅从ZIP文件中读取komari-theme.json并解析主题信息
+// peekThemeFromZip 仅从ZIP文件中读取monitor-theme.json并解析主题信息
 // 不执行解压安装，用于preview模式
 func peekThemeFromZip(zipPath string) (models.Theme, error) {
 	var themeInfo models.Theme
@@ -661,14 +661,14 @@ func peekThemeFromZip(zipPath string) (models.Theme, error) {
 
 	var themeConfigFile *zip.File
 	for _, f := range r.File {
-		if f.Name == "komari-theme.json" {
+		if f.Name == "monitor-theme.json" {
 			themeConfigFile = f
 			break
 		}
 	}
 
 	if themeConfigFile == nil {
-		return themeInfo, fmt.Errorf("主题配置文件 komari-theme.json 不存在，不是合法的主题包")
+		return themeInfo, fmt.Errorf("主题配置文件 monitor-theme.json 不存在，不是合法的主题包")
 	}
 
 	rc, err := themeConfigFile.Open()
@@ -796,13 +796,21 @@ func ImportTheme(c *gin.Context) {
 
 func GetThemeSettings(c *gin.Context) {
 	theme := c.Query("theme")
-	if theme == "" { theme = "VPS" }
+	if theme == "" {
+		theme = "VPS"
+	}
 	db := dbcore.GetDBInstance()
-	var row struct { Data string `gorm:"column:data"` }
+	var row struct {
+		Data string `gorm:"column:data"`
+	}
 	db.Table("theme_configurations").Where("short = ?", theme).Select("data").Scan(&row)
 	var data map[string]any
-	if row.Data != "" { json.Unmarshal([]byte(row.Data), &data) }
-	if data == nil { data = map[string]any{} }
+	if row.Data != "" {
+		json.Unmarshal([]byte(row.Data), &data)
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
 	c.JSON(http.StatusOK, data)
 }
 
@@ -829,9 +837,15 @@ func UpdateThemeSettings(c *gin.Context) {
 	}
 	// 合并已有配置和新提交的配置
 	var existing map[string]any
-	if themeCfg.Data != "" { json.Unmarshal([]byte(themeCfg.Data), &existing) }
-	if existing == nil { existing = map[string]any{} }
-	for k, v := range req { existing[k] = v }
+	if themeCfg.Data != "" {
+		json.Unmarshal([]byte(themeCfg.Data), &existing)
+	}
+	if existing == nil {
+		existing = map[string]any{}
+	}
+	for k, v := range req {
+		existing[k] = v
+	}
 	merged, _ := json.Marshal(existing)
 	themeCfg.Data = string(merged)
 	if err := db.Save(&themeCfg).Error; err != nil {

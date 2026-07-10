@@ -16,7 +16,7 @@ import (
 	_ "image/png"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/web/api"
 )
 
 const avatarPath = "./data/avatar/ethan-avatar.png"
@@ -114,7 +114,9 @@ func UploadAvatar(c *gin.Context) {
 
 	// 同步更新网站图标
 	src, _ := os.ReadFile(avatarPath)
-	if src != nil { os.WriteFile("./data/favicon.ico", src, 0644) }
+	if src != nil {
+		os.WriteFile("./data/favicon.ico", src, 0644)
+	}
 
 	api.RespondSuccessMessage(c, "头像已更新", gin.H{"path": "/images/ethan-avatar.png"})
 }

@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/pkg/config"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/config"
 )
 
 var startTimeUnix = time.Now().Unix()
@@ -425,7 +425,10 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 			return
 		}
 		if strings.HasPrefix(reqPath, "/admin") && hasValidSession(c) {
-			if reqPath != "/admin" { c.Redirect(http.StatusFound, "/admin"); return }
+			if reqPath != "/admin" {
+				c.Redirect(http.StatusFound, "/admin")
+				return
+			}
 			adminHTML, _, exists := getFileContent(VpsTheme, path.Join(DistDir, "admin.html"))
 			if exists {
 				c.Header("Cache-Control", "no-store")
@@ -464,7 +467,7 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 
 		// 执行 HTML 内容替换
 		replacer := strings.NewReplacer(
-			"<title>Komari Monitor</title>", "<title>"+cfg[config.SitenameKey].(string)+"</title>",
+			"<title>Monitor Monitor</title>", "<title>"+cfg[config.SitenameKey].(string)+"</title>",
 			"A simple server monitor tool.", "VPS Monitor",
 		)
 

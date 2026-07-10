@@ -7,7 +7,7 @@ package rpc
 import (
 	"context"
 
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/database/models"
 )
 
 // ContextMeta 保存一次 RPC 调用可用的鉴权/身份元数据。

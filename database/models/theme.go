@@ -13,7 +13,7 @@ const (
 	ThemeConfigurationRedirect = "redirect"
 )
 
-// Theme represents a komari theme information
+// Theme represents a monitor theme information
 type Theme struct {
 	Name          string        `json:"name"`          // 主题名称
 	Short         string        `json:"short"`         // 短名称，用作文件夹名

@@ -11,28 +11,28 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/cmd/flags"
-	"github.com/komari-monitor/komari/pkg/corn"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/cmd/flags"
+	"github.com/monitor-monitor/monitor/pkg/corn"
+	"github.com/monitor-monitor/monitor/web/api"
 
-	"github.com/komari-monitor/komari/database"
-	"github.com/komari-monitor/komari/database/accounts"
-	"github.com/komari-monitor/komari/database/auditlog"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/metricstore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/database/records"
-	"github.com/komari-monitor/komari/database/tasks"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/utils"
-	"github.com/komari-monitor/komari/utils/cloudflared"
-	"github.com/komari-monitor/komari/utils/geoip"
-	logutil "github.com/komari-monitor/komari/utils/log"
-	"github.com/komari-monitor/komari/web/oauth"
-	report_cache "github.com/komari-monitor/komari/web/report"
-	"github.com/komari-monitor/komari/web/router"
-	"github.com/komari-monitor/komari/web/security"
+	"github.com/monitor-monitor/monitor/database"
+	"github.com/monitor-monitor/monitor/database/accounts"
+	"github.com/monitor-monitor/monitor/database/auditlog"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/metricstore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/database/records"
+	"github.com/monitor-monitor/monitor/database/tasks"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/utils"
+	"github.com/monitor-monitor/monitor/utils/cloudflared"
+	"github.com/monitor-monitor/monitor/utils/geoip"
+	logutil "github.com/monitor-monitor/monitor/utils/log"
+	"github.com/monitor-monitor/monitor/web/oauth"
+	report_cache "github.com/monitor-monitor/monitor/web/report"
+	"github.com/monitor-monitor/monitor/web/router"
+	"github.com/monitor-monitor/monitor/web/security"
 	"github.com/spf13/cobra"
 )
 
@@ -47,8 +47,8 @@ var ServerCmd = &cobra.Command{
 
 func init() {
 	// 从环境变量获取监听地址
-	listenAddr := GetEnv("KOMARI_LISTEN", "0.0.0.0:25774")
-	ServerCmd.PersistentFlags().StringVarP(&flags.Listen, "listen", "l", listenAddr, "监听地址 [env: KOMARI_LISTEN]")
+	listenAddr := GetEnv("MONITOR_LISTEN", "0.0.0.0:25774")
+	ServerCmd.PersistentFlags().StringVarP(&flags.Listen, "listen", "l", listenAddr, "监听地址 [env: MONITOR_LISTEN]")
 	RootCmd.AddCommand(ServerCmd)
 }
 
@@ -94,7 +94,7 @@ func RunServer() {
 
 	})
 	// 初始化 cloudflared
-	if err := cloudflared.AutoStart(GetEnv("KOMARI_CLOUDFLARED_TOKEN", "")); err != nil {
+	if err := cloudflared.AutoStart(GetEnv("MONITOR_CLOUDFLARED_TOKEN", "")); err != nil {
 		log.Printf("failed to auto start cloudflared: %v", err)
 	}
 

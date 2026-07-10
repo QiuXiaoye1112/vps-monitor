@@ -1,6 +1,6 @@
 package v2
 
-import v1 "github.com/komari-monitor/komari/protocol/v1"
+import v1 "github.com/monitor-monitor/monitor/protocol/v1"
 
 const (
 	Version               = "2.0"

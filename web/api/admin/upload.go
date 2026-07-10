@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/web/api"
 )
 
 // 只有一个备份恢复操作在进行
@@ -70,14 +70,14 @@ func UploadBackup(c *gin.Context) {
 	if zr, err := zip.OpenReader(tempFilePath); err == nil {
 		hasMarkup := false
 		for _, f := range zr.File {
-			if f.Name == "komari-backup-markup" {
+			if f.Name == "monitor-backup-markup" {
 				hasMarkup = true
 				break
 			}
 		}
 		zr.Close()
 		if !hasMarkup {
-			api.RespondError(c, http.StatusBadRequest, "Invalid backup file: missing komari-backup-markup file")
+			api.RespondError(c, http.StatusBadRequest, "Invalid backup file: missing monitor-backup-markup file")
 			return
 		}
 	} else {

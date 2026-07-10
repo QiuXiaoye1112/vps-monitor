@@ -1,11 +1,11 @@
 package oauth
 
 import (
-	_ "github.com/komari-monitor/komari/web/oauth/cloudflare"
-	_ "github.com/komari-monitor/komari/web/oauth/factory"
-	_ "github.com/komari-monitor/komari/web/oauth/generic"
-	_ "github.com/komari-monitor/komari/web/oauth/github"
-	_ "github.com/komari-monitor/komari/web/oauth/qq"
+	_ "github.com/monitor-monitor/monitor/web/oauth/cloudflare"
+	_ "github.com/monitor-monitor/monitor/web/oauth/factory"
+	_ "github.com/monitor-monitor/monitor/web/oauth/generic"
+	_ "github.com/monitor-monitor/monitor/web/oauth/github"
+	_ "github.com/monitor-monitor/monitor/web/oauth/qq"
 )
 
 func All() {

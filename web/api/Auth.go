@@ -8,10 +8,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/accounts"
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/pkg/rpc"
+	"github.com/monitor-monitor/monitor/database/accounts"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/pkg/rpc"
 	"gorm.io/gorm"
 )
 

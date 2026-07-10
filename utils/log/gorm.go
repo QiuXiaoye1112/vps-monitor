@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	komari_utils "github.com/komari-monitor/komari/utils"
+	monitor_utils "github.com/monitor-monitor/monitor/utils"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
@@ -30,7 +30,7 @@ func NewGormLogger() *GormLogger {
 				return gormlogger.Info
 			}
 			return gormlogger.Silent
-		}(komari_utils.VersionHash),
+		}(monitor_utils.VersionHash),
 	}
 }
 

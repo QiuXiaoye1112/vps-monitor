@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/pkg/corn"
-	v2 "github.com/komari-monitor/komari/protocol/v2"
-	agent_runtime "github.com/komari-monitor/komari/web/agent"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/corn"
+	v2 "github.com/monitor-monitor/monitor/protocol/v2"
+	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 )
 
 // PingTaskManager 管理定时器和任务

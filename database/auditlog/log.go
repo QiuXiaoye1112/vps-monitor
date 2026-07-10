@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
 )
 
 func Log(ip, uuid, message, msgType string) {

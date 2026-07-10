@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/accounts"
-	"github.com/komari-monitor/komari/database/auditlog"
-	"github.com/komari-monitor/komari/utils/geoip"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/database/accounts"
+	"github.com/monitor-monitor/monitor/database/auditlog"
+	"github.com/monitor-monitor/monitor/utils/geoip"
+	"github.com/monitor-monitor/monitor/web/api"
 )
 
 // update.go

@@ -3,9 +3,9 @@ package records
 import (
 	"time"
 
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/metricstore"
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/metricstore"
+	"github.com/monitor-monitor/monitor/database/models"
 )
 
 type MonthlyTraffic struct {

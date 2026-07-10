@@ -19,20 +19,20 @@ RUN set -eux; \
     curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${cloudflared_arch}" -o /usr/local/bin/cloudflared; \
     chmod +x /usr/local/bin/cloudflared
 
-COPY komari-${TARGETOS}-${TARGETARCH} /app/komari
+COPY monitor-${TARGETOS}-${TARGETARCH} /app/monitor
 
-RUN chmod +x /app/komari
+RUN chmod +x /app/monitor
 
 ENV GIN_MODE=release
-ENV KOMARI_DB_TYPE=sqlite
-ENV KOMARI_DB_FILE=/app/data/komari.db
-ENV KOMARI_DB_HOST=localhost
-ENV KOMARI_DB_PORT=3306
-ENV KOMARI_DB_USER=root
-ENV KOMARI_DB_PASS=
-ENV KOMARI_DB_NAME=komari
-ENV KOMARI_LISTEN=0.0.0.0:25774
+ENV MONITOR_DB_TYPE=sqlite
+ENV MONITOR_DB_FILE=/app/data/monitor.db
+ENV MONITOR_DB_HOST=localhost
+ENV MONITOR_DB_PORT=3306
+ENV MONITOR_DB_USER=root
+ENV MONITOR_DB_PASS=
+ENV MONITOR_DB_NAME=monitor
+ENV MONITOR_LISTEN=0.0.0.0:25774
 
 EXPOSE 25774
 
-CMD ["/app/komari", "server"]
+CMD ["/app/monitor", "server"]

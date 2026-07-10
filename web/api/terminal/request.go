@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/utils"
-	agent_runtime "github.com/komari-monitor/komari/web/agent"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/utils"
+	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
+	"github.com/monitor-monitor/monitor/web/api"
 )
 
 func RequestTerminal(c *gin.Context) {

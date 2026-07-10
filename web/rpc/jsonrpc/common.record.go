@@ -7,11 +7,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/database/models"
-	recordsdb "github.com/komari-monitor/komari/database/records"
-	"github.com/komari-monitor/komari/database/tasks"
-	"github.com/komari-monitor/komari/pkg/rpc"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/database/models"
+	recordsdb "github.com/monitor-monitor/monitor/database/records"
+	"github.com/monitor-monitor/monitor/database/tasks"
+	"github.com/monitor-monitor/monitor/pkg/rpc"
 )
 
 func init() {
@@ -512,7 +512,6 @@ func getLoadRecordsCombined(uuid string, start, end time.Time) ([]models.Record,
 	// 所有客户端：统一通过 records 包查询，启用 metric store 时自动走 metric store
 	return recordsdb.GetRecordsByTime(start, end)
 }
-
 
 // ---------- downsampling helpers ----------
 

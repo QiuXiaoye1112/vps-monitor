@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/accounts"
+	"github.com/monitor-monitor/monitor/database/accounts"
 )
 
 func RequireSensitive2FA() gin.HandlerFunc {

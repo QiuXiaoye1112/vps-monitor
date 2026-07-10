@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	v1 "github.com/komari-monitor/komari/protocol/v1"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	v1 "github.com/monitor-monitor/monitor/protocol/v1"
 )
 
 func GetClientUUIDByToken(token string) (clientUUID string, err error) {

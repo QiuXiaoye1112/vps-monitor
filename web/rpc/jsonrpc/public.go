@@ -6,15 +6,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/komari-monitor/komari/database"
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/database/records"
-	"github.com/komari-monitor/komari/database/tasks"
-	"github.com/komari-monitor/komari/pkg/rpc"
-	"github.com/komari-monitor/komari/utils"
-	report_cache "github.com/komari-monitor/komari/web/report"
+	"github.com/monitor-monitor/monitor/database"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/database/records"
+	"github.com/monitor-monitor/monitor/database/tasks"
+	"github.com/monitor-monitor/monitor/pkg/rpc"
+	"github.com/monitor-monitor/monitor/utils"
+	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
 
 // public.go
@@ -71,34 +71,34 @@ func publicClientInfo(node models.Client) map[string]any {
 		resetDay = 0
 	}
 	return map[string]any{
-		"uuid":                 node.UUID,
-		"name":                 node.Name,
-		"cpu_name":             node.CpuName,
-		"virtualization":       node.Virtualization,
-		"arch":                 node.Arch,
-		"cpu_cores":            node.CpuCores,
-		"cpu_physical_cores":   node.CpuPhysicalCores,
-		"os":                   node.OS,
-		"kernel_version":       node.KernelVersion,
-		"gpu_name":             node.GpuName,
-		"region":               node.Region,
-		"mem_total":            node.MemTotal,
-		"swap_total":           node.SwapTotal,
-		"disk_total":           node.DiskTotal,
-		"weight":               node.Weight,
-		"group":                node.Group,
-		"tags":                 node.Tags,
-		"hidden":               node.Hidden,
-		"traffic_limit":        node.TrafficLimit,
-		"traffic_limit_type":   node.TrafficLimitType,
-		"traffic_reset_day":    resetDay,
-		"traffic_reset_hour":   node.TrafficResetHour,
+		"uuid":                  node.UUID,
+		"name":                  node.Name,
+		"cpu_name":              node.CpuName,
+		"virtualization":        node.Virtualization,
+		"arch":                  node.Arch,
+		"cpu_cores":             node.CpuCores,
+		"cpu_physical_cores":    node.CpuPhysicalCores,
+		"os":                    node.OS,
+		"kernel_version":        node.KernelVersion,
+		"gpu_name":              node.GpuName,
+		"region":                node.Region,
+		"mem_total":             node.MemTotal,
+		"swap_total":            node.SwapTotal,
+		"disk_total":            node.DiskTotal,
+		"weight":                node.Weight,
+		"group":                 node.Group,
+		"tags":                  node.Tags,
+		"hidden":                node.Hidden,
+		"traffic_limit":         node.TrafficLimit,
+		"traffic_limit_type":    node.TrafficLimitType,
+		"traffic_reset_day":     resetDay,
+		"traffic_reset_hour":    node.TrafficResetHour,
 		"traffic_reset_enabled": node.TrafficResetEnabled,
-		"traffic_compensation": node.TrafficComp,
-		"created_at":           node.CreatedAt,
-		"updated_at":           node.UpdatedAt,
-		"ipv4":                 node.IPv4,
-		"ipv6":                 node.IPv6,
+		"traffic_compensation":  node.TrafficComp,
+		"created_at":            node.CreatedAt,
+		"updated_at":            node.UpdatedAt,
+		"ipv4":                  node.IPv4,
+		"ipv6":                  node.IPv6,
 	}
 }
 

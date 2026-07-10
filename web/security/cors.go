@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/pkg/config"
+	"github.com/monitor-monitor/monitor/pkg/config"
 )
 
 func CorsMiddleware(initialEnabled bool, initialAllowedOrigins string) gin.HandlerFunc {

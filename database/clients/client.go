@@ -7,10 +7,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/database/tasks"
-	"github.com/komari-monitor/komari/utils"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/database/tasks"
+	"github.com/monitor-monitor/monitor/utils"
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
@@ -326,7 +326,6 @@ func trafficResetStart(client models.Client, now time.Time) time.Time {
 	}
 	return thisReset
 }
-
 
 func SaveClient(updates map[string]interface{}) error {
 	db := dbcore.GetDBInstance()

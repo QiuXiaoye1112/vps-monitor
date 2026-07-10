@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/cmd/flags"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/web/api"
+	"github.com/monitor-monitor/monitor/cmd/flags"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/web/api"
 )
 
 // copyFile 复制单个文件到目标路径（会确保父目录存在）
@@ -106,7 +106,7 @@ func backupSQLiteTo(destDBPath string) error {
 // DownloadBackup 用于打包 ./data 目录及数据库文件为 zip 并通过 HTTP 下载
 func DownloadBackup(c *gin.Context) {
 	// 1) 创建临时目录
-	tempDir, err := os.MkdirTemp("", "komari-backup-*")
+	tempDir, err := os.MkdirTemp("", "monitor-backup-*")
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, fmt.Sprintf("Error creating temporary directory: %v", err))
 		return
@@ -119,8 +119,8 @@ func DownloadBackup(c *gin.Context) {
 		return
 	}
 
-	// 3) 处理数据库备份 -> 临时目录/komari.db
-	destDB := filepath.Join(tempDir, "komari.db")
+	// 3) 处理数据库备份 -> 临时目录/monitor.db
+	destDB := filepath.Join(tempDir, "monitor.db")
 	dbFilePath := flags.DatabaseFile
 
 	if flags.IsSQLite() {
@@ -129,7 +129,7 @@ func DownloadBackup(c *gin.Context) {
 			return
 		}
 	} else if dbFilePath != "" {
-		// 非 sqlite 的情况：若配置了文件路径且存在，则直接复制（按用户需求仍然将名称固定为 komari.db）
+		// 非 sqlite 的情况：若配置了文件路径且存在，则直接复制（按用户需求仍然将名称固定为 monitor.db）
 		if _, err := os.Stat(dbFilePath); err == nil {
 			if err := copyFile(dbFilePath, destDB); err != nil {
 				api.RespondError(c, http.StatusInternalServerError, fmt.Sprintf("Error copying database file: %v", err))
@@ -193,9 +193,9 @@ func DownloadBackup(c *gin.Context) {
 	}
 
 	// 5) 追加备份标记文件（放在 zip 根目录）
-	markupContent := "此文件为 Komari 备份标记文件，请勿删除。\nThis is a Komari backup markup file, please do not delete.\n\n备份时间 / Backup Time: " + time.Now().Format(time.RFC3339)
+	markupContent := "此文件为 Monitor 备份标记文件，请勿删除。\nThis is a Monitor backup markup file, please do not delete.\n\n备份时间 / Backup Time: " + time.Now().Format(time.RFC3339)
 	markupWriter, err := zipWriter.CreateHeader(&zip.FileHeader{
-		Name:     "komari-backup-markup",
+		Name:     "monitor-backup-markup",
 		Method:   zip.Deflate,
 		Modified: time.Now(),
 	})

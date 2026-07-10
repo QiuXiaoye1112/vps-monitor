@@ -49,9 +49,9 @@ monitor-agent/                 # 被控节点 Agent（Go，独立项目）
 |------|------|------|
 | `monitoring/monitoring.go` | 删除 Load 采集 | 前端不显示系统负载 |
 | `server/basicInfo.go` | 删除 9 个字段 | cpu_name/cores/arch/kernel/ip/gpu/virtualization/version |
-| 全局 | Komari → Monitor | 所有文案/日志/二进制名改名 |
+| 全局 | Monitor → Monitor | 所有文案/日志/二进制名改名 |
 | `cmd/root.go` | 移除自动更新 | `update` 包不再导入调用 |
-| `go.mod` | `komari-agent` → `monitor-agent` | 模块名更改 |
+| `go.mod` | `monitor-agent` → `monitor-agent` | 模块名更改 |
 
 ### 数据库
 

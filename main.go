@@ -4,9 +4,9 @@ import (
 	"log"
 	"log/slog"
 
-	"github.com/komari-monitor/komari/cmd"
-	"github.com/komari-monitor/komari/utils"
-	logutil "github.com/komari-monitor/komari/utils/log"
+	"github.com/monitor-monitor/monitor/cmd"
+	"github.com/monitor-monitor/monitor/utils"
+	logutil "github.com/monitor-monitor/monitor/utils/log"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 		logutil.SetupGlobalLogger(slog.LevelInfo)
 	}
 
-	log.Printf("Komari Monitor %s (hash: %s)", utils.CurrentVersion, utils.VersionHash)
+	log.Printf("Monitor Monitor %s (hash: %s)", utils.CurrentVersion, utils.VersionHash)
 
 	cmd.Execute()
 }

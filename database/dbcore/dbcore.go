@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/komari-monitor/komari/cmd/flags"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/pkg/migrations"
-	logutil "github.com/komari-monitor/komari/utils/log"
+	"github.com/monitor-monitor/monitor/cmd/flags"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/pkg/migrations"
+	logutil "github.com/monitor-monitor/monitor/utils/log"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -172,7 +172,7 @@ var (
 
 func buildSQLiteDSN(databaseFile string) string {
 	if databaseFile == "" {
-		databaseFile = "./data/komari.db"
+		databaseFile = "./data/monitor.db"
 	}
 
 	params := "_busy_timeout=5000&_txlock=immediate&_journal_mode=WAL&_synchronous=NORMAL"
@@ -233,10 +233,10 @@ func GetDBInstance() *gorm.DB {
 					log.Printf("[restore] backup.zip removed")
 				}
 				// 8. 删除标记
-				if rmErr := os.Remove("./data/komari-backup-markup"); rmErr != nil {
-					log.Printf("[restore] failed to remove komari-backup-markup: %v", rmErr)
+				if rmErr := os.Remove("./data/monitor-backup-markup"); rmErr != nil {
+					log.Printf("[restore] failed to remove monitor-backup-markup: %v", rmErr)
 				} else {
-					log.Printf("[restore] komari-backup-markup removed")
+					log.Printf("[restore] monitor-backup-markup removed")
 				}
 			}
 		}()

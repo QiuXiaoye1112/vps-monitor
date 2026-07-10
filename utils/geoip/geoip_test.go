@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/komari-monitor/komari/utils/geoip"
+	"github.com/monitor-monitor/monitor/utils/geoip"
 )
 
 // 测试GeoIP数据库的初始化和更新功能

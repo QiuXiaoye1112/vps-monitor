@@ -3,11 +3,11 @@ package jsonrpc
 import (
 	"context"
 
-	"github.com/komari-monitor/komari/database/auditlog"
-	"github.com/komari-monitor/komari/database/clients"
-	"github.com/komari-monitor/komari/database/records"
-	"github.com/komari-monitor/komari/pkg/rpc"
-	agent_runtime "github.com/komari-monitor/komari/web/agent"
+	"github.com/monitor-monitor/monitor/database/auditlog"
+	"github.com/monitor-monitor/monitor/database/clients"
+	"github.com/monitor-monitor/monitor/database/records"
+	"github.com/monitor-monitor/monitor/pkg/rpc"
+	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 )
 
 // admin.client.go

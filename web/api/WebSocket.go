@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/web/security"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/web/security"
 )
 
 type WebSocketUpgradeOption func(*websocket.Upgrader)
@@ -37,7 +37,7 @@ func UpgradeWebSocket(c *gin.Context, options ...WebSocketUpgradeOption) (*webso
 
 func CheckWebSocketOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
-	if strings.EqualFold(os.Getenv("KOMARI_WS_DISABLE_ORIGIN"), "true") {
+	if strings.EqualFold(os.Getenv("MONITOR_WS_DISABLE_ORIGIN"), "true") {
 		return true
 	}
 	if security.IsAPIKeyRequest(r) {

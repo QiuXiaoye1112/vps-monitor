@@ -20,7 +20,7 @@ const (
 	InternalError  = -32603
 )
 
-// Komari 定义错误码
+// Monitor 定义错误码
 const (
 	NotFound         = -32044
 	AlreadyExists    = -32045

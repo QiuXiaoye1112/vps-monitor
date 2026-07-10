@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
-	"github.com/komari-monitor/komari/pkg/config"
-	"github.com/komari-monitor/komari/web/public"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/config"
+	"github.com/monitor-monitor/monitor/web/public"
 )
 
 func GetPublicInfo() (map[string]interface{}, error) {
@@ -75,14 +75,14 @@ func GetPublicInfo() (map[string]interface{}, error) {
 		log.Printf("%v", err)
 	}
 	// Try to load theme declaration file and merge defaults for managed configuration
-	// Theme declarations live in ./data/theme/<short>/komari-theme.json
+	// Theme declarations live in ./data/theme/<short>/monitor-theme.json
 	if cst.Theme != "" && cst.Theme != "default" {
 		var b []byte
 		var readErr error
 		if cst.Theme == public.VpsTheme {
-			b, readErr = public.PublicFS.ReadFile("vpsTheme/komari-theme.json")
+			b, readErr = public.PublicFS.ReadFile("vpsTheme/monitor-theme.json")
 		} else {
-			themeConfigPath := filepath.Join("./data/theme", cst.Theme, "komari-theme.json")
+			themeConfigPath := filepath.Join("./data/theme", cst.Theme, "monitor-theme.json")
 			if _, err := os.Stat(themeConfigPath); err == nil {
 				b, readErr = os.ReadFile(themeConfigPath)
 			}

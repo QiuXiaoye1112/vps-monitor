@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/database/models"
 )
 
 var uuid = "7901508c-304f-49aa-b84f-957c33ae6f8a"
@@ -345,7 +345,7 @@ func TestTrafficWindowEdgeCases(t *testing.T) {
 
 func TestTrafficResetSwitch(t *testing.T) {
 	loc := trafficLocation()
-	
+
 	// 测试 1: 开关开启
 	cEnabled := models.Client{
 		TrafficResetDay:     1,
@@ -367,5 +367,3 @@ func TestTrafficResetSwitch(t *testing.T) {
 	assert.True(t, startD.IsZero(), "Start window should be zero when reset is disabled")
 	assert.True(t, endD.After(now.AddDate(50, 0, 0)), "End window should be in the far future")
 }
-
-

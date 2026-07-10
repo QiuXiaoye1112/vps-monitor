@@ -3,10 +3,10 @@ package cmd
 import (
 	"os"
 
-	"github.com/komari-monitor/komari/cmd/flags"
-	"github.com/komari-monitor/komari/database/accounts"
-	"github.com/komari-monitor/komari/database/dbcore"
-	"github.com/komari-monitor/komari/database/models"
+	"github.com/monitor-monitor/monitor/cmd/flags"
+	"github.com/monitor-monitor/monitor/database/accounts"
+	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ var ChpasswdCmd = &cobra.Command{
 	Use:     "chpasswd",
 	Short:   "Force change password",
 	Long:    `Force change password`,
-	Example: `komari chpasswd -p <password>`,
+	Example: `monitor chpasswd -p <password>`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if NewPassword == "" {
 			cmd.Help()

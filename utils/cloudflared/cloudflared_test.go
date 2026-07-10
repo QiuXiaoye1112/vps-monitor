@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/komari-monitor/komari/utils/cloudflared"
+	"github.com/monitor-monitor/monitor/utils/cloudflared"
 )
 
 func TestStatusDoesNotExposeToken(t *testing.T) {
 	const token = "test-cloudflare-token"
-	t.Setenv("KOMARI_CLOUDFLARED_TOKEN", token)
+	t.Setenv("MONITOR_CLOUDFLARED_TOKEN", token)
 
 	status := cloudflared.Status()
 	if !status.EnvTokenPresent {
