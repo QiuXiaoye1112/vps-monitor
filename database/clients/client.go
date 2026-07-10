@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
@@ -142,40 +143,30 @@ func EditClientToken(clientUUID, token string) error {
 
 // CreateClient 创建新客户端
 func CreateClient() (clientUUID, token string, err error) {
-	db := dbcore.GetDBInstance()
-	token = utils.GenerateToken()
-	clientUUID = uuid.New().String()
-
-	client := models.Client{
-		UUID:                clientUUID,
-		Token:               token,
-		Name:                "client_" + clientUUID[0:8],
-		TrafficResetEnabled: true,
-		CreatedAt:           models.FromTime(time.Now()),
-		UpdatedAt:           models.FromTime(time.Now()),
-	}
-
-	err = db.Create(&client).Error
-	if err != nil {
-		return "", "", err
-	}
-	if err := tasks.AddDefaultOnClientUUID(clientUUID); err != nil {
-		log.Println("Failed to apply default-on ping tasks to new client:", err)
-	}
-	return clientUUID, token, nil
+	return createClient("", "")
 }
 
 func CreateClientWithName(name string) (clientUUID, token string, err error) {
-	if name == "" {
-		return CreateClient()
-	}
+	return createClient(name, "")
+}
+
+func CreateClientWithNameAndGroup(name, group string) (clientUUID, token string, err error) {
+	return createClient(name, group)
+}
+
+func createClient(name, group string) (clientUUID, token string, err error) {
 	db := dbcore.GetDBInstance()
 	token = utils.GenerateToken()
 	clientUUID = uuid.New().String()
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "client_" + clientUUID[0:8]
+	}
 	client := models.Client{
 		UUID:                clientUUID,
 		Token:               token,
 		Name:                name,
+		Group:               strings.TrimSpace(group),
 		TrafficResetEnabled: true,
 		CreatedAt:           models.FromTime(time.Now()),
 		UpdatedAt:           models.FromTime(time.Now()),

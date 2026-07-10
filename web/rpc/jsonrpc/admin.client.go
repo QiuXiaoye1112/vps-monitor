@@ -20,6 +20,7 @@ func init() {
 		Summary: "Create a new client",
 		Params: []rpc.ParamMeta{
 			{Name: "name", Type: "string", Required: false, Description: "Optional client name"},
+			{Name: "group", Type: "string", Required: false, Description: "Optional client group"},
 		},
 		Returns: "{ uuid: string, token: string }",
 	})
@@ -78,7 +79,8 @@ func auditActor(ctx context.Context) (uuid, ip string) {
 
 func adminAddClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
 	var params struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Group string `json:"group"`
 	}
 	req.BindParams(&params)
 
@@ -86,10 +88,10 @@ func adminAddClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Jso
 		uuid, token string
 		err         error
 	)
-	if params.Name == "" {
+	if params.Name == "" && params.Group == "" {
 		uuid, token, err = clients.CreateClient()
 	} else {
-		uuid, token, err = clients.CreateClientWithName(params.Name)
+		uuid, token, err = clients.CreateClientWithNameAndGroup(params.Name, params.Group)
 	}
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
