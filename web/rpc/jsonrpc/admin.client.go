@@ -2,6 +2,9 @@ package jsonrpc
 
 import (
 	"context"
+	"encoding/json"
+	"strconv"
+	"strings"
 
 	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/monitor-monitor/monitor/database/clients"
@@ -78,29 +81,120 @@ func auditActor(ctx context.Context) (uuid, ip string) {
 }
 
 func adminAddClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
-	var params struct {
-		Name  string `json:"name"`
-		Group string `json:"group"`
+	raw := map[string]interface{}{}
+	if err := req.BindParams(&raw); err != nil {
+		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid params", nil)
 	}
-	req.BindParams(&params)
+	name, _ := raw["name"].(string)
+	group, _ := raw["group"].(string)
 
 	var (
 		uuid, token string
 		err         error
 	)
-	if params.Name == "" && params.Group == "" {
+	if name == "" && group == "" {
 		uuid, token, err = clients.CreateClient()
 	} else {
-		uuid, token, err = clients.CreateClientWithNameAndGroup(params.Name, params.Group)
+		uuid, token, err = clients.CreateClientWithNameAndGroup(name, group)
 	}
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
-	if params.Name != "" {
+	update := clientCreateUpdateFromParams(uuid, raw)
+	if len(update) > 1 {
+		if err := clients.SaveClient(update); err != nil {
+			return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+		}
+	}
+	if name != "" {
 		actor, ip := auditActor(ctx)
 		auditlog.Log(ip, actor, "create client:"+uuid, "info")
 	}
 	return map[string]any{"uuid": uuid, "token": token}, nil
+}
+
+func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[string]interface{} {
+	update := map[string]interface{}{"uuid": uuid}
+	for _, key := range []string{
+		"name",
+		"group",
+		"weight",
+		"hidden",
+		"traffic_limit",
+		"traffic_limit_type",
+		"traffic_reset_day",
+		"traffic_reset_hour",
+		"traffic_compensation",
+		"traffic_reset_enabled",
+	} {
+		value, ok := raw[key]
+		if !ok {
+			continue
+		}
+		update[key] = normalizeClientCreateValue(key, value)
+	}
+	return update
+}
+
+func normalizeClientCreateValue(key string, value interface{}) interface{} {
+	switch key {
+	case "weight", "traffic_reset_day", "traffic_reset_hour":
+		if n, ok := asInt64(value); ok {
+			return int(n)
+		}
+	case "traffic_limit", "traffic_compensation":
+		if n, ok := asInt64(value); ok {
+			return n
+		}
+	}
+	return value
+}
+
+func asInt64(value interface{}) (int64, bool) {
+	switch v := value.(type) {
+	case int:
+		return int64(v), true
+	case int8:
+		return int64(v), true
+	case int16:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case uint:
+		return int64(v), true
+	case uint8:
+		return int64(v), true
+	case uint16:
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case uint64:
+		if v > uint64(^uint64(0)>>1) {
+			return 0, false
+		}
+		return int64(v), true
+	case float32:
+		return int64(v), true
+	case float64:
+		return int64(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err == nil {
+			return n, true
+		}
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return int64(f), true
+	case string:
+		n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {

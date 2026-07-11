@@ -210,6 +210,16 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping records", err.Error())
 		}
+
+		// 只保留当前仍启用、且作用域覆盖对应节点的任务记录。
+		// 否则关闭任务或调整作用域后，节点卡片和 Ping 图表会继续把旧任务记录算入平均延迟。
+		pingTasks, err := tasks.GetEnabledPingTasks()
+		if err != nil {
+			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks", err.Error())
+		}
+		scopedPingTasks := scopedPingTasksForRecords(pingTasks, taskId, params.UUID)
+		recs = filterPingRecordsByScopedTasks(recs, scopedPingTasks, params.UUID)
+
 		// hidden filter
 		if !isAdmin {
 			filtered := recs[:0]
@@ -296,20 +306,8 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		}
 
 		// tasks summary (always included for ping type; do not expose target field)
-		pingTasks, err := tasks.GetEnabledPingTasks()
-		if err != nil {
-			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks", err.Error())
-		}
-		toList := make([]map[string]any, 0, len(pingTasks))
-		for _, t := range pingTasks {
-			if taskId != -1 && t.Id != uint(taskId) {
-				continue
-			}
-			if params.UUID != "" { // ensure task assigned to specific client when filtering by uuid
-				if !t.AppliesToClient(params.UUID) {
-					continue
-				}
-			}
+		toList := make([]map[string]any, 0, len(scopedPingTasks))
+		for _, t := range scopedPingTasks {
 			total := 0
 			lossCount := 0
 			minLat := 0
@@ -511,6 +509,45 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 	default:
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid type, expected 'load' or 'ping'", params.Type)
 	}
+}
+
+func scopedPingTasksForRecords(pingTasks []models.PingTask, taskId int, uuid string) []models.PingTask {
+	scoped := make([]models.PingTask, 0, len(pingTasks))
+	for _, task := range pingTasks {
+		if taskId != -1 && task.Id != uint(taskId) {
+			continue
+		}
+		if uuid != "" && !task.AppliesToClient(uuid) {
+			continue
+		}
+		scoped = append(scoped, task)
+	}
+	return scoped
+}
+
+func filterPingRecordsByScopedTasks(recs []models.PingRecord, scopedTasks []models.PingTask, uuid string) []models.PingRecord {
+	if len(recs) == 0 || len(scopedTasks) == 0 {
+		return []models.PingRecord{}
+	}
+	taskByID := make(map[uint]models.PingTask, len(scopedTasks))
+	for _, task := range scopedTasks {
+		taskByID[task.Id] = task
+	}
+	filtered := make([]models.PingRecord, 0, len(recs))
+	for _, rec := range recs {
+		task, ok := taskByID[rec.TaskId]
+		if !ok {
+			continue
+		}
+		if uuid != "" && rec.Client != uuid {
+			continue
+		}
+		if !task.AppliesToClient(rec.Client) {
+			continue
+		}
+		filtered = append(filtered, rec)
+	}
+	return filtered
 }
 
 // ---------- helpers for load records ----------
