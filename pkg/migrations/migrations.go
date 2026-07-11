@@ -33,7 +33,7 @@ type legacyModelConfig struct {
 	CustomBody             string `json:"custom_body" gorm:"type:longtext"`
 	RecordEnabled          bool   `json:"record_enabled" gorm:"default:true"`
 	RecordPreserveTime     int    `json:"record_preserve_time" gorm:"default:720"`
-	PingRecordPreserveTime int    `json:"ping_record_preserve_time" gorm:"default:24"`
+	PingRecordPreserveTime int    `json:"ping_record_preserve_time" gorm:"default:168"`
 	CreatedAt              models.LocalTime
 	UpdatedAt              models.LocalTime
 }

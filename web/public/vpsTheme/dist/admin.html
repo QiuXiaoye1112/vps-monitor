@@ -49,6 +49,23 @@ textarea{resize:vertical;min-height:60px;font-family:monospace}
 .pb-green{background:var(--green)}.pb-yellow{background:var(--yellow)}.pb-red{background:var(--red)}.pb-blue{background:var(--accent)}
 .status-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
 .status-online{background:var(--green)}.status-offline{background:var(--red)}
+.switch{position:relative;display:inline-flex;align-items:center;width:38px;height:22px}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;cursor:pointer;inset:0;background:#334155;border:1px solid var(--border);border-radius:999px;transition:.15s}
+.switch span:before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s}
+.switch input:checked+span{background:var(--green);border-color:var(--green)}
+.switch input:checked+span:before{transform:translateX(16px)}
+.scope-box{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px;background:#0f172a;border:1px solid var(--border);border-radius:8px;max-height:160px;overflow:auto}
+.scope-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;background:rgba(255,255,255,.02)}
+.scope-item input{width:auto}
+.ping-table{table-layout:fixed}
+.ping-table th,.ping-table td{vertical-align:middle}
+.ping-table td{height:58px}
+.ping-name{font-weight:700;line-height:1.25}
+.ping-target{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;color:var(--text);line-height:1.35}
+.ping-type,.ping-interval,.ping-enabled,.ping-actions{white-space:nowrap}
+.ping-scope-badge{display:inline-flex;align-items:center;max-width:100%;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);color:var(--muted);font-size:12px;line-height:1.2}
+.ping-actions-wrap{display:flex;align-items:center;gap:8px}
 table{width:100%;border-collapse:collapse}
 th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--border)}
 th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
@@ -245,12 +262,17 @@ async function dashPage(){
 
 async function pingPage(){
   var tasks=await RPC("admin:getAllPingTasks")||[];
+  var nodes=await RPC("admin:listClients")||[];
+  var nodeNames={};
+  for(var ni=0;ni<nodes.length;ni++)nodeNames[nodes[ni].uuid]=nodes[ni].name||nodes[ni].uuid;
   var h='<div class="flex justify-between items-center mb-3"><h2>Ping 任务 ('+tasks.length+')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" style="color:var(--red)" id="clearPingBtn">清空记录</button><button class="btn btn-primary btn-sm" id="addPingBtn">+ 添加任务</button></div></div>';
   if(!tasks.length)return h+'<div class="card empty-state">暂无 Ping 任务</div>';
-  h+='<div class="card"><table><thead><tr><th>名称</th><th>目标</th><th>类型</th><th>间隔(s)</th><th>操作</th></tr></thead><tbody>';
+  h+='<div class="card"><table class="ping-table"><colgroup><col style="width:120px"><col><col style="width:80px"><col style="width:100px"><col style="width:130px"><col style="width:90px"><col style="width:150px"></colgroup><thead><tr><th>名称</th><th>目标</th><th>类型</th><th>间隔(S)</th><th>作用节点</th><th>启用</th><th>操作</th></tr></thead><tbody>';
   for(var i=0;i<tasks.length;i++){
     var t=tasks[i];
-    h+='<tr><td class="font-bold">'+E(t.name)+'</td><td>'+E(t.target)+'</td><td>'+E(t.type)+'</td><td>'+t.interval+'</td><td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></td></tr>';
+    var on=t.enabled!==false;
+    var scopeText=pingScopeText(t,nodeNames);
+    h+='<tr><td class="ping-name">'+E(t.name)+'</td><td class="ping-target" title="'+E(t.target)+'">'+E(t.target)+'</td><td class="ping-type">'+E(t.type)+'</td><td class="ping-interval">'+t.interval+'</td><td><span class="ping-scope-badge" title="'+E(scopeText)+'">'+E(scopeText)+'</span></td><td class="ping-enabled"><label class="switch" title="'+(on?"已启用":"已停用")+'"><input type="checkbox" '+(on?"checked":"")+' onchange="togglePing('+t.id+',this.checked)"><span></span></label></td><td class="ping-actions"><div class="ping-actions-wrap"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></div></td></tr>';
   }
   h+='</tbody></table></div>';return h;
 }
@@ -491,21 +513,74 @@ async function deleteNode(uuid){
   document.getElementById("btn"+id).onclick=async function(){await RPC("admin:removeClient",{uuid:uuid});closeModal(id);toast("已删除");navigate("dashboard")};
 }
 
+function pingDefaultOn(t){return !t||t.default_on!==false}
+function pingScopeText(t,nodeNames){
+  if(pingDefaultOn(t))return"全部节点";
+  var list=t.clients||[];
+  if(!list.length)return"未选择";
+  return list.map(function(uuid){return nodeNames[uuid]||uuid}).join("、");
+}
+function renderPingScope(nodes,t){
+  nodes=nodes||[];
+  var all=pingDefaultOn(t);
+  var selected={};
+  (t&&t.clients||[]).forEach(function(uuid){selected[uuid]=true});
+  var box='<div class="form-group"><label>作用节点</label><select name="scope" onchange="syncPingScope(this)"><option value="all" '+(all?"selected":"")+'>全部节点</option><option value="selected" '+(!all?"selected":"")+'>指定节点</option></select></div>';
+  box+='<div class="form-group ping-scope-nodes" style="'+(all?"display:none":"")+'"><label>选择节点</label>';
+  if(nodes.length){
+    box+='<div class="scope-box">';
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i], name=n.name||n.uuid;
+      box+='<label class="scope-item"><input type="checkbox" name="clients" value="'+E(n.uuid)+'" '+(selected[n.uuid]?"checked":"")+'> <span>'+E(name)+'</span></label>';
+    }
+    box+='</div>';
+  }else{
+    box+='<div class="text-sm text-muted">暂无节点，请先添加节点。</div>';
+  }
+  box+='</div>';
+  return box;
+}
+function syncPingScope(sel){
+  var form=sel&&sel.closest("form");
+  if(!form)return;
+  var box=form.querySelector(".ping-scope-nodes");
+  if(box)box.style.display=sel.value==="selected"?"":"none";
+}
+function collectPingScope(form){
+  var scope=form.querySelector('[name="scope"]');
+  if(!scope||scope.value==="all")return{default_on:true,clients:[]};
+  var clients=Array.from(form.querySelectorAll('input[name="clients"]:checked')).map(function(i){return i.value});
+  if(!clients.length){toast("请选择至少一个节点");return null}
+  return{default_on:false,clients:clients};
+}
+
 async function editPing(id){
   var tasks=await RPC("admin:getAllPingTasks");
+  var nodes=await RPC("admin:listClients")||[];
   var t=(tasks||[]).find(function(x){return x.id===id});
   if(!t)return;
   var mid=uid();
   openModal(mid,"编辑 Ping",
     '<form id="epf'+mid+'"><div class="form-group"><label>名称</label><input name="name" value="'+E(t.name||"")+'" required></div>'+
     '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" value="'+E(t.target||"")+'" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp" '+(t.type==="icmp"?"selected":"")+'>ICMP</option><option value="tcp" '+(t.type==="tcp"?"selected":"")+'>TCP</option><option value="http" '+(t.type==="http"?"selected":"")+'>HTTP</option></select></div></div>'+
-    '<div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="'+(t.interval||60)+'" required></div>'+
+    '<div class="modal-grid"><div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="'+(t.interval||60)+'" required></div><div class="form-group"><label>启用</label><select name="enabled"><option value="true" '+(t.enabled!==false?"selected":"")+'>开启</option><option value="false" '+(t.enabled===false?"selected":"")+'>关闭</option></select></div></div>'+
+    renderPingScope(nodes,t)+
     '<button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>');
   document.getElementById("epf"+mid).onsubmit=async function(e){
     e.preventDefault();var f=new FormData(e.target);
-    await RPC("admin:editPingTask",{tasks:[{id:id,name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:[],default_on:true}]});
+    var scope=collectPingScope(e.target);if(!scope)return;
+    await RPC("admin:editPingTask",{tasks:[{id:id,name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:scope.clients,default_on:scope.default_on,enabled:f.get("enabled")!=="false"}]});
     closeModal(mid);toast("已保存");navigate("ping");
   };
+}
+
+async function togglePing(id,enabled){
+  var tasks=await RPC("admin:getAllPingTasks");
+  var t=(tasks||[]).find(function(x){return x.id===id});
+  if(!t)return;
+  await RPC("admin:editPingTask",{tasks:[{id:id,name:t.name,target:t.target,type:t.type,interval:t.interval,clients:t.clients||[],default_on:t.default_on!==false,enabled:!!enabled}]});
+  toast(enabled?"已启用":"已停用");
+  navigate("ping");
 }
 
 async function deletePing(id){
@@ -604,14 +679,17 @@ function bindEvents(){
 var pbtn=_d.getElementById("addPingBtn");
   if(pbtn)pbtn.onclick=async function(){
     var id=uid();
+    var nodes=await RPC("admin:listClients")||[];
     openModal(id,"添加 Ping 任务",
       '<form id="apf'+id+'"><div class="form-group"><label>名称</label><input name="name" required></div>'+
       '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp">ICMP</option><option value="tcp">TCP</option><option value="http">HTTP</option></select></div></div>'+
-      '<div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="60" required></div>'+
+      '<div class="modal-grid"><div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="60" required></div><div class="form-group"><label>启用</label><select name="enabled"><option value="true" selected>开启</option><option value="false">关闭</option></select></div></div>'+
+      renderPingScope(nodes,{default_on:true,clients:[]})+
       '<button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>');
     _d.getElementById("apf"+id).onsubmit=async function(e){
       e.preventDefault();var f=new FormData(e.target);
-      await RPC("admin:addPingTask",{name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:[],default_on:true});
+      var scope=collectPingScope(e.target);if(!scope)return;
+      await RPC("admin:addPingTask",{name:f.get("name"),target:f.get("target"),type:f.get("type"),interval:parseInt(f.get("interval")),clients:scope.clients,default_on:scope.default_on,enabled:f.get("enabled")!=="false"});
       closeModal(id);toast("已创建");navigate("ping");
     };
   };

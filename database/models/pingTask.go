@@ -16,6 +16,7 @@ type PingTask struct {
 	Name      string      `json:"name" gorm:"type:varchar(255);not null;index"`
 	Clients   StringArray `json:"clients" gorm:"type:longtext"`
 	DefaultOn bool        `json:"default_on" gorm:"column:all_clients;not null;default:false"` // 新加入的服务器是否自动开启此监测；现有服务器不受此字段影响
+	Enabled   bool        `json:"enabled" gorm:"not null;default:true"`                        // 是否启用此监测任务
 	Type      string      `json:"type" gorm:"type:varchar(12);not null;default:'icmp'"`        // icmp tcp http
 	Target    string      `json:"target" gorm:"type:varchar(255);not null"`                    // Ping 目标地址
 	Interval  int         `json:"interval" gorm:"type:int;not null;default:60"`                // 间隔时间
@@ -23,6 +24,9 @@ type PingTask struct {
 
 // AppliesToClient 判断当前 PingTask 是否适用于指定服务器。
 func (task PingTask) AppliesToClient(uuid string) bool {
+	if !task.Enabled {
+		return false
+	}
 	if uuid == "" {
 		return false
 	}

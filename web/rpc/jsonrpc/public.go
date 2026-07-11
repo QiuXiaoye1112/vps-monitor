@@ -237,7 +237,7 @@ func publicGetRecordsByUUID(ctx context.Context, req *rpc.JsonRpcRequest) (any, 
 }
 
 func publicGetPublicPingTasks(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
-	pingTasks, err := tasks.GetAllPingTasks()
+	pingTasks, err := tasks.GetEnabledPingTasks()
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
@@ -368,6 +368,13 @@ func publicGetPingRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	if err != nil {
 		hoursInt = 4
 	}
+	if hoursInt <= 0 {
+		hoursInt = 4
+	}
+	maxPingHours := int(maxPingRecordWindow / time.Hour)
+	if hoursInt > maxPingHours {
+		hoursInt = maxPingHours
+	}
 	endTime := time.Now()
 	startTime := endTime.Add(-time.Duration(hoursInt) * time.Hour)
 
@@ -423,7 +430,7 @@ func publicGetPingRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	}
 
 	if params.UUID != "" || taskId != -1 {
-		pingTasks, err := tasks.GetAllPingTasks()
+		pingTasks, err := tasks.GetEnabledPingTasks()
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks: "+err.Error(), nil)
 		}

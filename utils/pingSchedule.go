@@ -33,6 +33,9 @@ func (m *PingTaskManager) Reload(pingTasks []models.PingTask) error {
 	// 按Interval分组任务
 	taskGroups := make(map[int][]models.PingTask)
 	for _, task := range pingTasks {
+		if !task.Enabled {
+			continue
+		}
 		if task.Interval <= 0 {
 			continue
 		}
@@ -57,6 +60,9 @@ func (m *PingTaskManager) Reload(pingTasks []models.PingTask) error {
 
 // executePingTask 执行单个PingTask
 func executePingTask(ctx context.Context, task models.PingTask) {
+	if !task.Enabled {
+		return
+	}
 	var message struct {
 		TaskID  uint   `json:"ping_task_id"`
 		Message string `json:"message"`
@@ -84,6 +90,9 @@ func executePingTask(ctx context.Context, task models.PingTask) {
 
 // targetPingClientUUIDs 根据任务配置计算本次调度需要下发的在线服务器列表。
 func targetPingClientUUIDs(task models.PingTask) []string {
+	if !task.Enabled {
+		return nil
+	}
 	if task.DefaultOn {
 		return agent_runtime.GetAllOnlineUUIDs()
 	}

@@ -175,7 +175,7 @@ func cleanupScheduledData() {
 	records.DeleteRecordBefore(time.Now().Add(-time.Hour * time.Duration(cfg.RecordPreserveTime)))
 	records.CompactRecord()
 	tasks.ClearTaskResultsByTimeBefore(time.Now().Add(-time.Hour * time.Duration(cfg.RecordPreserveTime)))
-	tasks.DeletePingRecordsBefore(time.Now().Add(-time.Hour * time.Duration(cfg.PingRecordPreserveTime)))
+	tasks.DeletePingRecordsBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultPingRecordPreserveTime)))
 	auditlog.RemoveOldLogs()
 	accounts.RemoveExpiredSessions()
 }

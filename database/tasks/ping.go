@@ -12,12 +12,13 @@ import (
 )
 
 // AddPingTask 创建延迟监测任务。defaultOn 表示新加入的服务器是否自动开启此监测。
-func AddPingTask(clients []string, defaultOn bool, name string, target, task_type string, interval int) (uint, error) {
+func AddPingTask(clients []string, defaultOn, enabled bool, name string, target, task_type string, interval int) (uint, error) {
 	db := dbcore.GetDBInstance()
 	normalizedClients := normalizePingClients(models.StringArray(clients))
 	task := models.PingTask{
 		Clients:   normalizedClients,
 		DefaultOn: defaultOn,
+		Enabled:   enabled,
 		Name:      name,
 		Type:      task_type,
 		Target:    target,
@@ -66,6 +67,7 @@ func EditPingTask(tasks []*models.PingTask) error {
 			"name":        task.Name,
 			"clients":     task.Clients,
 			"all_clients": task.DefaultOn,
+			"enabled":     task.Enabled,
 			"type":        task.Type,
 			"target":      task.Target,
 			"interval":    task.Interval,
@@ -100,10 +102,19 @@ func GetAllPingTasks() ([]models.PingTask, error) {
 func GetPingTasksByClient(uuid string) []models.PingTask {
 	db := dbcore.GetDBInstance()
 	var tasks []models.PingTask
-	if err := db.Where("all_clients = ? OR clients LIKE ?", true, `%"`+uuid+`"%`).Find(&tasks).Error; err != nil {
+	if err := db.Where("enabled = ? AND (all_clients = ? OR clients LIKE ?)", true, true, `%"`+uuid+`"%`).Find(&tasks).Error; err != nil {
 		return nil
 	}
 	return tasks
+}
+
+func GetEnabledPingTasks() ([]models.PingTask, error) {
+	db := dbcore.GetDBInstance()
+	var tasks []models.PingTask
+	if err := db.Where("enabled = ?", true).Order("weight ASC").Order("id ASC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
 func UpdatePingTaskOrder(order map[uint]int) error {
@@ -136,6 +147,9 @@ func SavePingRecord(record models.PingRecord) error {
 }
 
 func DeletePingRecordsBefore(time time.Time) error {
+	if metricstore.IsEnabled() {
+		return metricstore.DeletePingRecordsBefore(context.Background(), time)
+	}
 	db := dbcore.GetDBInstance()
 	err := db.Where("time < ?", time).Delete(&models.PingRecord{}).Error
 	return err
@@ -151,6 +165,9 @@ func DeletePingRecords(id []uint) error {
 }
 
 func DeleteAllPingRecords() error {
+	if metricstore.IsEnabled() {
+		return metricstore.DeleteAllPingRecords(context.Background())
+	}
 	db := dbcore.GetDBInstance()
 	result := db.Exec("DELETE FROM ping_records")
 	if result.RowsAffected == 0 {
@@ -161,7 +178,7 @@ func DeleteAllPingRecords() error {
 func ReloadPingSchedule() error {
 	db := dbcore.GetDBInstance()
 	var pingTasks []models.PingTask
-	if err := db.Find(&pingTasks).Error; err != nil {
+	if err := db.Where("enabled = ?", true).Find(&pingTasks).Error; err != nil {
 		return err
 	}
 	return utils.ReloadPingSchedule(pingTasks)

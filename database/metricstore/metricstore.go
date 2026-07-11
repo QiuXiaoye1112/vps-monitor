@@ -879,6 +879,26 @@ func GetPingRecords(ctx context.Context, clientUUID string, taskID int, start, e
 	return records, nil
 }
 
+// DeletePingRecordsBefore 删除指定时间之前的 Ping 记录。
+func DeletePingRecordsBefore(ctx context.Context, before time.Time) error {
+	s := GetStore()
+	if s == nil {
+		return fmt.Errorf("metric store not enabled")
+	}
+	_, err := s.DeleteBefore(ctx, MetricPingLatency, before)
+	return err
+}
+
+// DeleteAllPingRecords 删除所有 Ping 记录（保留指标定义）。
+func DeleteAllPingRecords(ctx context.Context) error {
+	s := GetStore()
+	if s == nil {
+		return fmt.Errorf("metric store not enabled")
+	}
+	_, err := s.DeleteBefore(ctx, MetricPingLatency, time.Now().Add(24*365*time.Hour))
+	return err
+}
+
 // DeleteAllRecords 删除所有记录（保留指标定义）
 func DeleteAllRecords(ctx context.Context) error {
 	s := GetStore()

@@ -50,7 +50,10 @@ func GetPublicInfo() (map[string]interface{}, error) {
 		cst.RecordPreserveTime = 720
 	}
 	if !hasKey("ping_record_preserve_time") {
-		cst.PingRecordPreserveTime = 24
+		cst.PingRecordPreserveTime = config.DefaultPingRecordPreserveTime
+	}
+	if cst.PingRecordPreserveTime < config.DefaultPingRecordPreserveTime {
+		cst.PingRecordPreserveTime = config.DefaultPingRecordPreserveTime
 	}
 
 	// Fallback defaults if we couldn't enumerate keys.

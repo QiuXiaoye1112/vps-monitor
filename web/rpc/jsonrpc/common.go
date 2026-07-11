@@ -384,7 +384,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	respMap := make(map[string]recordLike, len(latest))
 
 	// 预取所有 ping 任务
-	pingTasks, _ := tasks.GetAllPingTasks()
+	pingTasks, _ := tasks.GetEnabledPingTasks()
 
 	appendOne := func(uuid string, rep *v1.Report) {
 		if rep == nil {

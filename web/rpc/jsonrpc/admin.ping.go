@@ -43,6 +43,7 @@ func adminAddPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Jso
 	var params struct {
 		Clients   []string `json:"clients"`
 		DefaultOn bool     `json:"default_on"`
+		Enabled   *bool    `json:"enabled"`
 		Name      string   `json:"name"`
 		Target    string   `json:"target"`
 		TaskType  string   `json:"type"`
@@ -55,7 +56,11 @@ func adminAddPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Jso
 	if !params.DefaultOn && len(params.Clients) == 0 {
 		return nil, rpc.MakeError(rpc.InvalidParams, "clients is required when default_on is false", nil)
 	}
-	taskID, err := tasks.AddPingTask(params.Clients, params.DefaultOn, params.Name, params.Target, params.TaskType, params.Interval)
+	enabled := true
+	if params.Enabled != nil {
+		enabled = *params.Enabled
+	}
+	taskID, err := tasks.AddPingTask(params.Clients, params.DefaultOn, enabled, params.Name, params.Target, params.TaskType, params.Interval)
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
@@ -87,6 +92,12 @@ func adminEditPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	for _, task := range params.Tasks {
 		if task == nil {
 			return nil, rpc.MakeError(rpc.InvalidParams, "Invalid request data", nil)
+		}
+		if task.Name == "" || task.Target == "" || task.Type == "" || task.Interval == 0 {
+			return nil, rpc.MakeError(rpc.InvalidParams, "name, target, type and interval are required", nil)
+		}
+		if !task.DefaultOn && len(task.Clients) == 0 {
+			return nil, rpc.MakeError(rpc.InvalidParams, "clients is required when default_on is false", nil)
 		}
 	}
 	if err := tasks.EditPingTask(params.Tasks); err != nil {

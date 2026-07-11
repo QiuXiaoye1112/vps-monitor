@@ -14,8 +14,20 @@ import (
 	"github.com/monitor-monitor/monitor/pkg/rpc"
 )
 
+const maxPingRecordWindow = 7 * 24 * time.Hour
+
 func init() {
 	Register("getRecords", getRecords)
+}
+
+func clampPingRecordRange(start, end time.Time) (time.Time, time.Time) {
+	if end.IsZero() {
+		end = time.Now()
+	}
+	if start.IsZero() || end.Sub(start) > maxPingRecordWindow {
+		start = end.Add(-maxPingRecordWindow)
+	}
+	return start, end
 }
 
 func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
@@ -189,6 +201,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		}{Count: total, Records: grouped, From: models.FromTime(startTime), To: models.FromTime(endTime)}, nil
 
 	case "ping":
+		startTime, endTime = clampPingRecordRange(startTime, endTime)
 		taskId := params.TaskID
 		if taskId == 0 {
 			taskId = -1
@@ -283,7 +296,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		}
 
 		// tasks summary (always included for ping type; do not expose target field)
-		pingTasks, err := tasks.GetAllPingTasks()
+		pingTasks, err := tasks.GetEnabledPingTasks()
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks", err.Error())
 		}
