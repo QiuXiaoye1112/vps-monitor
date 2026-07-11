@@ -12,7 +12,6 @@
       { "name": "基础设置", "type": "title" },
       { "key": "themeMode", "name": "默认主题模式", "type": "select", "default": "beijing", "options": "beijing,light,dark", "help": "全站默认主题模式：beijing=按北京时间自动切换，light=默认浅色，dark=默认深色。" },
       { "key": "dataUpdateInterval", "name": "数据更新间隔", "type": "number", "default": 1, "help": "实时数据刷新间隔，单位：秒。" },
-      { "key": "rpcTransportMode", "name": "RPC 连接模式", "type": "select", "default": "http", "options": "http,websocket", "help": "HTTP 兼容性最好；确认反向代理支持 WebSocket 时可切换 websocket。" },
       { "key": "nodeCardSize", "name": "节点卡片尺寸", "type": "select", "default": "compact", "options": "compact,comfortable,large", "help": "首页节点卡片尺寸。" },
 
       { "name": "首页模块设置", "type": "title" },
@@ -22,8 +21,6 @@
       { "key": "hideGeneralCard", "name": "隐藏头部", "type": "switch", "default": false, "help": "隐藏地球和总览卡片。" },
       { "key": "generalCardKeys", "name": "自定义头部卡片", "type": "string", "default": "onlineNodes,totalTraffic,uploadSpeed,downloadSpeed", "help": "用英文逗号分隔 key，例如 onlineNodes,totalTraffic,uploadSpeed,downloadSpeed。" },
       { "key": "hideAdminEntryWhenLoggedOut", "name": "隐藏后台入口", "type": "switch", "default": false, "help": "未登录时隐藏顶部后台管理入口。" },
-      { "key": "disablePageAnimation", "name": "减弱过渡动画", "type": "switch", "default": true, "help": "减少页面过渡动画，提升响应速度。" },
-
       { "name": "自定义背景", "type": "title" },
       { "key": "backgroundEnabled", "name": "启用自定义背景", "type": "switch", "default": false, "help": "启用后可设置自定义图片或视频作为页面背景。" },
       { "key": "backgroundType", "name": "背景类型", "type": "select", "default": "image", "options": "image,video", "help": "选择背景类型：图片或视频。" },

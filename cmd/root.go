@@ -31,8 +31,7 @@ var (
 var RootCmd = &cobra.Command{
 	Use:   "Monitor",
 	Short: "Monitor is a simple server monitoring tool",
-	Long: `Monitor is a simple server monitoring tool.
-Made by Akizon77 with love.`,
+	Long:  `VPS Monitor is a simple server monitoring tool.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.SetArgs([]string{"server"})
 		cmd.Execute()

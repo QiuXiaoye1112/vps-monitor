@@ -15,7 +15,8 @@ import (
 
 func RequestTerminal(c *gin.Context) {
 	uuid := c.Param("uuid")
-	user_uuid, _ := c.Get("uuid")
+	userValue, _ := c.Get("uuid")
+	userUUID, _ := userValue.(string)
 	_, err := clients.GetClientByUUID(uuid)
 	if err != nil {
 		c.JSON(400, gin.H{
@@ -36,7 +37,7 @@ func RequestTerminal(c *gin.Context) {
 	// 新建一个终端连接
 	id := utils.GenerateRandomString(32)
 	session := &TerminalSession{
-		UserUUID:    user_uuid.(string),
+		UserUUID:    userUUID,
 		UUID:        uuid,
 		Browser:     conn,
 		Agent:       nil,
@@ -50,20 +51,20 @@ func RequestTerminal(c *gin.Context) {
 		log.Println("Terminal connection closed:", code, text)
 		TerminalSessionsMutex.Lock()
 		delete(TerminalSessions, id)
+		agent := session.Agent
 		TerminalSessionsMutex.Unlock()
 		// 通知 Agent 关闭终端连接
-		if session.Agent != nil {
-			session.Agent.Close()
+		if agent != nil {
+			agent.Close()
 		}
 		return nil
 	})
 
-	if agent_runtime.GetConnectedClients()[uuid] == nil {
+	agentConn := agent_runtime.GetConnectedClients()[uuid]
+	if agentConn == nil {
 		conn.WriteMessage(1, []byte("Client offline!\n被控端离线!\n"))
 		conn.Close()
-		TerminalSessionsMutex.Lock()
-		delete(TerminalSessions, id)
-		TerminalSessionsMutex.Unlock()
+		deleteTerminalSession(id)
 		return
 	}
 
@@ -75,21 +76,19 @@ func RequestTerminal(c *gin.Context) {
 		}
 	}
 
-	err = agent_runtime.GetConnectedClients()[uuid].WriteJSON(gin.H{
+	err = agentConn.WriteJSON(gin.H{
 		"message":    "terminal",
 		"request_id": id,
 	})
 	if err != nil {
 		conn.Close()
-		TerminalSessionsMutex.Lock()
-		delete(TerminalSessions, id)
-		TerminalSessionsMutex.Unlock()
+		deleteTerminalSession(id)
 		return
 	}
 	conn.WriteMessage(1, []byte("等待被控端连接 waiting for agent...\n"))
 	// 如果没有连接上，则关闭连接
 	waitForAgentConnection(conn, session, id)
-	//auditlog.Log(c.ClientIP(), user_uuid.(string), "request, terminal id:"+id+",client:"+session.UUID, "terminal")
+	//auditlog.Log(c.ClientIP(), userUUID, "request, terminal id:"+id+",client:"+session.UUID, "terminal")
 }
 
 func waitForAgentConnection(conn interface{ Close() error }, session *TerminalSession, id string) {

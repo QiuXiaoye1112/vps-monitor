@@ -16,7 +16,7 @@ func main() {
 		logutil.SetupGlobalLogger(slog.LevelInfo)
 	}
 
-	log.Printf("Monitor Monitor %s (hash: %s)", utils.CurrentVersion, utils.VersionHash)
+	log.Printf("VPS Monitor %s (hash: %s)", utils.CurrentVersion, utils.VersionHash)
 
 	cmd.Execute()
 }

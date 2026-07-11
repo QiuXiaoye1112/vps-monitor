@@ -25,6 +25,25 @@ import (
 	cache "github.com/patrickmn/go-cache"
 )
 
+func adjustedTrafficTotals(up, down, compensation int64) (int64, int64) {
+	half := compensation / 2
+	remainder := compensation % 2
+	adjustedUp := up + half + remainder
+	adjustedDown := down + half
+	if adjustedUp < 0 {
+		adjustedDown += adjustedUp
+		adjustedUp = 0
+	}
+	if adjustedDown < 0 {
+		adjustedUp += adjustedDown
+		adjustedDown = 0
+	}
+	if adjustedUp < 0 {
+		adjustedUp = 0
+	}
+	return adjustedUp, adjustedDown
+}
+
 // pingstats:<uuid>
 var pingStatsCache = cache.New(1*time.Minute, 2*time.Minute)
 
@@ -378,10 +397,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		if client, ok := clientByUUID[uuid]; ok {
 			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
 				monthly = mt
-				half := mt.Compensation / 2
-				rem := mt.Compensation % 2
-				monthlyUp = mt.Up + half + rem
-				monthlyDown = mt.Down + half
+				monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Compensation)
 			}
 		}
 		resetDay := clientByUUID[uuid].TrafficResetDay

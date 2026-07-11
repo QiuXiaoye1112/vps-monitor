@@ -9,7 +9,7 @@ import (
 
 func EstablishConnection(c *gin.Context) {
 	session_id := c.Query("id")
-	session, exists := TerminalSessions[session_id]
+	session, exists := getTerminalSession(session_id)
 	if !exists || session == nil || session.Browser == nil {
 		c.JSON(404, gin.H{"status": "error", "error": "Session not found"})
 		return
@@ -29,9 +29,17 @@ func EstablishConnection(c *gin.Context) {
 		TerminalSessionsMutex.Unlock()
 		return
 	}
+	TerminalSessionsMutex.Lock()
+	current, stillExists := TerminalSessions[session_id]
+	if !stillExists || current != session || session.Browser == nil {
+		TerminalSessionsMutex.Unlock()
+		conn.Close()
+		return
+	}
 	session.Agent = conn
+	TerminalSessionsMutex.Unlock()
 	conn.SetCloseHandler(func(code int, text string) error {
-		delete(TerminalSessions, session_id)
+		deleteTerminalSession(session_id)
 		// 通知 Browser 关闭终端连接
 		if session.Browser != nil {
 			session.Browser.Close()

@@ -112,3 +112,27 @@ func TestServeAvatar(t *testing.T) {
 		t.Fatalf("Expected body to match testContent")
 	}
 }
+
+func TestUnknownAPIAndStaticAssetReturn404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	Static(r.Group("/"), func(handlers ...gin.HandlerFunc) {
+		r.NoRoute(handlers...)
+	})
+
+	for _, requestPath := range []string{"/api/admin/task/all", "/assets/missing.js", "/styles/missing.css"} {
+		req := httptest.NewRequest(http.MethodGet, requestPath, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("GET %s returned %d, want 404", requestPath, w.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/instance/test-node", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("SPA route returned %d, want 200", w.Code)
+	}
+}

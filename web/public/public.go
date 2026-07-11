@@ -400,6 +400,10 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 	// 核心逻辑：渲染 Index.html
 	serveIndex := func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
+		if reqPath == "/api" || strings.HasPrefix(reqPath, "/api/") || reqPath == "/rpc2" {
+			c.Status(http.StatusNotFound)
+			return
+		}
 		cfg := getConfig()
 
 		if reqPath == "/admin/settings/theme" {
@@ -467,7 +471,7 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 
 		// 执行 HTML 内容替换
 		replacer := strings.NewReplacer(
-			"<title>Monitor Monitor</title>", "<title>"+cfg[config.SitenameKey].(string)+"</title>",
+			"<title>VPS Monitor</title>", "<title>"+cfg[config.SitenameKey].(string)+"</title>",
 			"A simple server monitor tool.", "VPS Monitor",
 		)
 
@@ -632,13 +636,12 @@ self.addEventListener('activate', (event) => {
 			return
 		}
 
-		// 如果资源不存在，且路径包含扩展名 (如 .js, .css, .png)，则返回 404
-		// 避免将 index.html 作为 js 文件返回导致 "Failed to fetch dynamically imported module"
-		//ext := filepath.Ext(reqPath)
-		//if ext != "" && ext != ".html" {
-		//	c.Status(http.StatusNotFound)
-		//	return
-		//}
+		// 缺失的静态资源必须返回 404，不能用 index.html 冒充脚本或样式。
+		ext := filepath.Ext(reqPath)
+		if ext != "" && ext != ".html" {
+			c.Status(http.StatusNotFound)
+			return
+		}
 
 		// 路由 (如 /dashboard, /settings) -> 返回 index.html
 		serveIndex(c)

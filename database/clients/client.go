@@ -232,11 +232,6 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(clients); i++ {
-		if !clients[i].TrafficResetEnabled {
-			clients[i].TrafficResetDay = 0
-		}
-	}
 	return clients, nil
 }
 
@@ -252,31 +247,32 @@ func ResetTrafficCompensationForDueClients() {
 	}
 	now := time.Now()
 	for _, c := range allClients {
-		if c.TrafficComp == 0 {
+		if !shouldResetTrafficCompensation(c, now) {
 			continue
 		}
-		if !c.TrafficResetEnabled {
-			continue
-		}
-		start := trafficResetStart(c, now)
-		// 如果上次更新或重置补偿的时间在当前周期开始之前，则认为该补偿属于旧周期，需清零
-		compResetTime := c.TrafficCompResetAt.ToTime()
-		if compResetTime.IsZero() {
-			compResetTime = c.CreatedAt.ToTime()
-		}
-		if compResetTime.Before(start) {
-			if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
-				Updates(map[string]interface{}{
-					"traffic_compensation":          int64(0),
-					"traffic_compensation_reset_at": now,
-					"updated_at":                    now,
-				}).Error; err != nil {
-				log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
-			} else {
-				log.Printf("[traffic_comp_reset] reset compensation for %s (was %d)", c.UUID, c.TrafficComp)
-			}
+		if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
+			Updates(map[string]interface{}{
+				"traffic_compensation":          int64(0),
+				"traffic_compensation_reset_at": now,
+				"updated_at":                    now,
+			}).Error; err != nil {
+			log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
+		} else {
+			log.Printf("[traffic_comp_reset] reset compensation for %s (was %d)", c.UUID, c.TrafficComp)
 		}
 	}
+}
+
+func shouldResetTrafficCompensation(client models.Client, now time.Time) bool {
+	if client.TrafficComp == 0 || !client.TrafficResetEnabled {
+		return false
+	}
+	start := trafficResetStart(client, now)
+	compResetTime := client.TrafficCompResetAt.ToTime()
+	if compResetTime.IsZero() {
+		compResetTime = client.CreatedAt.ToTime()
+	}
+	return compResetTime.Before(start)
 }
 
 // trafficResetStart 返回当前计费周期的起始时间（Asia/Shanghai 时区）。

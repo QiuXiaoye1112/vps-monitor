@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	TwoFactorIssuer = "Monitor Monitor"
+	TwoFactorIssuer = "VPS Monitor"
 )
 
 func Generate2Fa() (string, image.Image, error) {

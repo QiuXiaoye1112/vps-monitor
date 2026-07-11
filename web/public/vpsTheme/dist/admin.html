@@ -103,7 +103,7 @@ function H(s){var d=document.createElement("div");d.innerHTML=s;return d.firstEl
 function E(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 function B(v){if(!v||v===0)return"0 B";var u=["B","KB","MB","GB","TB"];var i=0;while(v>=1024&&i<u.length-1){v/=1024;i++}return v.toFixed(i>1?2:0)+" "+u[i]}
 function bps(v){return B(v)+"/s"}
-function ago(ts){if(!ts)return"-";var s=(Date.now()-new Date(ts).getTime())/1000;if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d"}
+function ago(ts){if(!ts)return"-";var ms=new Date(ts).getTime();if(!Number.isFinite(ms))return"-";var s=Math.max(0,(Date.now()-ms)/1000);if(s<5)return"刚刚";if(s<60)return Math.floor(s)+"s";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";return Math.floor(s/86400)+"d"}
 async function copy(txt){try{await navigator.clipboard.writeText(txt);toast("已复制")}catch(e){var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();toast("已复制")}}
 
 async function RPC(method,params){
@@ -141,7 +141,6 @@ var NAV=[
   {id:"account",icon:"👤",label:"账户"},
   {id:"sessions",icon:"🔑",label:"会话"},
   {id:"database",icon:"🗄",label:"数据库"},
-  {id:"tasks",icon:"📝",label:"任务记录"},
   {id:"clipboard",icon:"📎",label:"剪贴板"},
   {id:"backup",icon:"💾",label:"备份"},{id:"home",icon:"🏠",label:"前台首页",external:true},{id:"logout",icon:"🚪",label:"退出",action:"logout"}
 ];
@@ -206,7 +205,6 @@ async function render(){
       case"account":m.innerHTML=await accountPage();break;
       case"sessions":m.innerHTML=await sessionsPage();break;
       case"database":m.innerHTML=await databasePage();break;
-      case"tasks":m.innerHTML=await tasksPage();break;
       case"clipboard":m.innerHTML=await clipboardPage();break;
       case"backup":m.innerHTML=await backupPage();break;
     }
@@ -222,12 +220,11 @@ async function dashPage(){
   for(var i=0;i<nodes.length;i++){var s=liveData[nodes[i].uuid];if(s){nodes[i].online=s.online;nodes[i].cpu=s.cpu;nodes[i].ram=s.ram;nodes[i].disk=s.disk;nodes[i].net_out=s.network_up;nodes[i].net_in=s.network_down;nodes[i].net_total_up=s.total_up;nodes[i].net_total_down=s.total_down;nodes[i].uptime=s.uptime}}
   var online=nodes.filter(function(n){return n.online}).length;
   var size=await RPC("admin:getDatabaseSize")||{};
-  var tasks=await RPC("admin:getTasks")||[];
   var h='<div class="flex justify-between items-center mb-3"><h2>总览 ('+nodes.length+')</h2><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div><div class="grid-3 mb-4">';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+nodes.length+'</div><div class="text-xs text-muted mt-1">节点总数</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700;color:var(--green)">'+online+'</div><div class="text-xs text-muted mt-1">在线节点</div></div>';
   h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+B(size.size||0)+'</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
-  h+='<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">'+tasks.length+'</div><div class="text-xs text-muted mt-1">任务记录</div></div></div>';
+  h+='</div>';
   if(nodes.length){
     h+='<div class="card"><div class="flex justify-between items-center mb-3"><h3>节点列表</h3><span class="text-xs text-muted">拖动 ☰ 调整顺序</span></div><table><thead><tr><th style="width:32px"></th><th>名称</th><th>分组</th><th>状态</th><th>操作</th></tr></thead><tbody id="nodeTableBody">';
     for(var i=0;i<nodes.length;i++){
@@ -299,6 +296,7 @@ async function settingsPage(){
 async function themePage(){
   var r=await fetch("/api/admin/theme/settings?theme=VPS",{credentials:"include"});
   var s=r.ok?await r.json():{};
+  var defaults={themeMode:"beijing",dataUpdateInterval:1,nodeCardSize:"compact",stopEarth:false,earthRenderer:"cobe",hideEarth:false,hideGeneralCard:false,backgroundEnabled:false,backgroundType:"image",lightBackgroundUrl:"",darkBackgroundUrl:"",backgroundBlur:0,backgroundOverlay:0};
   var secs=[
     {title:"通用",fields:[
       {k:"themeMode",l:"默认主题模式",t:"select",o:["beijing","light","dark"],h:"beijing=按北京时间自动切换"},
@@ -326,7 +324,7 @@ async function themePage(){
     h+='<h4 class="sec-title">'+sec.title+'</h4>';
     for(var fi=0;fi<sec.fields.length;fi++){
       var f=sec.fields[fi];
-      var v=s[f.k]!==undefined?s[f.k]:"";
+      var v=s[f.k]!==undefined?s[f.k]:defaults[f.k];
       h+='<div class="form-group"><label>'+f.l+'</label>';
       if(f.t==="bool"){
         h+='<select name="'+f.k+'"><option value="true" '+(v===true?'selected':'')+'>开启</option><option value="false" '+(v===false?'selected':'')+'>关闭</option></select>';
@@ -387,18 +385,6 @@ async function logsPage(){
   return h;
 }
 function pageLogs(p){logsPage=p;navigate("logs")}
-
-async function tasksPage(){
-  var tasks=await RPC("admin:getTasks")||[];
-  var h='<h2 class="mb-3">任务记录 ('+tasks.length+')</h2>';
-  if(!tasks.length)return h+'<div class="card empty-state">暂无任务</div>';
-  h+='<div class="card"><table><thead><tr><th>ID</th><th>命令</th><th>创建时间</th></tr></thead><tbody>';
-  for(var i=0;i<Math.min(tasks.length,50);i++){
-    var t=tasks[i];
-    h+='<tr><td>'+(t.task_id||t.id)+'</td><td class="code" style="max-width:400px;overflow:hidden;text-overflow:ellipsis">'+E(t.command||"")+'</td><td>'+ago(t.created_at)+'</td></tr>';
-  }
-  h+='</tbody></table></div>';return h;
-}
 
 async function clipboardPage(){
   var items=await RPC("admin:listClipboard")||[];

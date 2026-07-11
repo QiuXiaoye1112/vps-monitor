@@ -162,7 +162,7 @@ show_banner() {
     fi
     clear
     echo "=============================================================="
-    echo "            Monitor Monitoring System Installer"
+    echo "                 VPS Monitor Installer"
     echo "       https://github.com/monitor-monitor/monitor"
     echo "=============================================================="
     echo
@@ -386,7 +386,7 @@ create_systemd_service() {
     local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
     cat > "$service_file" << EOF
 [Unit]
-Description=Monitor Monitor Service
+Description=VPS Monitor Service
 After=network.target
 
 [Service]
