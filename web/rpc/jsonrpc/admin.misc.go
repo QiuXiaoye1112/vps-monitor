@@ -166,6 +166,7 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 
 func adminClearPingRecords(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
 	tasks.DeleteAllPingRecords()
+	clearPingStatsCache()
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "clear ping records", "info")
 	return nil, nil
@@ -175,6 +176,7 @@ func adminClearAllRecords(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc
 
 	records.DeleteAll()
 	tasks.DeleteAllPingRecords()
+	clearPingStatsCache()
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "clear all records", "info")
 	return nil, nil

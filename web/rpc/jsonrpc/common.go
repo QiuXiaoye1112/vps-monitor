@@ -44,7 +44,7 @@ func adjustedTrafficTotals(up, down, compensation int64) (int64, int64) {
 	return adjustedUp, adjustedDown
 }
 
-// pingstats:<uuid>
+// pingstats:<uuid>:<enabled-scoped-task-ids>
 var pingStatsCache = cache.New(1*time.Minute, 2*time.Minute)
 
 type pingStat struct {
@@ -62,17 +62,11 @@ func getPingStatsForNode(uuid string, pingTasks []models.PingTask) map[string]pi
 	if uuid == "" {
 		return map[string]pingStat{}
 	}
-	key := fmt.Sprintf("pingstats:%s", uuid)
+	assigned := assignedPingTasksForNode(uuid, pingTasks)
+	key := pingStatsCacheKey(uuid, assigned)
 	if v, ok := pingStatsCache.Get(key); ok {
 		if m, ok2 := v.(map[string]pingStat); ok2 {
 			return m
-		}
-	}
-	// 筛选属于该节点的任务
-	assigned := make([]models.PingTask, 0, 4)
-	for _, t := range pingTasks {
-		if t.AppliesToClient(uuid) {
-			assigned = append(assigned, t)
 		}
 	}
 	if len(assigned) == 0 {
@@ -183,6 +177,32 @@ func getPingStatsForNode(uuid string, pingTasks []models.PingTask) map[string]pi
 	}
 	pingStatsCache.Set(key, result, cache.DefaultExpiration)
 	return result
+}
+
+func assignedPingTasksForNode(uuid string, pingTasks []models.PingTask) []models.PingTask {
+	if uuid == "" {
+		return nil
+	}
+	assigned := make([]models.PingTask, 0, len(pingTasks))
+	for _, t := range pingTasks {
+		if t.AppliesToClient(uuid) {
+			assigned = append(assigned, t)
+		}
+	}
+	return assigned
+}
+
+func pingStatsCacheKey(uuid string, assigned []models.PingTask) string {
+	taskIDs := make([]string, 0, len(assigned))
+	for _, t := range assigned {
+		taskIDs = append(taskIDs, fmt.Sprintf("%d", t.Id))
+	}
+	sort.Strings(taskIDs)
+	return fmt.Sprintf("pingstats:%s:%s", uuid, strings.Join(taskIDs, ","))
+}
+
+func clearPingStatsCache() {
+	pingStatsCache.Flush()
 }
 
 func init() {

@@ -64,6 +64,7 @@ func adminAddPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Jso
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	clearPingStatsCache()
 	return map[string]any{"task_id": taskID}, nil
 }
 
@@ -78,6 +79,7 @@ func adminDeletePingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	if err := tasks.DeletePingTask(params.ID); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	clearPingStatsCache()
 	return nil, nil
 }
 
@@ -103,6 +105,7 @@ func adminEditPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if err := tasks.EditPingTask(params.Tasks); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	clearPingStatsCache()
 	return nil, nil
 }
 
@@ -131,5 +134,6 @@ func adminOrderPingTask(_ context.Context, req *rpc.JsonRpcRequest) (any, *rpc.J
 	if err := tasks.UpdatePingTaskOrder(order); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	clearPingStatsCache()
 	return nil, nil
 }
