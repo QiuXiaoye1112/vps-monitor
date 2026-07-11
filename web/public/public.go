@@ -511,6 +511,8 @@ self.addEventListener('activate', (event) => {
 `))
 	})
 
+	r.GET("/terminal", serveTerminalPage)
+
 	// 1. Favicon 优先策略
 	r.GET("/favicon.ico", func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
