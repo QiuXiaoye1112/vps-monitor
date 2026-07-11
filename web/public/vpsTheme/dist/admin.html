@@ -303,16 +303,13 @@ async function themePage(){
     {title:"通用",fields:[
       {k:"themeMode",l:"默认主题模式",t:"select",o:["beijing","light","dark"],h:"beijing=按北京时间自动切换"},
       {k:"dataUpdateInterval",l:"数据更新间隔(秒)",t:"num"},
-      {k:"rpcTransportMode",l:"RPC 连接模式",t:"select",o:["http","websocket"],h:"HTTP兼容性最好;确认反代支持WS可切websocket"},
       {k:"nodeCardSize",l:"节点卡片尺寸",t:"select",o:["compact","comfortable","large"]}
     ]},
     {title:"首页模块",fields:[
       {k:"stopEarth",l:"停止地球旋转",t:"bool",h:"开启后地球不自动旋转，用户仍可手动拖拽"},
       {k:"earthRenderer",l:"地球样式",t:"select",o:["realistic","cobe","tiled"],h:"realistic=真实贴图 cobe=点阵 tiled=平铺"},
       {k:"hideEarth",l:"隐藏地球",t:"bool"},
-      {k:"hideGeneralCard",l:"隐藏头部总览卡片",t:"bool"},
-      
-      {k:"disablePageAnimation",l:"减弱过渡动画",t:"bool"}
+      {k:"hideGeneralCard",l:"隐藏头部总览卡片",t:"bool"}
     ]},
     {title:"自定义背景",fields:[
       {k:"backgroundEnabled",l:"启用自定义背景",t:"bool"},
