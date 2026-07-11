@@ -521,16 +521,7 @@ self.addEventListener('activate', (event) => {
 			return
 		}
 
-		// 其次：当前主题的 dist/favicon.ico 或 theme_root/favicon.ico ?
-		// 通常构建后的资源在 dist 中，这里假设优先找 dist 内的，如果你的 favicon 在根目录，去掉 DistDir 拼接即可
-		cfg := getConfig()
-		themeFaviconPath := path.Join(DistDir, FaviconFile)
-		content, mimeType, exists := getFileContent(cfg[config.ThemeKey].(string), themeFaviconPath)
-		if exists {
-			c.Data(http.StatusOK, mimeType, content)
-			return
-		}
-
+		// 没有自定义 favicon 时不再回退到主题默认图标，避免显示内置头像。
 		c.Status(http.StatusNotFound)
 	})
 
