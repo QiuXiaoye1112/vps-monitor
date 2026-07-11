@@ -27,7 +27,7 @@ func serveTerminalPage(c *gin.Context) {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>终端 - ` + escapedSiteName + `</title>
   <link rel="icon" href="/favicon.ico?t=` + favTimestamp + `" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <link rel="stylesheet" href="/terminal-assets/xterm.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -158,13 +158,13 @@ func serveTerminalPage(c *gin.Context) {
       <div id="terminal"></div>
       <div class="fallback" id="fallback">
         <strong>终端组件加载失败。</strong>
-        <p>请检查浏览器能否访问 xterm.js CDN，或返回后台重新打开终端。</p>
+        <p>请刷新页面，或返回后台重新打开终端。</p>
         <p><a href="/admin">返回后台</a></p>
       </div>
     </section>
   </main>
-  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="/terminal-assets/xterm.js"></script>
+  <script src="/terminal-assets/xterm-addon-fit.js"></script>
   <script>
     (function () {
       var params = new URLSearchParams(location.search);
@@ -210,6 +210,29 @@ func serveTerminalPage(c *gin.Context) {
         }
       }
 
+      async function getClientName() {
+        if (!uuid) return '';
+        try {
+          var response = await fetch('/api/rpc2', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'admin:getClient',
+              params: { uuid: uuid },
+              id: Date.now()
+            })
+          });
+          if (!response.ok) return '';
+          var payload = await response.json();
+          var client = payload && payload.result ? payload.result : null;
+          return client && client.name ? String(client.name) : '';
+        } catch (err) {
+          return '';
+        }
+      }
+
       function fit() {
         if (!fitAddon || !term) return;
         try {
@@ -236,69 +259,85 @@ func serveTerminalPage(c *gin.Context) {
       }
 
       async function start() {
-        uuidEl.textContent = uuid ? ('节点 UUID: ' + uuid) : '缺少节点 UUID';
-        if (!uuid) {
-          setStatus('缺少 UUID', 'bad');
-          return;
-        }
-        if (!window.Terminal || !window.FitAddon || !window.FitAddon.FitAddon) {
-          terminalEl.style.display = 'none';
-          fallbackEl.style.display = 'block';
-          setStatus('组件加载失败', 'bad');
-          return;
-        }
+        try {
+          uuidEl.textContent = uuid ? '节点：加载中...' : '缺少节点';
+          if (!uuid) {
+            setStatus('缺少节点', 'bad');
+            return;
+          }
+          var clientNamePromise = getClientName();
+          var TerminalCtor = globalThis.Terminal || self.Terminal || window.Terminal;
+          var FitAddonCtor = (globalThis.FitAddon && globalThis.FitAddon.FitAddon) ||
+            (self.FitAddon && self.FitAddon.FitAddon) ||
+            (window.FitAddon && window.FitAddon.FitAddon);
+          if (!TerminalCtor || !FitAddonCtor) {
+            terminalEl.style.display = 'none';
+            fallbackEl.style.display = 'block';
+            setStatus('组件加载失败', 'bad');
+            return;
+          }
 
-        var settings = await getTerminalSettings();
-        var options = Object.assign({
-          cursorBlink: true,
-          convertEol: true,
-          fontFamily: "'Cascadia Mono', 'Noto Sans SC', Menlo, Monaco, Consolas, monospace",
-          fontSize: 15,
-          scrollback: 5000,
-          macOptionIsMeta: true,
-          theme: {
+          var clientName = await clientNamePromise;
+          var displayName = clientName || uuid;
+          uuidEl.textContent = '节点：' + displayName;
+
+          var settings = await getTerminalSettings();
+          var defaultTheme = {
             foreground: '#e2e8f0',
             background: '#020617',
             cursor: '#22c55e',
             selectionBackground: '#334155'
-          }
-        }, settings.terminalOptions || {});
-        if (settings.terminalOptions && settings.terminalOptions.theme) {
-          options.theme = Object.assign(options.theme, settings.terminalOptions.theme);
+          };
+          var incomingOptions = Object.assign({}, settings.terminalOptions || {});
+          var incomingTheme = incomingOptions.theme;
+          delete incomingOptions.theme;
+          var options = Object.assign({
+            cursorBlink: true,
+            convertEol: true,
+            fontFamily: "'Cascadia Mono', 'Noto Sans SC', Menlo, Monaco, Consolas, monospace",
+            fontSize: 15,
+            scrollback: 5000,
+            macOptionIsMeta: true
+          }, incomingOptions);
+          options.theme = Object.assign({}, defaultTheme, incomingTheme || {});
+
+          term = new TerminalCtor(options);
+          fitAddon = new FitAddonCtor();
+          term.loadAddon(fitAddon);
+          term.open(terminalEl);
+          term.writeln('Connecting to ' + displayName + ' ...');
+          window.addEventListener('resize', fit);
+          setTimeout(fit, 0);
+
+          setStatus('连接中');
+          ws = new WebSocket(wsURL());
+          ws.binaryType = 'arraybuffer';
+          ws.onopen = function () {
+            setStatus('已连接', 'ok');
+            term.writeln('\r\nConnected. Waiting for agent...');
+            term.focus();
+            fit();
+          };
+          ws.onmessage = function (event) {
+            writeMessage(event.data);
+          };
+          ws.onerror = function () {
+            setStatus('连接错误', 'bad');
+          };
+          ws.onclose = function () {
+            setStatus('已断开', 'bad');
+            if (term) term.writeln('\r\n\r\n[connection closed]');
+          };
+          term.onData(function (data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'input', input: data }));
+            }
+          });
+        } catch (err) {
+          console.error(err);
+          setStatus('启动失败', 'bad');
+          if (term) term.writeln('\r\nTerminal startup failed: ' + (err && err.message ? err.message : err));
         }
-
-        term = new Terminal(options);
-        fitAddon = new FitAddon.FitAddon();
-        term.loadAddon(fitAddon);
-        term.open(terminalEl);
-        term.writeln('Connecting to ' + uuid + ' ...');
-        window.addEventListener('resize', fit);
-        setTimeout(fit, 0);
-
-        setStatus('连接中');
-        ws = new WebSocket(wsURL());
-        ws.binaryType = 'arraybuffer';
-        ws.onopen = function () {
-          setStatus('已连接', 'ok');
-          term.writeln('\r\nConnected. Waiting for agent...');
-          term.focus();
-          fit();
-        };
-        ws.onmessage = function (event) {
-          writeMessage(event.data);
-        };
-        ws.onerror = function () {
-          setStatus('连接错误', 'bad');
-        };
-        ws.onclose = function () {
-          setStatus('已断开', 'bad');
-          if (term) term.writeln('\r\n\r\n[connection closed]');
-        };
-        term.onData(function (data) {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(data);
-          }
-        });
       }
 
       start();

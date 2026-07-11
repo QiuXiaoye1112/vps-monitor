@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/monitor-monitor/monitor/database/clients"
+	v2 "github.com/monitor-monitor/monitor/protocol/v2"
 	"github.com/monitor-monitor/monitor/utils"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 	"github.com/monitor-monitor/monitor/web/api"
@@ -65,6 +66,15 @@ func RequestTerminal(c *gin.Context) {
 		TerminalSessionsMutex.Unlock()
 		return
 	}
+
+	if agent_runtime.IsV2Client(uuid) {
+		if agent_runtime.DispatchV2Event(uuid, v2.MethodAgentTerminal, v2.TerminalRequestParams{RequestID: id}) {
+			conn.WriteMessage(1, []byte("等待被控端连接 waiting for agent...\n"))
+			waitForAgentConnection(conn, session, id)
+			return
+		}
+	}
+
 	err = agent_runtime.GetConnectedClients()[uuid].WriteJSON(gin.H{
 		"message":    "terminal",
 		"request_id": id,
@@ -78,6 +88,11 @@ func RequestTerminal(c *gin.Context) {
 	}
 	conn.WriteMessage(1, []byte("等待被控端连接 waiting for agent...\n"))
 	// 如果没有连接上，则关闭连接
+	waitForAgentConnection(conn, session, id)
+	//auditlog.Log(c.ClientIP(), user_uuid.(string), "request, terminal id:"+id+",client:"+session.UUID, "terminal")
+}
+
+func waitForAgentConnection(conn interface{ Close() error }, session *TerminalSession, id string) {
 	time.AfterFunc(30*time.Second, func() {
 		TerminalSessionsMutex.Lock()
 		if session.Agent == nil {
@@ -90,5 +105,4 @@ func RequestTerminal(c *gin.Context) {
 		}
 		TerminalSessionsMutex.Unlock()
 	})
-	//auditlog.Log(c.ClientIP(), user_uuid.(string), "request, terminal id:"+id+",client:"+session.UUID, "terminal")
 }

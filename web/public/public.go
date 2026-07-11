@@ -21,7 +21,7 @@ import (
 
 var startTimeUnix = time.Now().Unix()
 
-//go:embed defaultTheme vpsTheme
+//go:embed defaultTheme vpsTheme terminalAssets
 var PublicFS embed.FS
 
 // 常量定义
@@ -512,6 +512,22 @@ self.addEventListener('activate', (event) => {
 	})
 
 	r.GET("/terminal", serveTerminalPage)
+
+	r.GET("/terminal-assets/*path", func(c *gin.Context) {
+		filePath := strings.TrimPrefix(c.Param("path"), "/")
+		if filePath == "" || strings.Contains(filePath, "..") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		embedPath := path.Join("terminalAssets", filepath.ToSlash(filePath))
+		content, err := fs.ReadFile(PublicFS, embedPath)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.Data(http.StatusOK, mime.TypeByExtension(filepath.Ext(filePath)), content)
+	})
 
 	// 1. Favicon 优先策略
 	r.GET("/favicon.ico", func(c *gin.Context) {
