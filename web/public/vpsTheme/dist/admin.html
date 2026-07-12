@@ -64,7 +64,7 @@ textarea{resize:vertical;min-height:60px;font-family:monospace}
 .ping-name{font-weight:700;line-height:1.25}
 .ping-target{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;color:var(--text);line-height:1.35}
 .ping-type,.ping-interval,.ping-enabled,.ping-actions{white-space:nowrap}
-.ping-scope-badge{display:inline-flex;align-items:center;max-width:100%;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);color:var(--muted);font-size:12px;line-height:1.2}
+.ping-scope-badge{display:inline-flex;align-items:center;max-width:100%;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);color:var(--muted);font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ping-actions-wrap{display:flex;align-items:center;gap:8px}
 table{width:100%;border-collapse:collapse}
 th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--border)}
@@ -271,8 +271,8 @@ async function pingPage(){
   for(var i=0;i<tasks.length;i++){
     var t=tasks[i];
     var on=t.enabled!==false;
-    var scopeText=pingScopeText(t,nodeNames);
-    h+='<tr><td class="ping-name">'+E(t.name)+'</td><td class="ping-target" title="'+E(t.target)+'">'+E(t.target)+'</td><td class="ping-type">'+E(t.type)+'</td><td class="ping-interval">'+t.interval+'</td><td><span class="ping-scope-badge" title="'+E(scopeText)+'">'+E(scopeText)+'</span></td><td class="ping-enabled"><label class="switch" title="'+(on?"已启用":"已停用")+'"><input type="checkbox" '+(on?"checked":"")+' onchange="togglePing('+t.id+',this.checked)"><span></span></label></td><td class="ping-actions"><div class="ping-actions-wrap"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></div></td></tr>';
+    var scope=pingScopeSummary(t,nodeNames,2);
+    h+='<tr><td class="ping-name">'+E(t.name)+'</td><td class="ping-target" title="'+E(t.target)+'">'+E(t.target)+'</td><td class="ping-type">'+E(t.type)+'</td><td class="ping-interval">'+t.interval+'</td><td><span class="ping-scope-badge" title="'+E(scope.full)+'">'+E(scope.label)+'</span></td><td class="ping-enabled"><label class="switch" title="'+(on?"已启用":"已停用")+'"><input type="checkbox" '+(on?"checked":"")+' onchange="togglePing('+t.id+',this.checked)"><span></span></label></td><td class="ping-actions"><div class="ping-actions-wrap"><button class="btn btn-outline btn-xs" onclick="editPing('+t.id+')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing('+t.id+')">删除</button></div></td></tr>';
   }
   h+='</tbody></table></div>';return h;
 }
@@ -521,17 +521,26 @@ async function deleteNode(uuid){
 }
 
 function pingDefaultOn(t){return !t||t.default_on!==false}
-function pingScopeText(t,nodeNames){
-  if(pingDefaultOn(t))return"全部节点";
+function pingScopeSummary(t,nodeNames,limit){
+  if(pingDefaultOn(t))return{label:"全部节点",full:"全部节点"};
   var list=t.clients||[];
-  if(!list.length)return"未选择";
-  return list.map(function(uuid){return nodeNames[uuid]||uuid}).join("、");
+  if(!list.length)return{label:"未选择",full:"未选择"};
+  var names=list.map(function(uuid){return nodeNames[uuid]||uuid});
+  var max=limit||2;
+  var label=names.slice(0,max).join("、");
+  if(names.length>max)label+=" +"+(names.length-max);
+  return{label:label,full:names.join("、")};
 }
 function renderPingScope(nodes,t){
   nodes=nodes||[];
   var all=pingDefaultOn(t);
   var selected={};
   (t&&t.clients||[]).forEach(function(uuid){selected[uuid]=true});
+  nodes=nodes.slice().sort(function(a,b){
+    var as=selected[a.uuid]?1:0, bs=selected[b.uuid]?1:0;
+    if(as!==bs)return bs-as;
+    return String(a.name||a.uuid).localeCompare(String(b.name||b.uuid));
+  });
   var box='<div class="form-group"><label>作用节点</label><select name="scope" onchange="syncPingScope(this)"><option value="all" '+(all?"selected":"")+'>全部节点</option><option value="selected" '+(!all?"selected":"")+'>指定节点</option></select></div>';
   box+='<div class="form-group ping-scope-nodes" style="'+(all?"display:none":"")+'"><label>选择节点</label>';
   if(nodes.length){
