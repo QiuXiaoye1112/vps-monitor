@@ -526,10 +526,7 @@ function pingScopeSummary(t,nodeNames,limit){
   var list=t.clients||[];
   if(!list.length)return{label:"未选择",full:"未选择"};
   var names=list.map(function(uuid){return nodeNames[uuid]||uuid});
-  var max=limit||2;
-  var label=names.slice(0,max).join("、");
-  if(names.length>max)label+=" +"+(names.length-max);
-  return{label:label,full:names.join("、")};
+  return{label:"部分节点",full:names.join("、")};
 }
 function renderPingScope(nodes,t){
   nodes=nodes||[];
