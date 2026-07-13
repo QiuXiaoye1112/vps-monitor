@@ -13,6 +13,7 @@ const (
 	MethodAgentMessage    = "agent.message"
 	MethodAgentEvent      = "agent.event"
 	MethodAgentTerminal   = "agent.terminal.request"
+	MethodAgentFile       = "agent.file.request"
 	MethodAgentPull       = "agent.pull"
 )
 
@@ -90,6 +91,10 @@ type EventParams struct {
 }
 
 type TerminalRequestParams struct {
+	RequestID string `json:"request_id"`
+}
+
+type FileRequestParams struct {
 	RequestID string `json:"request_id"`
 }
 

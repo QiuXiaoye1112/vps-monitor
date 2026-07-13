@@ -5,6 +5,7 @@ import (
 	"github.com/monitor-monitor/monitor/web/api"
 	"github.com/monitor-monitor/monitor/web/api/admin"
 	"github.com/monitor-monitor/monitor/web/api/client"
+	"github.com/monitor-monitor/monitor/web/api/filemanager"
 	public_api "github.com/monitor-monitor/monitor/web/api/public"
 	"github.com/monitor-monitor/monitor/web/api/terminal"
 	"github.com/monitor-monitor/monitor/web/public"
@@ -97,6 +98,7 @@ func registerAgentRoutes(r *gin.Engine) {
 		tokenAuthorized.GET("/v2/rpc", client.WebSocketV2RPC)
 		tokenAuthorized.POST("/v2/rpc", client.UploadV2RPC)
 		tokenAuthorized.GET("/terminal", terminal.EstablishConnection)
+		tokenAuthorized.GET("/files", filemanager.EstablishConnection)
 
 		// JSON 接口 -> RPC2 (client: 命名空间)。
 		tokenAuthorized.POST("/task/result", jsonRpc.Bind("client:taskResult", jsonRpc.WithRaw()))
@@ -157,6 +159,7 @@ func registerAdminRoutes(r *gin.Engine) {
 		clientGroup.GET("/:uuid/token", jsonRpc.Bind("admin:getClientToken", jsonRpc.WithPath("uuid"), jsonRpc.WithFlat()))
 		clientGroup.POST("/order", jsonRpc.Bind("admin:orderClients"))
 		clientGroup.GET("/:uuid/terminal", api.RequireSensitive2FA(), terminal.RequestTerminal)
+		clientGroup.GET("/:uuid/files", api.RequireSensitive2FA(), filemanager.RequestFileManager)
 	}
 
 	// records
