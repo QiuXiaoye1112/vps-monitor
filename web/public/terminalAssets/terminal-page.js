@@ -9,6 +9,7 @@
   var fitAddon = null;
   var term = null;
   var metricTimer = null;
+  var fileHeartbeatTimer = null;
   var requestSequence = 0;
   var pendingRequests = new Map();
   var toastTimer = null;
@@ -175,6 +176,7 @@
           if (message.data && message.data.home) {
             fileState.home = message.data.home;
             setFileStatus('已连接', 'ok');
+            startFileHeartbeat();
             loadDirectory(message.data.home, 0);
           }
           return;
@@ -193,6 +195,7 @@
     };
     fileWS.onerror = function () { setFileStatus('连接错误', 'bad'); };
     fileWS.onclose = function () {
+      stopFileHeartbeat();
       setFileStatus('已断开', 'bad');
       pendingRequests.forEach(function (pending) {
         clearTimeout(pending.timer);
@@ -200,6 +203,21 @@
       });
       pendingRequests.clear();
     };
+  }
+
+  function startFileHeartbeat() {
+    stopFileHeartbeat();
+    fileHeartbeatTimer = setInterval(function () {
+      if (fileWS && fileWS.readyState === WebSocket.OPEN) {
+        fileRequest('ping', {}, 10000).catch(function () {});
+      }
+    }, 25000);
+  }
+
+  function stopFileHeartbeat() {
+    if (!fileHeartbeatTimer) return;
+    clearInterval(fileHeartbeatTimer);
+    fileHeartbeatTimer = null;
   }
 
   function fileRequest(type, payload, timeout) {
@@ -681,6 +699,7 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) updateMetrics(); });
   window.addEventListener('beforeunload', function () {
     clearInterval(metricTimer);
+    stopFileHeartbeat();
     if (ws) ws.close();
     if (fileWS) fileWS.close();
   });

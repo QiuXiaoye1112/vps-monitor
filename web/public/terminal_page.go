@@ -23,7 +23,7 @@ func serveTerminalPage(c *gin.Context) {
   <title>节点控制台 - ` + escapedSiteName + `</title>
   <link rel="icon" href="/favicon.ico?t=` + getFaviconTimestamp() + `" />
   <link rel="stylesheet" href="/terminal-assets/xterm.css" />
-  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260714-3" />
+  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260714-4" />
 </head>
 <body data-site-name="` + escapedSiteName + `">
   <main class="shell">
@@ -109,7 +109,7 @@ func serveTerminalPage(c *gin.Context) {
   <div class="toast" id="toast" hidden></div>
   <script src="/terminal-assets/xterm.js"></script>
   <script src="/terminal-assets/xterm-addon-fit.js"></script>
-  <script src="/terminal-assets/terminal-page.js?v=20260714-3"></script>
+  <script src="/terminal-assets/terminal-page.js?v=20260714-4"></script>
 </body>
 </html>`
 	c.Header("Cache-Control", "no-store")
