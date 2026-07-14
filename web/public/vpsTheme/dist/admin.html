@@ -457,17 +457,31 @@ async function showInstall(uuid){
     var inNic=document.getElementById("includeNic"+id).value.trim();
     var exNic=document.getElementById("excludeNic"+id).value.trim();
     var mps=document.getElementById("mountpoints"+id).value.trim();
-    
-    var args="-e "+endpoint+" -t "+token+" -i "+interval;
-    if(dns)args+=" --custom-dns "+dns;
-    if(inNic)args+=" --include-nics "+inNic;
-    if(exNic)args+=" --exclude-nics "+exNic;
-    if(mps)args+=" --include-mountpoint "+mps;
-    
-    var dl="curl -fsSL https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64 -o "+path+" && chmod +x "+path;
-    var run=path+" "+args;
-    var svc="cat > /etc/systemd/system/monitor-agent.service << EOF\n[Unit]\nDescription=Monitor Agent\nAfter=network.target\n[Service]\nType=simple\nExecStart="+path+" -e "+endpoint+" -t "+token+" -i "+interval+"\nRestart=always\nRestartSec=10\n[Install]\nWantedBy=multi-user.target\nEOF\nsystemctl daemon-reload\nsystemctl enable --now monitor-agent";
-    var cmd="第一步：下载并测试运行\n"+dl+"\n\n第二步：测试 Agent\n"+run+"\n\n第三步：注册系统服务（开机自启）\n"+svc;
+
+    if(path.charAt(0)!=="/"||/[\r\n]/.test(path)){toast("安装路径必须是有效的绝对路径");return}
+    var intervalNumber=Number(interval);
+    if(!Number.isFinite(intervalNumber)||intervalNumber<=0){toast("上报间隔必须大于 0");return}
+
+    function shellQuote(value){return"'"+String(value).replace(/'/g,"'\"'\"'")+"'"}
+    function systemdQuote(value){return'"'+String(value).replace(/%/g,"%%").replace(/([\\"])/g,"\\$1")+'"'}
+    function utf8Base64(value){
+      var bytes=new TextEncoder().encode(value),binary="";
+      for(var i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+
+    endpoint=String(endpoint||location.origin).replace(/\/+$/,"");
+    var args=["-e",endpoint,"-t",token,"-i",String(intervalNumber)];
+    if(dns)args.push("--custom-dns",dns);
+    if(inNic)args.push("--include-nics",inNic);
+    if(exNic)args.push("--exclude-nics",exNic);
+    if(mps)args.push("--include-mountpoint",mps);
+
+    var execStart=[path].concat(args).map(systemdQuote).join(" ");
+    var unit="[Unit]\nDescription=Monitor Agent\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart="+execStart+"\nRestart=always\nRestartSec=10\n\n[Install]\nWantedBy=multi-user.target\n";
+    var release="https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64";
+    var newPath=path+".new";
+    var cmd="set -e; [ \"$(id -u)\" -eq 0 ] || { echo \"请使用 root 运行\"; exit 1; }; [ \"$(uname -m)\" = \"x86_64\" ] || { echo \"目前仅支持 AMD64\"; exit 1; }; TMP=$(mktemp /tmp/monitor-agent-install.XXXXXX); trap 'rm -f \"$TMP\"' EXIT; curl -fsSL "+shellQuote(release)+" -o \"$TMP\"; install -d -m 0755 \"$(dirname -- "+shellQuote(path)+")\"; install -m 0755 \"$TMP\" "+shellQuote(newPath)+"; mv -f "+shellQuote(newPath)+" "+shellQuote(path)+"; printf %s "+shellQuote(utf8Base64(unit))+" | base64 -d > /etc/systemd/system/monitor-agent.service; systemctl daemon-reload; systemctl enable monitor-agent >/dev/null; systemctl restart monitor-agent; systemctl is-active monitor-agent";
     var el=document.getElementById("cmd"+id);
     el.textContent=cmd;
     el.onclick=function(){copy(this.textContent)};
