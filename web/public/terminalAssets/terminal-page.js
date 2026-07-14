@@ -9,7 +9,7 @@
   var fitAddon = null;
   var term = null;
   var metricTimer = null;
-  var fileHeartbeatTimer = null;
+  var connectionHeartbeatTimer = null;
   var requestSequence = 0;
   var pendingRequests = new Map();
   var toastTimer = null;
@@ -137,32 +137,41 @@
   }
 
   function connectTerminal(displayName) {
+    if (ws) {
+      try { ws.close(); } catch (_) {}
+    }
     setStatus('连接中');
-    ws = new WebSocket(terminalURL());
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = function () {
+    var connection = new WebSocket(terminalURL());
+    ws = connection;
+    connection.binaryType = 'arraybuffer';
+    connection.onopen = function () {
+      if (ws !== connection) return;
       setStatus('已连接', 'ok');
       term.writeln('\r\nConnected. Waiting for agent...');
       term.focus();
       fit();
     };
-    ws.onmessage = function (event) { writeTerminalMessage(event.data); };
-    ws.onerror = function () { setStatus('连接错误', 'bad'); };
-    ws.onclose = function () {
+    connection.onmessage = function (event) { writeTerminalMessage(event.data); };
+    connection.onerror = function () { if (ws === connection) setStatus('连接错误', 'bad'); };
+    connection.onclose = function () {
+      if (ws !== connection) return;
+      ws = null;
       setStatus('已断开', 'bad');
       if (term) term.writeln('\r\n\r\n[connection closed]');
     };
-    term.onData(function (data) {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', input: data }));
-    });
   }
 
   function connectFiles() {
     if (!uuid) return;
+    if (fileWS) {
+      try { fileWS.close(); } catch (_) {}
+    }
     setFileStatus('连接中');
-    fileWS = new WebSocket(filesURL());
-    fileWS.onopen = function () { setFileStatus('等待 Agent'); };
-    fileWS.onmessage = function (event) {
+    var connection = new WebSocket(filesURL());
+    fileWS = connection;
+    connection.onopen = function () { if (fileWS === connection) setFileStatus('等待 Agent'); };
+    connection.onmessage = function (event) {
+      if (fileWS !== connection) return;
       var parse = function (text) {
         var message;
         try { message = JSON.parse(text); } catch (_) { return; }
@@ -176,7 +185,6 @@
           if (message.data && message.data.home) {
             fileState.home = message.data.home;
             setFileStatus('已连接', 'ok');
-            startFileHeartbeat();
             loadDirectory(message.data.home, 0);
           }
           return;
@@ -193,9 +201,10 @@
       if (typeof event.data === 'string') parse(event.data);
       else if (event.data instanceof Blob) event.data.text().then(parse);
     };
-    fileWS.onerror = function () { setFileStatus('连接错误', 'bad'); };
-    fileWS.onclose = function () {
-      stopFileHeartbeat();
+    connection.onerror = function () { if (fileWS === connection) setFileStatus('连接错误', 'bad'); };
+    connection.onclose = function () {
+      if (fileWS !== connection) return;
+      fileWS = null;
       setFileStatus('已断开', 'bad');
       pendingRequests.forEach(function (pending) {
         clearTimeout(pending.timer);
@@ -205,19 +214,22 @@
     };
   }
 
-  function startFileHeartbeat() {
-    stopFileHeartbeat();
-    fileHeartbeatTimer = setInterval(function () {
+  function startConnectionHeartbeat() {
+    stopConnectionHeartbeat();
+    connectionHeartbeatTimer = setInterval(function () {
+      if (ws && ws.readyState === WebSocket.OPEN && term) {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
       if (fileWS && fileWS.readyState === WebSocket.OPEN) {
         fileRequest('ping', {}, 10000).catch(function () {});
       }
     }, 25000);
   }
 
-  function stopFileHeartbeat() {
-    if (!fileHeartbeatTimer) return;
-    clearInterval(fileHeartbeatTimer);
-    fileHeartbeatTimer = null;
+  function stopConnectionHeartbeat() {
+    if (!connectionHeartbeatTimer) return;
+    clearInterval(connectionHeartbeatTimer);
+    connectionHeartbeatTimer = null;
   }
 
   function fileRequest(type, payload, timeout) {
@@ -688,10 +700,14 @@
     term.loadAddon(fitAddon);
     term.open(terminalEl);
     term.writeln('Connecting to ' + nodeName + ' ...');
+    term.onData(function (data) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', input: data }));
+    });
     setTimeout(fit, 0);
 
     connectTerminal(nodeName);
     connectFiles();
+    startConnectionHeartbeat();
     updateMetrics();
     metricTimer = setInterval(updateMetrics, 3000);
   }
@@ -699,7 +715,7 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) updateMetrics(); });
   window.addEventListener('beforeunload', function () {
     clearInterval(metricTimer);
-    stopFileHeartbeat();
+    stopConnectionHeartbeat();
     if (ws) ws.close();
     if (fileWS) fileWS.close();
   });
