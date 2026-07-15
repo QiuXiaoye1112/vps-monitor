@@ -14,6 +14,7 @@
   var pendingRequests = new Map();
   var toastTimer = null;
   var currentTransfer = null;
+  var fileClipboard = null;
   var fileState = { path: '', parent: '', offset: 0, total: 0, hasMore: false, items: [], selected: null, home: '' };
 
   function byId(id) { return document.getElementById(id); }
@@ -28,6 +29,8 @@
   var pathInput = byId('pathInput');
   var fileRows = byId('fileRows');
   var contextMenu = byId('contextMenu');
+  var fileListWrap = document.querySelector('.file-list-wrap');
+  var pasteButton = byId('pasteButton');
 
   function setStatus(text, state) {
     statusText.textContent = text;
@@ -260,7 +263,8 @@
     fileRows.appendChild(row);
   }
 
-  async function loadDirectory(path, offset) {
+  async function loadDirectory(path, offset, viewOptions) {
+    viewOptions = viewOptions || {};
     hideContextMenu();
     renderFileError('正在读取目录...');
     try {
@@ -274,6 +278,12 @@
       fileState.selected = null;
       pathInput.value = data.path;
       renderFiles();
+      requestAnimationFrame(function () {
+        if (!fileListWrap) return;
+        var requestedScroll = Number(viewOptions.scrollTop || 0);
+        var maximumScroll = Math.max(0, fileListWrap.scrollHeight - fileListWrap.clientHeight);
+        fileListWrap.scrollTop = Math.min(Math.max(0, requestedScroll), maximumScroll);
+      });
       if (data.truncated) showToast('目录项目超过 1000 个，仅显示前 1000 个', true);
     } catch (err) {
       renderFileError(err.message);
@@ -295,6 +305,7 @@
       fileState.items.forEach(function (item) {
         var row = document.createElement('tr');
         row.className = 'file-row';
+        if (fileClipboard && fileClipboard.mode === 'move' && fileClipboard.path === item.path) row.classList.add('clipboard-cut');
         row.dataset.path = item.path;
         row.title = item.mode || '';
 
@@ -326,6 +337,7 @@
         fileRows.appendChild(row);
       });
     }
+    updateClipboardUI();
   }
 
   function selectFile(item, row) {
@@ -348,6 +360,50 @@
   }
 
   function hideContextMenu() { contextMenu.hidden = true; }
+
+  function currentFileScroll() {
+    return fileListWrap ? fileListWrap.scrollTop : 0;
+  }
+
+  function reloadCurrentDirectory() {
+    return loadDirectory(fileState.path, fileState.offset, { scrollTop: currentFileScroll() });
+  }
+
+  function updateClipboardUI() {
+    pasteButton.disabled = !fileClipboard;
+    pasteButton.textContent = fileClipboard ? (fileClipboard.mode === 'move' ? '粘贴（剪切）' : '粘贴（复制）') : '粘贴';
+    pasteButton.title = fileClipboard ? fileClipboard.name + ' → ' + fileState.path : '请先右键复制或剪切文件';
+    fileRows.querySelectorAll('.clipboard-cut').forEach(function (row) { row.classList.remove('clipboard-cut'); });
+    if (fileClipboard && fileClipboard.mode === 'move') {
+      Array.from(fileRows.querySelectorAll('.file-row')).forEach(function (row) {
+        if (row.dataset.path === fileClipboard.path) row.classList.add('clipboard-cut');
+      });
+    }
+  }
+
+  function setFileClipboard(item, mode) {
+    fileClipboard = { path: item.path, name: item.name, isDir: !!item.is_dir, mode: mode };
+    updateClipboardUI();
+    showToast((mode === 'move' ? '已剪切：' : '已复制：') + item.name);
+  }
+
+  async function pasteFileClipboard() {
+    if (!fileClipboard) return;
+    var operation = fileClipboard.mode === 'move' ? 'move' : 'copy';
+    var scrollTop = currentFileScroll();
+    pasteButton.disabled = true;
+    try {
+      await fileRequest(operation, { path: fileClipboard.path, destination: fileState.path }, 1800000);
+      var completed = fileClipboard;
+      if (operation === 'move') fileClipboard = null;
+      showToast((operation === 'move' ? '移动完成：' : '复制完成：') + completed.name);
+      await loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      updateClipboardUI();
+    }
+  }
 
   async function openItem(item) {
     hideContextMenu();
@@ -415,7 +471,7 @@
       if (content === null) return;
       await fileRequest('write', { path: item.path, content_base64: bytesToBase64(new TextEncoder().encode(content)) }, 45000);
       showToast('文件已保存');
-      loadDirectory(fileState.path, fileState.offset);
+      reloadCurrentDirectory();
     } catch (err) { showToast(err.message, true); }
   }
 
@@ -425,7 +481,8 @@
     try {
       await fileRequest('rename', { path: item.path, new_name: name.trim() });
       showToast('重命名完成');
-      loadDirectory(fileState.path, fileState.offset);
+      if (fileClipboard && fileClipboard.path === item.path) fileClipboard = null;
+      reloadCurrentDirectory();
     } catch (err) { showToast(err.message, true); }
   }
 
@@ -437,10 +494,12 @@
       danger: true
     });
     if (!accepted) return;
+    var scrollTop = currentFileScroll();
     try {
       await fileRequest('delete', { path: item.path });
+      if (fileClipboard && fileClipboard.path === item.path) fileClipboard = null;
       showToast('已删除');
-      loadDirectory(fileState.path, fileState.offset);
+      loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
     } catch (err) { showToast(err.message, true); }
   }
 
@@ -512,7 +571,7 @@
     for (var i = 0; i < files.length; i++) {
       try { await uploadOne(files[i]); } catch (err) { showToast(err.message, true); break; }
     }
-    loadDirectory(fileState.path, fileState.offset);
+    reloadCurrentDirectory();
   }
 
   async function downloadItem(item) {
@@ -581,17 +640,18 @@
     try {
       await fileRequest(type, { path: fileState.path, name: name.trim() });
       showToast('创建完成');
-      loadDirectory(fileState.path, fileState.offset);
+      reloadCurrentDirectory();
     } catch (err) { showToast(err.message, true); }
   }
 
   function bindFileUI() {
     byId('homeButton').addEventListener('click', function () { loadDirectory(fileState.home || '', 0); });
     byId('upButton').addEventListener('click', function () { loadDirectory(fileState.parent || fileState.path, 0); });
-    byId('refreshButton').addEventListener('click', function () { loadDirectory(fileState.path, fileState.offset); });
+    byId('refreshButton').addEventListener('click', reloadCurrentDirectory);
     pathInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') loadDirectory(pathInput.value, 0); });
     byId('newFileButton').addEventListener('click', function () { createEntry('create'); });
     byId('newFolderButton').addEventListener('click', function () { createEntry('mkdir'); });
+    pasteButton.addEventListener('click', pasteFileClipboard);
     byId('uploadButton').addEventListener('click', function () { byId('uploadInput').click(); });
     byId('uploadInput').addEventListener('change', function () {
       var files = Array.from(this.files || []);
@@ -611,6 +671,8 @@
       var action = button.dataset.action;
       if (action === 'open') openItem(item);
       if (action === 'download') downloadItem(item);
+      if (action === 'copy') setFileClipboard(item, 'copy');
+      if (action === 'cut') setFileClipboard(item, 'move');
       if (action === 'rename') renameItem(item);
       if (action === 'delete') deleteItem(item);
     });

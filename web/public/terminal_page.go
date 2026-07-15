@@ -23,7 +23,7 @@ func serveTerminalPage(c *gin.Context) {
   <title>节点控制台 - ` + escapedSiteName + `</title>
   <link rel="icon" href="/favicon.ico?t=` + getFaviconTimestamp() + `" />
   <link rel="stylesheet" href="/terminal-assets/xterm.css" />
-  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260714-5" />
+  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260715-1" />
 </head>
 <body data-site-name="` + escapedSiteName + `">
   <main class="shell">
@@ -73,6 +73,7 @@ func serveTerminalPage(c *gin.Context) {
           <button type="button" id="uploadButton">上传</button>
           <button type="button" id="newFileButton">新建文件</button>
           <button type="button" id="newFolderButton">新建文件夹</button>
+          <button type="button" id="pasteButton" disabled>粘贴</button>
           <input type="file" id="uploadInput" hidden multiple />
         </div>
         <div class="transfer" id="transfer" hidden>
@@ -92,6 +93,8 @@ func serveTerminalPage(c *gin.Context) {
   <div class="context-menu" id="contextMenu" hidden>
     <button data-action="open">打开</button>
     <button data-action="download">下载</button>
+    <button data-action="copy">复制</button>
+    <button data-action="cut">剪切</button>
     <button data-action="rename">重命名</button>
     <button data-action="delete" class="danger">删除</button>
   </div>
@@ -109,7 +112,7 @@ func serveTerminalPage(c *gin.Context) {
   <div class="toast" id="toast" hidden></div>
   <script src="/terminal-assets/xterm.js"></script>
   <script src="/terminal-assets/xterm-addon-fit.js"></script>
-  <script src="/terminal-assets/terminal-page.js?v=20260714-5"></script>
+  <script src="/terminal-assets/terminal-page.js?v=20260715-1"></script>
 </body>
 </html>`
 	c.Header("Cache-Control", "no-store")
