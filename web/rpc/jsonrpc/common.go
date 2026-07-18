@@ -58,11 +58,11 @@ type pingStat struct {
 }
 
 // getPingStatsForNode 计算并缓存节点最近 1 小时 ping 统计
-func getPingStatsForNode(uuid string, pingTasks []models.PingTask) map[string]pingStat {
+func getPingStatsForNode(uuid string, pingTasks []models.PingTask, taskOrder models.UintArray) map[string]pingStat {
 	if uuid == "" {
 		return map[string]pingStat{}
 	}
-	assigned := assignedPingTasksForNode(uuid, pingTasks)
+	assigned := assignedPingTasksForNode(uuid, pingTasks, taskOrder)
 	key := pingStatsCacheKey(uuid, assigned)
 	if v, ok := pingStatsCache.Get(key); ok {
 		if m, ok2 := v.(map[string]pingStat); ok2 {
@@ -179,7 +179,7 @@ func getPingStatsForNode(uuid string, pingTasks []models.PingTask) map[string]pi
 	return result
 }
 
-func assignedPingTasksForNode(uuid string, pingTasks []models.PingTask) []models.PingTask {
+func assignedPingTasksForNode(uuid string, pingTasks []models.PingTask, taskOrder models.UintArray) []models.PingTask {
 	if uuid == "" {
 		return nil
 	}
@@ -189,7 +189,10 @@ func assignedPingTasksForNode(uuid string, pingTasks []models.PingTask) []models
 			assigned = append(assigned, t)
 		}
 	}
-	return assigned
+	if len(taskOrder) == 0 {
+		return assigned
+	}
+	return tasks.OrderPingTasks(taskOrder, assigned)
 }
 
 func pingStatsCacheKey(uuid string, assigned []models.PingTask) string {
@@ -410,7 +413,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		if rep == nil {
 			return
 		}
-		stats := getPingStatsForNode(uuid, pingTasks)
+		stats := getPingStatsForNode(uuid, pingTasks, clientByUUID[uuid].PingTaskOrder)
 		monthlyUp := rep.Network.TotalUp
 		monthlyDown := rep.Network.TotalDown
 		var monthly records.MonthlyTraffic

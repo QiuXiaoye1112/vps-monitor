@@ -347,3 +347,92 @@ func isLegacyPingClientsEmpty(raw string) bool {
 	}
 	return len(clients) == 0
 }
+
+// BackfillClientPingTaskOrder moves the legacy task-centric scope into each
+// client's ordered task list. It runs after AutoMigrate has added the new
+// clients.ping_task_order column. Rows already containing JSON (including [])
+// are treated as explicitly configured and are never overwritten.
+func BackfillClientPingTaskOrder(db *gorm.DB) error {
+	if db == nil || !db.Migrator().HasTable(&models.Client{}) || !db.Migrator().HasTable(&models.PingTask{}) {
+		return nil
+	}
+	if !hasTableColumn(db, "clients", "ping_task_order") {
+		return nil
+	}
+
+	var pingTasks []models.PingTask
+	if err := db.Order("weight ASC").Order("id ASC").Find(&pingTasks).Error; err != nil {
+		return fmt.Errorf("read ping tasks for client order migration: %w", err)
+	}
+	var allClients []models.Client
+	if err := db.Order("weight ASC").Order("created_at ASC").Find(&allClients).Error; err != nil {
+		return fmt.Errorf("read clients for ping task order migration: %w", err)
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Task execution is now controlled per node by PingTaskOrder. The former
+		// global enabled switch no longer has a UI and must not keep an otherwise
+		// selected task disabled.
+		if err := tx.Model(&models.PingTask{}).Where("enabled = ?", false).Update("enabled", true).Error; err != nil {
+			return fmt.Errorf("enable ping tasks for node-owned scope: %w", err)
+		}
+		for i := range pingTasks {
+			pingTasks[i].Enabled = true
+		}
+
+		for i := range allClients {
+			client := &allClients[i]
+			var raw struct {
+				PingTaskOrder *string `gorm:"column:ping_task_order"`
+			}
+			if err := tx.Table("clients").Select("ping_task_order").Where("uuid = ?", client.UUID).Scan(&raw).Error; err != nil {
+				return fmt.Errorf("read ping task order for client %s: %w", client.UUID, err)
+			}
+			if raw.PingTaskOrder != nil && strings.TrimSpace(*raw.PingTaskOrder) != "" && strings.TrimSpace(*raw.PingTaskOrder) != "null" {
+				continue
+			}
+
+			order := make(models.UintArray, 0, len(pingTasks))
+			for _, task := range pingTasks {
+				if task.DefaultOn || stringArrayContains(task.Clients, client.UUID) {
+					order = append(order, task.Id)
+				}
+			}
+			if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("ping_task_order", order).Error; err != nil {
+				return fmt.Errorf("backfill ping task order for client %s: %w", client.UUID, err)
+			}
+			client.PingTaskOrder = order
+		}
+
+		// The per-client list is authoritative after migration. Rebuild each
+		// task's legacy clients field for compatibility with existing filters.
+		assigned := make(map[uint]models.StringArray, len(pingTasks))
+		for _, client := range allClients {
+			for _, taskID := range client.PingTaskOrder {
+				assigned[taskID] = append(assigned[taskID], client.UUID)
+			}
+		}
+		for _, task := range pingTasks {
+			clients := assigned[task.Id]
+			if clients == nil {
+				clients = models.StringArray{}
+			}
+			if err := tx.Model(&models.PingTask{}).Where("id = ?", task.Id).Updates(map[string]interface{}{
+				"clients":     clients,
+				"all_clients": false,
+			}).Error; err != nil {
+				return fmt.Errorf("normalize ping task %d client scope: %w", task.Id, err)
+			}
+		}
+		return nil
+	})
+}
+
+func stringArrayContains(values models.StringArray, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}

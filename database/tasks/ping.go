@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
@@ -49,12 +50,42 @@ func AddPingTask(clients []string, defaultOn, enabled bool, name string, target,
 
 func DeletePingTask(id []uint) error {
 	db := dbcore.GetDBInstance()
-	result := db.Where("id IN ?", id).Delete(&models.PingTask{})
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+	removed := make(map[uint]struct{}, len(id))
+	for _, taskID := range id {
+		removed[taskID] = struct{}{}
+	}
+	err := db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Where("id IN ?", id).Delete(&models.PingTask{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		var clients []models.Client
+		if err := tx.Select("uuid", "ping_task_order").Find(&clients).Error; err != nil {
+			return err
+		}
+		for _, client := range clients {
+			filtered := make(models.UintArray, 0, len(client.PingTaskOrder))
+			for _, taskID := range client.PingTaskOrder {
+				if _, deleted := removed[taskID]; !deleted {
+					filtered = append(filtered, taskID)
+				}
+			}
+			if len(filtered) != len(client.PingTaskOrder) {
+				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("ping_task_order", filtered).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	ReloadPingSchedule()
-	return result.Error
+	return nil
 }
 
 // EditPingTask 批量更新延迟监测任务配置。
@@ -101,11 +132,145 @@ func GetAllPingTasks() ([]models.PingTask, error) {
 // GetPingTasksByClient 获取指定服务器需要执行的延迟监测任务。
 func GetPingTasksByClient(uuid string) []models.PingTask {
 	db := dbcore.GetDBInstance()
-	var tasks []models.PingTask
-	if err := db.Where("enabled = ? AND (all_clients = ? OR clients LIKE ?)", true, true, `%"`+uuid+`"%`).Find(&tasks).Error; err != nil {
+	var client models.Client
+	if err := db.Select("uuid", "ping_task_order").Where("uuid = ?", uuid).First(&client).Error; err != nil {
 		return nil
 	}
-	return tasks
+	if len(client.PingTaskOrder) == 0 {
+		return []models.PingTask{}
+	}
+	var pingTasks []models.PingTask
+	if err := db.Where("enabled = ? AND id IN ?", true, []uint(client.PingTaskOrder)).Find(&pingTasks).Error; err != nil {
+		return nil
+	}
+	return OrderPingTasks(client.PingTaskOrder, pingTasks)
+}
+
+// GetClientPingTaskOrder returns the node-owned task order.
+func GetClientPingTaskOrder(uuid string) models.UintArray {
+	if uuid == "" {
+		return models.UintArray{}
+	}
+	var client models.Client
+	if err := dbcore.GetDBInstance().Select("uuid", "ping_task_order").Where("uuid = ?", uuid).First(&client).Error; err != nil {
+		return models.UintArray{}
+	}
+	return client.PingTaskOrder
+}
+
+// OrderPingTasks filters candidates to the selected IDs and returns them in
+// the exact order configured on the node.
+func OrderPingTasks(order models.UintArray, candidates []models.PingTask) []models.PingTask {
+	byID := make(map[uint]models.PingTask, len(candidates))
+	for _, task := range candidates {
+		byID[task.Id] = task
+	}
+	ordered := make([]models.PingTask, 0, len(order))
+	for _, taskID := range order {
+		if task, ok := byID[taskID]; ok {
+			ordered = append(ordered, task)
+		}
+	}
+	return ordered
+}
+
+// SetClientPingTaskOrder atomically updates the node-owned ordered selection
+// and mirrors it into PingTask.Clients for compatibility with record filters.
+func SetClientPingTaskOrder(uuid string, taskIDs []uint) error {
+	if uuid == "" {
+		return fmt.Errorf("invalid client UUID")
+	}
+	normalized := make(models.UintArray, 0, len(taskIDs))
+	seen := make(map[uint]struct{}, len(taskIDs))
+	for _, taskID := range taskIDs {
+		if taskID == 0 {
+			return fmt.Errorf("invalid ping task ID: 0")
+		}
+		if _, exists := seen[taskID]; exists {
+			continue
+		}
+		seen[taskID] = struct{}{}
+		normalized = append(normalized, taskID)
+	}
+
+	db := dbcore.GetDBInstance()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var client models.Client
+		if err := tx.Select("uuid").Where("uuid = ?", uuid).First(&client).Error; err != nil {
+			return err
+		}
+		var pingTasks []models.PingTask
+		if err := tx.Order("weight ASC").Order("id ASC").Find(&pingTasks).Error; err != nil {
+			return err
+		}
+		valid := make(map[uint]struct{}, len(pingTasks))
+		for _, task := range pingTasks {
+			valid[task.Id] = struct{}{}
+		}
+		for _, taskID := range normalized {
+			if _, ok := valid[taskID]; !ok {
+				return fmt.Errorf("ping task not found: %d", taskID)
+			}
+		}
+		if err := tx.Model(&models.Client{}).Where("uuid = ?", uuid).Update("ping_task_order", normalized).Error; err != nil {
+			return err
+		}
+		for _, task := range pingTasks {
+			clients := normalizePingClients(task.Clients)
+			updated := make(models.StringArray, 0, len(clients)+1)
+			for _, clientUUID := range clients {
+				if clientUUID != uuid {
+					updated = append(updated, clientUUID)
+				}
+			}
+			if _, selected := seen[task.Id]; selected {
+				updated = append(updated, uuid)
+			}
+			if err := tx.Model(&models.PingTask{}).Where("id = ?", task.Id).Updates(map[string]interface{}{
+				"clients":     updated,
+				"all_clients": false,
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return ReloadPingSchedule()
+}
+
+// RemoveClientFromPingTasks removes a deleted node from compatibility scopes.
+func RemoveClientFromPingTasks(uuid string) error {
+	if uuid == "" {
+		return nil
+	}
+	db := dbcore.GetDBInstance()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var pingTasks []models.PingTask
+		if err := tx.Find(&pingTasks).Error; err != nil {
+			return err
+		}
+		for _, task := range pingTasks {
+			updated := make(models.StringArray, 0, len(task.Clients))
+			for _, clientUUID := range task.Clients {
+				if clientUUID != uuid {
+					updated = append(updated, clientUUID)
+				}
+			}
+			if len(updated) != len(task.Clients) {
+				if err := tx.Model(&models.PingTask{}).Where("id = ?", task.Id).Update("clients", updated).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return ReloadPingSchedule()
 }
 
 func GetEnabledPingTasks() ([]models.PingTask, error) {

@@ -15,7 +15,7 @@ func TestPingStatsCacheKeyUsesOnlyEnabledScopedTasks(t *testing.T) {
 		{Id: 1, Enabled: true, Clients: models.StringArray{"node-a"}},
 	}
 
-	assigned := assignedPingTasksForNode(uuid, pingTasks)
+	assigned := assignedPingTasksForNode(uuid, pingTasks, nil)
 	if len(assigned) != 2 {
 		t.Fatalf("assigned tasks = %d, want 2", len(assigned))
 	}
@@ -29,10 +29,10 @@ func TestPingStatsCacheKeyChangesWhenTaskScopeChanges(t *testing.T) {
 	const uuid = "node-a"
 	before := assignedPingTasksForNode(uuid, []models.PingTask{
 		{Id: 7, Enabled: true, Clients: models.StringArray{"node-a"}},
-	})
+	}, nil)
 	after := assignedPingTasksForNode(uuid, []models.PingTask{
 		{Id: 7, Enabled: true, Clients: models.StringArray{"node-b"}},
-	})
+	}, nil)
 
 	beforeKey := pingStatsCacheKey(uuid, before)
 	afterKey := pingStatsCacheKey(uuid, after)

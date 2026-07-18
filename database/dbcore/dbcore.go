@@ -305,6 +305,9 @@ func GetDBInstance() *gorm.DB {
 		if err != nil {
 			log.Fatalf("Failed to create tables: %v", err)
 		}
+		if err := migrations.BackfillClientPingTaskOrder(instance); err != nil {
+			log.Fatalf("Failed to migrate client Ping task order: %v", err)
+		}
 		err = instance.Table("records_long_term").AutoMigrate(
 			&models.Record{},
 		)

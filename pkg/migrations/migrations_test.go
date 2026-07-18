@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -240,5 +241,64 @@ func TestRunExpandsLegacyPingAllClientsTasks(t *testing.T) {
 	}
 	if string(raw) != `["client-a","client-b"]` {
 		t.Fatalf("unexpected clients json: %s", raw)
+	}
+}
+
+func TestBackfillClientPingTaskOrderPreservesLegacyAssignments(t *testing.T) {
+	db := openTestDB(t, "client_ping_task_order")
+	if err := db.Exec("CREATE TABLE clients (uuid varchar(36) PRIMARY KEY, token varchar(255) NOT NULL UNIQUE, name varchar(100), weight integer, created_at timestamp, updated_at timestamp)").Error; err != nil {
+		t.Fatalf("create legacy clients table: %v", err)
+	}
+	if err := db.AutoMigrate(&models.PingTask{}); err != nil {
+		t.Fatalf("migrate ping tasks: %v", err)
+	}
+	if err := db.Exec("INSERT INTO clients (uuid, token, name, weight) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
+		"node-a", "token-a", "A", 0, "node-b", "token-b", "B", 1).Error; err != nil {
+		t.Fatalf("seed clients: %v", err)
+	}
+	pingTasks := []models.PingTask{
+		{Weight: 20, Name: "default", DefaultOn: true, Enabled: true, Type: "tcp", Target: "a.example:80", Interval: 60},
+		{Weight: 10, Name: "selected", Clients: models.StringArray{"node-a"}, Enabled: false, Type: "tcp", Target: "b.example:80", Interval: 60},
+	}
+	if err := db.Create(&pingTasks).Error; err != nil {
+		t.Fatalf("seed ping tasks: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Client{}); err != nil {
+		t.Fatalf("add ping task order column: %v", err)
+	}
+	if err := BackfillClientPingTaskOrder(db); err != nil {
+		t.Fatalf("backfill client ping task order: %v", err)
+	}
+
+	var clients []models.Client
+	if err := db.Order("uuid ASC").Find(&clients).Error; err != nil {
+		t.Fatalf("read migrated clients: %v", err)
+	}
+	wantNodeA := models.UintArray{pingTasks[1].Id, pingTasks[0].Id}
+	if got, want := clients[0].PingTaskOrder, wantNodeA; !reflect.DeepEqual(got, want) {
+		t.Fatalf("node-a order = %v, want %v", got, want)
+	}
+	wantNodeB := models.UintArray{pingTasks[0].Id}
+	if got, want := clients[1].PingTaskOrder, wantNodeB; !reflect.DeepEqual(got, want) {
+		t.Fatalf("node-b order = %v, want %v", got, want)
+	}
+
+	var migratedTasks []models.PingTask
+	if err := db.Order("weight ASC").Find(&migratedTasks).Error; err != nil {
+		t.Fatalf("read migrated tasks: %v", err)
+	}
+	if migratedTasks[0].DefaultOn || migratedTasks[1].DefaultOn {
+		t.Fatal("legacy all_clients flags were not disabled")
+	}
+	if !migratedTasks[0].Enabled || !migratedTasks[1].Enabled {
+		t.Fatal("legacy global disabled state was not removed")
+	}
+	wantSelectedClients := models.StringArray{"node-a"}
+	if got, want := migratedTasks[0].Clients, wantSelectedClients; !reflect.DeepEqual(got, want) {
+		t.Fatalf("selected task clients = %v, want %v", got, want)
+	}
+	wantDefaultClients := models.StringArray{"node-a", "node-b"}
+	if got, want := migratedTasks[1].Clients, wantDefaultClients; !reflect.DeepEqual(got, want) {
+		t.Fatalf("default task clients = %v, want %v", got, want)
 	}
 }

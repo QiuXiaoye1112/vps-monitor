@@ -95,6 +95,7 @@ func publicClientInfo(node models.Client) map[string]any {
 		"traffic_reset_hour":    node.TrafficResetHour,
 		"traffic_reset_enabled": node.TrafficResetEnabled,
 		"traffic_compensation":  node.TrafficComp,
+		"ping_task_order":       node.PingTaskOrder,
 		"created_at":            node.CreatedAt,
 		"updated_at":            node.UpdatedAt,
 		"ipv4":                  node.IPv4,
@@ -390,6 +391,19 @@ func publicGetPingRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping records: "+err.Error(), nil)
 	}
+	if params.UUID != "" {
+		allowed := make(map[uint]struct{})
+		for _, task := range tasks.GetPingTasksByClient(params.UUID) {
+			allowed[task.Id] = struct{}{}
+		}
+		filtered := make([]models.PingRecord, 0, len(recs))
+		for _, record := range recs {
+			if _, ok := allowed[record.TaskId]; ok {
+				filtered = append(filtered, record)
+			}
+		}
+		recs = filtered
+	}
 
 	clientStats := make(map[string]struct {
 		total, loss, min, max int
@@ -433,6 +447,9 @@ func publicGetPingRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		pingTasks, err := tasks.GetEnabledPingTasks()
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks: "+err.Error(), nil)
+		}
+		if params.UUID != "" {
+			pingTasks = tasks.OrderPingTasks(tasks.GetClientPingTaskOrder(params.UUID), pingTasks)
 		}
 		tasksList := make([]map[string]any, 0, len(pingTasks))
 		for _, t := range pingTasks {

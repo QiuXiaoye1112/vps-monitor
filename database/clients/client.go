@@ -23,7 +23,7 @@ func DeleteClient(clientUuid string) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	return tasks.RemoveClientFromPingTasks(clientUuid)
 }
 
 func SaveClientInfo(update map[string]interface{}) error {
@@ -168,6 +168,7 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 		Name:                name,
 		Group:               strings.TrimSpace(group),
 		TrafficResetEnabled: true,
+		PingTaskOrder:       models.UintArray{},
 		CreatedAt:           models.FromTime(time.Now()),
 		UpdatedAt:           models.FromTime(time.Now()),
 	}
@@ -175,9 +176,6 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 	err = db.Create(&client).Error
 	if err != nil {
 		return "", "", err
-	}
-	if err := tasks.AddDefaultOnClientUUID(clientUUID); err != nil {
-		log.Println("Failed to apply default-on ping tasks to new client:", err)
 	}
 	return clientUUID, token, nil
 }

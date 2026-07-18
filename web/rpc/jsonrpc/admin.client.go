@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/records"
+	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 )
@@ -89,24 +91,35 @@ func adminAddClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Jso
 	}
 	name, _ := raw["name"].(string)
 	group, _ := raw["group"].(string)
+	pingTaskOrder, hasPingTaskOrder, err := popPingTaskOrder(raw)
+	if err != nil {
+		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
+	}
 
 	var (
 		uuid, token string
-		err         error
+		createErr   error
 	)
 	if name == "" && group == "" {
-		uuid, token, err = clients.CreateClient()
+		uuid, token, createErr = clients.CreateClient()
 	} else {
-		uuid, token, err = clients.CreateClientWithNameAndGroup(name, group)
+		uuid, token, createErr = clients.CreateClientWithNameAndGroup(name, group)
 	}
-	if err != nil {
-		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+	if createErr != nil {
+		return nil, rpc.MakeError(rpc.InternalError, createErr.Error(), nil)
 	}
 	update := clientCreateUpdateFromParams(uuid, raw)
 	if len(update) > 1 {
 		if err := clients.SaveClient(update); err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 		}
+	}
+	if hasPingTaskOrder {
+		if err := tasks.SetClientPingTaskOrder(uuid, pingTaskOrder); err != nil {
+			_ = clients.DeleteClient(uuid)
+			return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+		}
+		clearPingStatsCache()
 	}
 	if name != "" {
 		actor, ip := auditActor(ctx)
@@ -221,15 +234,42 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if uuid == "" {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
+	pingTaskOrder, hasPingTaskOrder, err := popPingTaskOrder(update)
+	if err != nil {
+		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
+	}
 	if err := normalizeVisibleTrafficCompensation(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
 	if err := clients.SaveClient(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
+	if hasPingTaskOrder {
+		if err := tasks.SetClientPingTaskOrder(uuid, pingTaskOrder); err != nil {
+			return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+		}
+		clearPingStatsCache()
+	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "edit client:"+uuid, "info")
 	return nil, nil
+}
+
+func popPingTaskOrder(update map[string]interface{}) ([]uint, bool, error) {
+	raw, exists := update["ping_task_order"]
+	delete(update, "ping_task_order")
+	if !exists {
+		return nil, false, nil
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return nil, true, fmt.Errorf("invalid ping_task_order")
+	}
+	var order []uint
+	if err := json.Unmarshal(encoded, &order); err != nil {
+		return nil, true, fmt.Errorf("invalid ping_task_order")
+	}
+	return order, true, nil
 }
 
 func normalizeVisibleTrafficCompensation(update map[string]interface{}) error {

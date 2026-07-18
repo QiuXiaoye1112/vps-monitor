@@ -217,7 +217,11 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping tasks", err.Error())
 		}
-		scopedPingTasks := scopedPingTasksForRecords(pingTasks, taskId, params.UUID)
+		var taskOrder models.UintArray
+		if params.UUID != "" {
+			taskOrder = tasks.GetClientPingTaskOrder(params.UUID)
+		}
+		scopedPingTasks := scopedPingTasksForRecords(pingTasks, taskId, params.UUID, taskOrder)
 		recs = filterPingRecordsByScopedTasks(recs, scopedPingTasks, params.UUID)
 
 		// hidden filter
@@ -511,7 +515,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 	}
 }
 
-func scopedPingTasksForRecords(pingTasks []models.PingTask, taskId int, uuid string) []models.PingTask {
+func scopedPingTasksForRecords(pingTasks []models.PingTask, taskId int, uuid string, taskOrder models.UintArray) []models.PingTask {
 	scoped := make([]models.PingTask, 0, len(pingTasks))
 	for _, task := range pingTasks {
 		if taskId != -1 && task.Id != uint(taskId) {
@@ -521,6 +525,9 @@ func scopedPingTasksForRecords(pingTasks []models.PingTask, taskId int, uuid str
 			continue
 		}
 		scoped = append(scoped, task)
+	}
+	if uuid != "" && len(taskOrder) > 0 {
+		return tasks.OrderPingTasks(taskOrder, scoped)
 	}
 	return scoped
 }
