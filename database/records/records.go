@@ -17,6 +17,8 @@ import (
 	"github.com/monitor-monitor/monitor/utils"
 )
 
+const longTermRecordInterval = 15 * time.Minute
+
 func DeleteAll() error {
 	if metricstore.IsEnabled() {
 		return metricstore.DeleteAllRecords(context.Background())
@@ -41,9 +43,50 @@ func DeleteRecordBefore(before time.Time) error {
 	if metricstore.IsEnabled() {
 		return metricstore.DeleteRecordsBefore(context.Background(), before)
 	}
-	db := dbcore.GetDBInstance()
-	db.Table("records_long_term").Where("time < ?", before).Delete(&models.Record{})
-	return db.Where("time < ?", before).Delete(&models.Record{}).Error
+	return deleteLegacyRecordsBefore(dbcore.GetDBInstance(), before, time.Now())
+}
+
+func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Raw records are only the high-resolution history. Traffic that is old
+		// enough to reach this cutoff has already been rolled up by CompactRecord.
+		if err := tx.Table("records").Where("time < ?", before).Delete(&models.Record{}).Error; err != nil {
+			return err
+		}
+
+		var clients []models.Client
+		if err := tx.Select("uuid", "traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour").Find(&clients).Error; err != nil {
+			return err
+		}
+
+		clientUUIDs := make([]string, 0, len(clients))
+		for _, client := range clients {
+			clientUUIDs = append(clientUUIDs, client.UUID)
+			if !client.TrafficResetEnabled {
+				// With reset disabled, records_long_term is the persistent cumulative
+				// traffic ledger. Deleting it would make the displayed total decrease.
+				continue
+			}
+
+			periodStart, _ := TrafficWindow(client, now)
+			deleteBefore := before
+			if periodStart.Before(deleteBefore) {
+				deleteBefore = periodStart
+			}
+			if err := tx.Table("records_long_term").
+				Where("client = ? AND time < ?", client.UUID, deleteBefore).
+				Delete(&models.Record{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Records belonging to deleted nodes no longer contribute to any total.
+		orphanQuery := tx.Table("records_long_term").Where("time < ?", before)
+		if len(clientUUIDs) > 0 {
+			orphanQuery = orphanQuery.Where("client NOT IN ?", clientUUIDs)
+		}
+		return orphanQuery.Delete(&models.Record{}).Error
+	})
 }
 
 func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Record, error) {
@@ -170,7 +213,7 @@ func migrateOldRecords(db *gorm.DB) error {
 }
 
 func compactRecordCutoff(now time.Time) time.Time {
-	return now.Add(-4 * time.Hour).Truncate(15 * time.Minute)
+	return now.Add(-4 * time.Hour).Truncate(longTermRecordInterval)
 }
 
 func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
@@ -220,7 +263,7 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 
 	groupedRecords := make(map[string]*groupData)
 	for _, record := range records {
-		key := record.Client + "_" + record.Time.ToTime().Truncate(15*time.Minute).Format(time.RFC3339)
+		key := record.Client + "_" + record.Time.ToTime().Truncate(longTermRecordInterval).Format(time.RFC3339)
 		if _, ok := groupedRecords[key]; !ok {
 			groupedRecords[key] = &groupData{}
 		}

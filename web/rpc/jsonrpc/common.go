@@ -46,6 +46,7 @@ func adjustedTrafficTotals(up, down, compensation int64) (int64, int64) {
 
 // pingstats:<uuid>:<enabled-scoped-task-ids>
 var pingStatsCache = cache.New(1*time.Minute, 2*time.Minute)
+var monthlyTrafficCache = cache.New(cache.NoExpiration, 10*time.Minute)
 
 type pingStat struct {
 	Name   string  `json:"name"`
@@ -420,7 +421,16 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		if client, ok := clientByUUID[uuid]; ok {
 			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
 				monthly = mt
+				monthlyTrafficCache.Set(uuid, mt, cache.NoExpiration)
 				monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Compensation)
+			} else if cached, found := monthlyTrafficCache.Get(uuid); found {
+				if mt, valid := cached.(records.MonthlyTraffic); valid {
+					monthly = mt
+					monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Compensation)
+				}
+				log.Printf("failed to calculate monthly traffic for %s, using last known value: %v", uuid, err)
+			} else {
+				log.Printf("failed to calculate monthly traffic for %s and no cached value is available: %v", uuid, err)
 			}
 		}
 		resetDay := clientByUUID[uuid].TrafficResetDay

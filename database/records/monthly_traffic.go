@@ -1,11 +1,13 @@
 package records
 
 import (
+	"errors"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
+	"gorm.io/gorm"
 )
 
 type MonthlyTraffic struct {
@@ -116,34 +118,59 @@ func sumTrafficDeltas(uuid string, start, end time.Time) (int64, int64, error) {
 		return up, down, nil
 	}
 
-	db := dbcore.GetDBInstance()
-	fourHoursAgo := time.Now().Add(-4*time.Hour - time.Minute)
-	recentStart := start
-	if end.After(fourHoursAgo) && recentStart.Before(fourHoursAgo) {
-		recentStart = fourHoursAgo
-	}
+	return sumLegacyTrafficDeltas(dbcore.GetDBInstance(), uuid, start, end)
+}
 
+// sumLegacyTrafficDeltas joins the compacted and raw record streams at the
+// actual last compacted slot. A wall-clock cutoff is not safe here: compaction
+// runs periodically, so its newest slot can lag the nominal four-hour cutoff
+// by several minutes. Using that nominal cutoff creates a moving gap and makes
+// an otherwise cumulative traffic total decrease until the next compaction.
+func sumLegacyTrafficDeltas(db *gorm.DB, uuid string, start, end time.Time) (int64, int64, error) {
 	var recent struct {
 		Up   int64
 		Down int64
 	}
-	if end.After(fourHoursAgo) {
-		if err := db.Table("records").
-			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-			Where("client = ? AND time >= ? AND time <= ?", uuid, recentStart, end).
-			Scan(&recent).Error; err != nil {
-			return 0, 0, err
-		}
-	}
-
 	var archived struct {
 		Up   int64
 		Down int64
 	}
-	if err := db.Table("records_long_term").
-		Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-		Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
-		Scan(&archived).Error; err != nil {
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("records_long_term").
+			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
+			Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
+			Scan(&archived).Error; err != nil {
+			return err
+		}
+
+		recentStart := start
+		var latestArchived models.Record
+		result := tx.Table("records_long_term").
+			Select("time").
+			Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
+			Order("time DESC").
+			Limit(1).
+			Take(&latestArchived)
+		if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return result.Error
+		}
+		if result.Error == nil {
+			afterArchivedSlot := latestArchived.Time.ToTime().Add(longTermRecordInterval)
+			if afterArchivedSlot.After(recentStart) {
+				recentStart = afterArchivedSlot
+			}
+		}
+
+		if recentStart.After(end) {
+			return nil
+		}
+		return tx.Table("records").
+			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
+			Where("client = ? AND time >= ? AND time <= ?", uuid, recentStart, end).
+			Scan(&recent).Error
+	})
+	if err != nil {
 		return 0, 0, err
 	}
 
