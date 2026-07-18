@@ -349,12 +349,6 @@ func ReloadPingSchedule() error {
 	return utils.ReloadPingSchedule(pingTasks)
 }
 
-// AddDefaultOnClientUUID 在新客户端注册后，把该 UUID 追加到所有 default_on=true 的任务的 clients 中（去重）。
-func AddDefaultOnClientUUID(uuid string) error {
-	// 因为现在 default_on/all_clients 任务能动态应用到所有客户端，不再需要物理追加到 clients 数组。
-	return nil
-}
-
 func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
 	if metricstore.IsEnabled() {
 		return metricstore.GetPingRecords(context.Background(), uuid, taskId, start, end)
