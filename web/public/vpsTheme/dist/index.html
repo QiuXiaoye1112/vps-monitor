@@ -29,6 +29,17 @@
       html[data-vps-custom-background="true"] body {
         background-color: transparent !important;
       }
+      html[data-vps-custom-background="true"] #vps-background-bootstrap {
+        z-index: 0;
+      }
+      html[data-vps-custom-background="true"] .loading-cover {
+        background-color: rgba(248, 250, 252, 0.12) !important;
+        -webkit-backdrop-filter: blur(2px) !important;
+        backdrop-filter: blur(2px) !important;
+      }
+      html.dark[data-vps-custom-background="true"] .loading-cover {
+        background-color: rgba(2, 6, 23, 0.18) !important;
+      }
       html[data-vps-custom-background="true"] .default-background,
       html[data-vps-custom-background="true"] .background-loading {
         background: transparent !important;
