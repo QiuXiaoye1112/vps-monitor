@@ -90,6 +90,7 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`id="vps-background-bootstrap"`,
 		`new MutationObserver(detectAppBackground)`,
 		`background-image-dark-fix-20260719`,
+		`href="/assets/index-zYil-n0Q.css?v=background-image-dark-fix-20260719"`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("background bootstrap guard %q is missing", required)
