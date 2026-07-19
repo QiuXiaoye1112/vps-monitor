@@ -22,6 +22,11 @@
 
 ## 执行日志
 
+### 2026-07-19 realistic globe vertical alignment (M4)
+
+- 将 realistic 地球容器的移动端/桌面端垂直位移统一为 cobe 的 `-translate-y-6 md:-translate-y-12`，使两种地球样式切换时高度及其与节点卡片的交叠位置一致。
+- 验证：`web/theme-src/build-vps-theme.sh` 完整通过类型检查、lint 和生产构建；仅保留既有 VueUse PURE 注释及 globe 大 chunk 警告，嵌入式主题产物已同步。
+
 ### 2026-07-19 native source migration
 
 - 从官方仓库导入 v3.2.0 完整源码并记录 upstream commit，保留 Bun 锁文件和可重复构建脚本。

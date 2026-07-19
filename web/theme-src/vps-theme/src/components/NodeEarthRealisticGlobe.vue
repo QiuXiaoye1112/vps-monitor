@@ -307,7 +307,7 @@ watch(shouldRender, (visible) => {
 </script>
 
 <template>
-  <div ref="containerRef" class="relative z-0 aspect-square w-full max-w-md mx-auto translate-y-2 md:-translate-y-1 overflow-visible pointer-events-none">
+  <div ref="containerRef" class="relative z-0 aspect-square w-full max-w-md mx-auto -translate-y-6 md:-translate-y-12 overflow-visible pointer-events-none">
     <div ref="globeHostRef" class="earth-globe-host absolute inset-0 z-0 w-full h-full scale-106 select-none touch-auto pointer-events-auto cursor-grab active:cursor-grabbing" />
 
     <div
