@@ -53,3 +53,26 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
+	raw, err := PublicFS.ReadFile("vpsTheme/dist/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(raw)
+	for _, required := range []string{
+		vpsThemeBootstrapMarker,
+		`window.__VPS_BACKGROUND_READY__`,
+		`rel = 'preload'`,
+		`preload.as = 'image'`,
+		`fetchPriority = 'high'`,
+		`data-vps-custom-background="true"] .default-background`,
+		`id="vps-background-bootstrap"`,
+		`new MutationObserver(detectAppBackground)`,
+		`bootstrapVideo.pause()`,
+	} {
+		if !strings.Contains(html, required) {
+			t.Fatalf("background bootstrap guard %q is missing", required)
+		}
+	}
+}

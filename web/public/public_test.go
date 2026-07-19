@@ -6,11 +6,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/models"
 )
 
 func TestMain(m *testing.M) {
@@ -84,6 +86,36 @@ func TestReplaceHTMLLanguage(t *testing.T) {
 				t.Fatalf("replaceHTMLLanguage() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestInjectVPSThemeBootstrap(t *testing.T) {
+	db := dbcore.GetDBInstance()
+	t.Cleanup(func() {
+		db.Where("short = ?", VpsTheme).Delete(&models.ThemeConfiguration{})
+	})
+
+	configuration := models.ThemeConfiguration{
+		Short: VpsTheme,
+		Data:  `{"backgroundEnabled":true,"backgroundType":"image","darkBackgroundUrl":"https://cdn.example/dark.webp?x=</script>"}`,
+	}
+	if err := db.Save(&configuration).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	got := injectVPSThemeBootstrap(`<head>`+vpsThemeBootstrapMarker+`</head>`, "Test Monitor")
+	for _, required := range []string{
+		`window.__VPS_THEME_BOOTSTRAP__=`,
+		`"backgroundEnabled":true`,
+		`"sitename":"Test Monitor"`,
+		`\u003c/script\u003e`,
+	} {
+		if !strings.Contains(got, required) {
+			t.Fatalf("bootstrap output missing %q: %s", required, got)
+		}
+	}
+	if strings.Contains(got, vpsThemeBootstrapMarker) {
+		t.Fatalf("bootstrap marker was not replaced: %s", got)
 	}
 }
 

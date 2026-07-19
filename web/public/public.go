@@ -2,6 +2,7 @@ package public
 
 import (
 	"embed"
+	"encoding/json"
 	"html"
 	"io/fs"
 	"mime"
@@ -36,7 +37,35 @@ const (
 	// 主题内部结构定义
 	DistDir   = "dist"       // 静态资源存放目录
 	IndexFile = "index.html" // 相对于 DistDir
+
+	vpsThemeBootstrapMarker = "<!-- VPS_THEME_BOOTSTRAP -->"
 )
+
+func buildVPSThemeBootstrap(siteName string) string {
+	settings := map[string]any{}
+	var themeConfiguration models.ThemeConfiguration
+	if err := dbcore.GetDBInstance().Where("short = ?", VpsTheme).First(&themeConfiguration).Error; err == nil {
+		_ = json.Unmarshal([]byte(themeConfiguration.Data), &settings)
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"sitename":       siteName,
+		"theme":          VpsTheme,
+		"theme_settings": settings,
+	})
+	if err != nil {
+		return ""
+	}
+
+	return `<script>window.__VPS_THEME_BOOTSTRAP__=` + string(payload) + `;</script>`
+}
+
+func injectVPSThemeBootstrap(htmlStr, siteName string) string {
+	if !strings.Contains(htmlStr, vpsThemeBootstrapMarker) {
+		return htmlStr
+	}
+	return strings.Replace(htmlStr, vpsThemeBootstrapMarker, buildVPSThemeBootstrap(siteName), 1)
+}
 
 func init() {
 	_ = os.MkdirAll("./data/theme", 0755)
@@ -470,6 +499,9 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 		}
 
 		// 执行 HTML 内容替换
+		if currentTheme == VpsTheme {
+			htmlStr = injectVPSThemeBootstrap(htmlStr, cfg[config.SitenameKey].(string))
+		}
 		replacer := strings.NewReplacer(
 			"<title>VPS Monitor</title>", "<title>"+cfg[config.SitenameKey].(string)+"</title>",
 			"A simple server monitor tool.", "VPS Monitor",
