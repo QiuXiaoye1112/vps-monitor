@@ -1,0 +1,30 @@
+{
+  "name": "VPS",
+  "short": "VPS",
+  "description": "VPS 监控主题",
+  "version": "1.0.0",
+  "author": "Ethan",
+  "preview": "preview-v2.0.0.png",
+  "configuration": {
+    "type": "managed",
+    "name": "主题自定义",
+    "data": [
+      { "name": "基础设置", "type": "title" },
+      { "key": "themeMode", "name": "默认主题模式", "type": "select", "default": "beijing", "options": "beijing,light,dark", "help": "全站默认主题模式：beijing=按北京时间自动切换，light=默认浅色，dark=默认深色。" },
+      { "key": "dataUpdateInterval", "name": "数据更新间隔", "type": "number", "default": 1, "help": "实时数据刷新间隔，单位：秒。" },
+      { "key": "nodeCardSize", "name": "节点卡片尺寸", "type": "select", "default": "compact", "options": "compact,comfortable,large", "help": "首页节点卡片尺寸。" },
+
+      { "name": "首页模块设置", "type": "title" },
+      { "key": "stopEarth", "name": "停止地球旋转", "type": "switch", "default": false, "help": "开启后地球默认不自动旋转，用户仍可手动拖拽查看。" },
+      { "key": "earthRenderer", "name": "地球样式", "type": "select", "default": "cobe", "options": "realistic,cobe,tiled", "help": "realistic=真实贴图地球，cobe=点阵地球，tiled=平铺地图。" },
+      { "key": "hideEarth", "name": "隐藏地球", "type": "switch", "default": false, "help": "隐藏首页地球区域。" },
+      { "key": "hideGeneralCard", "name": "隐藏头部", "type": "switch", "default": false, "help": "隐藏地球和总览卡片。" },
+      { "key": "generalCardKeys", "name": "自定义头部卡片", "type": "string", "default": "onlineNodes,totalTraffic,uploadSpeed,downloadSpeed", "help": "用英文逗号分隔 key，例如 onlineNodes,totalTraffic,uploadSpeed,downloadSpeed。" },
+      { "key": "hideAdminEntryWhenLoggedOut", "name": "隐藏后台入口", "type": "switch", "default": false, "help": "未登录时隐藏顶部后台管理入口。" },
+      { "name": "自定义背景", "type": "title" },
+      { "key": "backgroundEnabled", "name": "启用自定义背景", "type": "switch", "default": false, "help": "使用后台手动上传到本机的图片作为页面背景。" },
+      { "key": "backgroundBlur", "name": "背景模糊半径", "type": "number", "default": 0, "help": "背景的高斯模糊半径，单位 px。" },
+      { "key": "backgroundOverlay", "name": "背景遮罩强度", "type": "number", "default": 0, "help": "背景遮罩强度，-100 到 100。" }
+    ]
+  }
+}

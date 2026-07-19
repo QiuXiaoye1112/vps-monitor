@@ -1,0 +1,2412 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Monitor Admin</title>
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+      :root {
+        --bg: #0b1120;
+        --card: #131b2e;
+        --border: #1e2a45;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #3b82f6;
+        --red: #ef4444;
+        --green: #22c55e;
+        --yellow: #eab308;
+        --radius: 10px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+      }
+      .sidebar {
+        width: 210px;
+        min-height: 100vh;
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        padding: 20px 0;
+        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar h2 {
+        padding: 0 16px 16px;
+        font-size: 15px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 8px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted);
+        transition: all 0.12s;
+        border-left: 3px solid transparent;
+      }
+      .nav-item:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .nav-item.active {
+        color: var(--text);
+        background: rgba(59, 130, 246, 0.1);
+        border-left-color: var(--accent);
+      }
+      .main {
+        flex: 1;
+        padding: 24px;
+        max-width: calc(100vw - 210px);
+        min-height: 100vh;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card h3,
+      .card h2 {
+        margin-bottom: 14px;
+        font-size: 16px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .modal-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      .form-group label {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 3px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 9px 11px;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+        outline: none;
+        font-family: inherit;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--accent);
+      }
+      textarea {
+        resize: vertical;
+        min-height: 60px;
+        font-family: monospace;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 15px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        opacity: 0.85;
+      }
+      .btn-danger {
+        background: var(--red);
+        color: #fff;
+      }
+      .btn-danger:hover {
+        opacity: 0.85;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-outline:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        padding: 4px 8px;
+      }
+      .btn-ghost:hover {
+        color: var(--text);
+      }
+      .btn-sm {
+        padding: 5px 11px;
+        font-size: 12px;
+      }
+      .btn-xs {
+        padding: 3px 7px;
+        font-size: 11px;
+      }
+      .btn-block {
+        width: 100%;
+        justify-content: center;
+      }
+      .flex {
+        display: flex;
+      }
+      .items-center {
+        align-items: center;
+      }
+      .justify-between {
+        justify-content: space-between;
+      }
+      .gap-1 {
+        gap: 4px;
+      }
+      .gap-2 {
+        gap: 8px;
+      }
+      .gap-3 {
+        gap: 12px;
+      }
+      .gap-4 {
+        gap: 16px;
+      }
+      .mb-1 {
+        margin-bottom: 4px;
+      }
+      .mb-2 {
+        margin-bottom: 8px;
+      }
+      .mb-3 {
+        margin-bottom: 12px;
+      }
+      .mb-4 {
+        margin-bottom: 16px;
+      }
+      .mt-2 {
+        margin-top: 8px;
+      }
+      .mt-4 {
+        margin-top: 16px;
+      }
+      .text-sm {
+        font-size: 12px;
+      }
+      .text-xs {
+        font-size: 10px;
+      }
+      .text-muted {
+        color: var(--muted);
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+      .w-full {
+        width: 100%;
+      }
+      .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .badge-green {
+        background: rgba(34, 197, 94, 0.15);
+        color: var(--green);
+      }
+      .badge-red {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--red);
+      }
+      .badge-yellow {
+        background: rgba(234, 179, 8, 0.15);
+        color: var(--yellow);
+      }
+      .badge-blue {
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--accent);
+      }
+      .progress {
+        width: 100%;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 99px;
+        overflow: hidden;
+      }
+      .progress-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.3s;
+      }
+      .pb-green {
+        background: var(--green);
+      }
+      .pb-yellow {
+        background: var(--yellow);
+      }
+      .pb-red {
+        background: var(--red);
+      }
+      .pb-blue {
+        background: var(--accent);
+      }
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .status-online {
+        background: var(--green);
+      }
+      .status-offline {
+        background: var(--red);
+      }
+      .node-ping-selector {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .node-ping-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        padding: 10px;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        max-height: 230px;
+        overflow: auto;
+      }
+      .node-ping-row {
+        display: grid;
+        grid-template-columns: 22px 24px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 9px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        font-size: 12px;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .node-ping-row input {
+        width: auto;
+      }
+      .node-ping-row[data-selected="true"] {
+        cursor: grab;
+      }
+      .node-ping-row.drag-over {
+        border-top: 2px solid var(--accent);
+        background: rgba(59, 130, 246, 0.12);
+      }
+      .node-ping-handle {
+        color: var(--muted);
+        text-align: center;
+        user-select: none;
+      }
+      .node-ping-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .node-ping-empty {
+        padding: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+      }
+      .node-ping-badge {
+        display: inline-flex;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 10px;
+        white-space: nowrap;
+        background: rgba(148, 163, 184, 0.12);
+        color: var(--muted);
+      }
+      .node-ping-badge.card-slot {
+        background: rgba(59, 130, 246, 0.16);
+        color: #60a5fa;
+      }
+      .ping-table {
+        table-layout: fixed;
+      }
+      .ping-table th,
+      .ping-table td {
+        vertical-align: middle;
+      }
+      .ping-table td {
+        height: 58px;
+      }
+      .ping-name {
+        font-weight: 700;
+        line-height: 1.25;
+      }
+      .ping-target {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow-wrap: anywhere;
+        color: var(--text);
+        line-height: 1.35;
+      }
+      .ping-type,
+      .ping-interval,
+      .ping-actions {
+        white-space: nowrap;
+      }
+      .ping-actions-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 9px 11px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
+      td {
+        font-size: 13px;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 48px 20px;
+        color: var(--muted);
+      }
+      .token-box {
+        font-family: monospace;
+        background: #0f172a;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        word-break: break-all;
+        cursor: pointer;
+      }
+      .token-box:hover {
+        background: #1e293b;
+      }
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--green);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 13px;
+        z-index: 999;
+        animation: fadeout 1.8s forwards;
+      }
+      @keyframes fadeout {
+        0%,
+        60% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      .modal {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px;
+        width: min(540px, 93vw);
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .sec-title {
+        color: var(--accent);
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 6px;
+        margin: 18px 0 10px;
+      }
+      .sec-title:first-child {
+        margin-top: 0;
+      }
+      @media (max-width: 768px) {
+        body {
+          flex-direction: column;
+        }
+        .sidebar {
+          width: 100%;
+          min-height: auto;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          flex-direction: row;
+          overflow-x: auto;
+          padding: 2px 4px;
+          gap: 0;
+          flex-wrap: nowrap;
+          -webkit-overflow-scrolling: touch;
+        }
+        .sidebar h2 {
+          display: none;
+        }
+        .nav-item {
+          border-left: none;
+          border-bottom: 3px solid transparent;
+          white-space: nowrap;
+          padding: 6px 7px;
+          font-size: 10px;
+          flex-shrink: 0;
+        }
+        .nav-item.active {
+          border-left: none;
+          border-bottom-color: var(--accent);
+        }
+        .main {
+          max-width: 100%;
+          padding: 8px;
+        }
+        .grid-2,
+        .grid-3 {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .modal-grid {
+          grid-template-columns: 1fr;
+        }
+        .modal {
+          width: 96vw;
+          padding: 14px;
+          margin: 8px;
+        }
+        .card {
+          padding: 12px;
+          margin-bottom: 8px;
+        }
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+        th,
+        td {
+          padding: 6px 8px;
+          font-size: 11px;
+        }
+        .btn {
+          padding: 6px 10px;
+          font-size: 11px;
+        }
+        .btn-sm {
+          padding: 4px 8px;
+          font-size: 10px;
+        }
+        .btn-xs {
+          padding: 2px 6px;
+          font-size: 9px;
+        }
+        input,
+        select,
+        textarea {
+          padding: 8px;
+          font-size: 12px;
+        }
+        h2 {
+          font-size: 16px;
+        }
+        h3 {
+          font-size: 14px;
+        }
+        .stat .val {
+          font-size: 18px;
+        }
+        .token-box {
+          font-size: 10px;
+          word-break: break-all;
+        }
+        .flex.gap-1 {
+          flex-wrap: wrap;
+        }
+      }
+      .draggable-row {
+        cursor: grab;
+        transition: background 0.15s;
+      }
+      .draggable-row:active {
+        cursor: grabbing;
+      }
+      .draggable-row.drag-over {
+        background: rgba(59, 130, 246, 0.15);
+        border-top: 2px solid var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar" id="sidebar"><h2>Monitor</h2></div>
+    <div class="main" id="main"></div>
+    <div id="modals"></div>
+    <script>
+      "use strict";
+      var A = "/api/rpc2";
+      var page = "dashboard";
+      var session = null;
+      var logsPage = 1;
+
+      function $(s) {
+        return document.querySelector(s);
+      }
+      function $$(s) {
+        return document.querySelectorAll(s);
+      }
+      function H(s) {
+        var d = document.createElement("div");
+        d.innerHTML = s;
+        return d.firstElementChild;
+      }
+      function E(s) {
+        var d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+      function B(v) {
+        if (!v || v === 0) return "0 B";
+        var u = ["B", "KB", "MB", "GB", "TB"];
+        var i = 0;
+        while (v >= 1024 && i < u.length - 1) {
+          v /= 1024;
+          i++;
+        }
+        return v.toFixed(i > 1 ? 2 : 0) + " " + u[i];
+      }
+      function bps(v) {
+        return B(v) + "/s";
+      }
+      function ago(ts) {
+        if (!ts) return "-";
+        var ms = new Date(ts).getTime();
+        if (!Number.isFinite(ms)) return "-";
+        var s = Math.max(0,(Date.now()-ms)/1000);
+        if (s < 5) return"刚刚";
+        if (s < 60) return Math.floor(s) + "s";
+        if (s < 3600) return Math.floor(s / 60) + "m";
+        if (s < 86400) return Math.floor(s / 3600) + "h";
+        return Math.floor(s / 86400) + "d";
+      }
+      async function copy(txt) {
+        try {
+          await navigator.clipboard.writeText(txt);
+          toast("已复制");
+        } catch (e) {
+          var ta = document.createElement("textarea");
+          ta.value = txt;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+          toast("已复制");
+        }
+      }
+
+      async function RPC(method, params) {
+        params = params || {};
+        try {
+          var r = await fetch(A, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: method,
+              params: params,
+              id: Date.now(),
+            }),
+          });
+          if (r.status === 401) {
+            logout();
+            return null;
+          }
+          var d = await r.json();
+          if (d.error) throw new Error(d.error.message || "RPC error");
+          return d.result;
+        } catch (e) {
+          console.error(method, e);
+          return null;
+        }
+      }
+
+      function toast(msg) {
+        var t = H('<div class="toast">' + msg + "</div>");
+        document.body.appendChild(t);
+        setTimeout(function () {
+          t.remove();
+        }, 2000);
+      }
+
+      function openModal(id, title, html) {
+        var ov = H(
+          '<div class="modal-overlay" id="' +
+            id +
+            '"><div class="modal"><div class="flex justify-between items-center mb-3"><h3>' +
+            title +
+            '</h3><button class="btn-ghost" style="font-size:18px" onclick="document.getElementById(\'' +
+            id +
+            "').remove()\">×</button></div>" +
+            html +
+            "</div></div>",
+        );
+        ov.onclick = function (e) {
+          if (e.target === ov) ov.remove();
+        };
+        document.getElementById("modals").appendChild(ov);
+      }
+
+      function closeModal(id) {
+        var m = document.getElementById(id);
+        if (m) m.remove();
+      }
+
+      // ====== NAV ======
+      var NAV = [
+        { id: "dashboard", icon: "📊", label: "总览" },
+
+        { id: "ping", icon: "📡", label: "Ping 任务" },
+        { id: "settings", icon: "⚙", label: "站点设置" },
+        { id: "theme", icon: "🎨", label: "主题" },
+        { id: "account", icon: "👤", label: "账户" },
+        { id: "sessions", icon: "🔑", label: "会话" },
+        { id: "database", icon: "🗄", label: "数据库" },
+        { id: "clipboard", icon: "📎", label: "剪贴板" },
+        { id: "backup", icon: "💾", label: "备份" },
+        { id: "home", icon: "🏠", label: "前台首页", external: true },
+        { id: "logout", icon: "🚪", label: "退出", action: "logout" },
+      ];
+
+      function buildSidebar() {
+        var s = document.getElementById("sidebar");
+        NAV.forEach(function (n) {
+          var el = H(
+            '<div class="nav-item" data-page="' +
+              n.id +
+              '"><span style="width:18px;text-align:center">' +
+              n.icon +
+              "</span>" +
+              n.label +
+              "</div>",
+          );
+          if (n.external) {
+            el.onclick = function () {
+              window.open("/", "_blank");
+            };
+          } else if (n.action === "logout") {
+            el.onclick = function () {
+              logout();
+            };
+          } else {
+            el.onclick = function () {
+              navigate(n.id);
+            };
+          }
+          s.appendChild(el);
+        });
+      }
+
+      function navigate(p) {
+        page = p;
+        var items = document.querySelectorAll(".nav-item");
+        for (var i = 0; i < items.length; i++)
+          items[i].classList.toggle("active", items[i].dataset.page === p);
+        render();
+      }
+
+      // ====== AUTH ======
+      async function checkSession() {
+        var me = await RPC("public:getMe");
+        session = me && me.logged_in ? me : null;
+        if (!session) {
+          document.getElementById("sidebar").style.display = "none";
+          document.getElementById("main").innerHTML =
+            '<div class="card empty-state" style="max-width:400px;margin:80px auto"><h2 style="margin-bottom:20px;text-align:center">Monitor Admin</h2><form id="loginForm"><input name="user" placeholder="用户名" class="mb-3" autofocus required><input name="pass" type="password" placeholder="密码" class="mb-3" required><button class="btn btn-primary w-full" id="loginBtn">登录</button><div id="loginErr" style="color:var(--red);margin-top:10px;font-size:12px"></div></form></div>';
+          document.getElementById("loginForm").onsubmit = async function (e) {
+            e.preventDefault();
+            var f = new FormData(e.target);
+            var btn = document.getElementById("loginBtn");
+            btn.disabled = true;
+            btn.textContent = "...";
+            try {
+              var r = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  username: f.get("user"),
+                  password: f.get("pass"),
+                }),
+              });
+              if (!r.ok) throw new Error("用户名或密码错误");
+              location.reload();
+            } catch (err) {
+              document.getElementById("loginErr").textContent = err.message;
+            } finally {
+              btn.disabled = false;
+              btn.textContent = "登录";
+            }
+          };
+        }
+      }
+
+      async function logout() {
+        await fetch("/api/logout", { credentials: "include" });
+        session = null;
+        location.reload();
+      }
+
+      // ====== RENDER ======
+      function loading() {
+        return '<div style="text-align:center;padding:40px;color:var(--muted)">加载中...</div>';
+      }
+
+      async function render() {
+        var m = document.getElementById("main");
+        m.innerHTML = loading();
+        try {
+          switch (page) {
+            case "dashboard":
+              m.innerHTML = await dashPage();
+              break;
+            case "nodes":
+              m.innerHTML = await dashPage();
+              break;
+            case "logs":
+              m.innerHTML = await logsPage();
+              break;
+            case "ping":
+              m.innerHTML = await pingPage();
+              break;
+            case "settings":
+              m.innerHTML = await settingsPage();
+              break;
+            case "theme":
+              m.innerHTML = await themePage();
+              break;
+            case "account":
+              m.innerHTML = await accountPage();
+              break;
+            case "sessions":
+              m.innerHTML = await sessionsPage();
+              break;
+            case "database":
+              m.innerHTML = await databasePage();
+              break;
+            case "clipboard":
+              m.innerHTML = await clipboardPage();
+              break;
+            case "backup":
+              m.innerHTML = await backupPage();
+              break;
+          }
+        } catch (e) {
+          m.innerHTML =
+            '<div class="card empty-state">错误: ' + E(e.message) + "</div>";
+        }
+        bindEvents();
+      }
+
+      // ====== PAGES ======
+      async function dashPage() {
+        var nodes = (await RPC("admin:listClients")) || [];
+        var status = (await RPC("common:getNodesLatestStatus")) || {};
+        var liveData = status.data || status || {};
+        for (var i = 0; i < nodes.length; i++) {
+          var s = liveData[nodes[i].uuid];
+          if (s) {
+            nodes[i].online = s.online;
+            nodes[i].cpu = s.cpu;
+            nodes[i].ram = s.ram;
+            nodes[i].disk = s.disk;
+            nodes[i].net_out = s.network_up;
+            nodes[i].net_in = s.network_down;
+            nodes[i].net_total_up = s.total_up;
+            nodes[i].net_total_down = s.total_down;
+            nodes[i].uptime = s.uptime;
+          }
+        }
+        var online = nodes.filter(function (n) {
+          return n.online;
+        }).length;
+        var size = (await RPC("admin:getDatabaseSize")) || {};
+        var h =
+          '<div class="flex justify-between items-center mb-3"><h2>总览 (' +
+          nodes.length +
+          ')</h2><button class="btn btn-primary btn-sm" id="addNodeBtn">+ 添加节点</button></div><div class="grid-3 mb-4">';
+        h +=
+          '<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">' +
+          nodes.length +
+          '</div><div class="text-xs text-muted mt-1">节点总数</div></div>';
+        h +=
+          '<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700;color:var(--green)">' +
+          online +
+          '</div><div class="text-xs text-muted mt-1">在线节点</div></div>';
+        h +=
+          '<div class="card" style="text-align:center;padding:16px"><div style="font-size:28px;font-weight:700">' +
+          B(size.size || 0) +
+          '</div><div class="text-xs text-muted mt-1">数据库大小</div></div>';
+        h += "</div>";
+        if (nodes.length) {
+          h +=
+            '<div class="card"><div class="flex justify-between items-center mb-3"><h3>节点列表</h3><span class="text-xs text-muted">拖动 ☰ 调整顺序</span></div><table><thead><tr><th style="width:32px"></th><th>名称</th><th>分组</th><th>状态</th><th>操作</th></tr></thead><tbody id="nodeTableBody">';
+          for (var i = 0; i < nodes.length; i++) {
+            var n = nodes[i];
+            h +=
+              '<tr draggable="true" data-uuid="' +
+              n.uuid +
+              '" class="draggable-row">';
+            h +=
+              '<td style="cursor:grab;color:var(--muted);user-select:none;text-align:center" class="drag-handle">☰</td>';
+            h += '<td class="font-bold">' + E(n.name) + "</td>";
+            h += '<td class="text-muted text-sm">' + E(n.group || "") + "</td>";
+            h += "";
+            h +=
+              '<td><span class="badge ' +
+              (n.online ? "badge-green" : "badge-red") +
+              '">' +
+              (n.online ? "在线" : "离线") +
+              "</span></td>";
+            h +=
+              '<td class="flex gap-1"><button class="btn btn-outline btn-xs" onclick="showToken(\'' +
+              n.uuid +
+              '\')" draggable="false">Token</button><button class="btn btn-outline btn-xs" onclick="showInstall(\'' +
+              n.uuid +
+              '\')" draggable="false">安装</button><button class="btn btn-outline btn-xs" onclick="editNode(\'' +
+              n.uuid +
+              '\')" draggable="false">编辑</button><button class="btn btn-outline btn-xs" onclick="window.open(\'/terminal?uuid=' +
+              n.uuid +
+              '\',\'_blank\')" draggable="false">终端</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deleteNode(\'' +
+              n.uuid +
+              '\')" draggable="false">删除</button></td>';
+            h += "</tr>";
+          }
+          h += "</tbody></table></div>";
+        }
+        return h;
+      }
+
+      async function pingPage() {
+        var tasks = (await RPC("admin:getAllPingTasks")) || [];
+        var h =
+          '<div class="flex justify-between items-center mb-3"><h2>Ping 任务 (' +
+          tasks.length +
+          ')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" style="color:var(--red)" id="clearPingBtn">清空记录</button><button class="btn btn-primary btn-sm" id="addPingBtn">+ 添加任务</button></div></div>';
+        if (!tasks.length)
+          return h + '<div class="card empty-state">暂无 Ping 任务</div>';
+        h +=
+          '<div class="card"><table class="ping-table"><colgroup><col style="width:140px"><col><col style="width:80px"><col style="width:100px"><col style="width:150px"></colgroup><thead><tr><th>名称</th><th>目标</th><th>类型</th><th>间隔(S)</th><th>操作</th></tr></thead><tbody>';
+        for (var i = 0; i < tasks.length; i++) {
+          var t = tasks[i];
+          h +=
+            '<tr><td class="ping-name">' +
+            E(t.name) +
+            '</td><td class="ping-target" title="' +
+            E(t.target) +
+            '">' +
+            E(t.target) +
+            '</td><td class="ping-type">' +
+            E(t.type) +
+            '</td><td class="ping-interval">' +
+            t.interval +
+            '</td><td class="ping-actions"><div class="ping-actions-wrap"><button class="btn btn-outline btn-xs" onclick="editPing(' +
+            t.id +
+            ')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="deletePing(' +
+            t.id +
+            ')">删除</button></div></td></tr>';
+        }
+        h += "</tbody></table></div>";
+        return h;
+      }
+
+      async function settingsPage() {
+        var s = (await RPC("admin:getSettings")) || {};
+        var sections = [
+          { title: "基本", fields: [{ k: "sitename", l: "站点名称" }] },
+          {
+            title: "功能",
+            fields: [
+              { k: "geo_ip_enabled", l: "GeoIP", t: "bool" },
+              {
+                k: "geo_ip_provider",
+                l: "GeoIP 提供商",
+                t: "select",
+                o: ["ipinfo", "mmdb", "ip-api", "geojs"],
+              },
+            ],
+          },
+        ];
+        var h = '<div class="card"><h3>站点设置</h3><form id="settingsForm">';
+        for (var si = 0; si < sections.length; si++) {
+          var sec = sections[si];
+          h += '<h4 class="sec-title">' + sec.title + "</h4>";
+          for (var fi = 0; fi < sec.fields.length; fi++) {
+            var f = sec.fields[fi];
+            var v = s[f.k] !== undefined ? s[f.k] : "";
+            h += '<div class="form-group"><label>' + f.l + "</label>";
+            if (f.t === "bool") {
+              h +=
+                '<select name="' +
+                f.k +
+                '"><option value="true" ' +
+                (v === true ? "selected" : "") +
+                '>开启</option><option value="false" ' +
+                (v === false ? "selected" : "") +
+                ">关闭</option></select>";
+            } else if (f.t === "select" && f.o) {
+              h += '<select name="' + f.k + '">';
+              for (var oi = 0; oi < f.o.length; oi++)
+                h +=
+                  '<option value="' +
+                  f.o[oi] +
+                  '" ' +
+                  (v === f.o[oi] ? "selected" : "") +
+                  ">" +
+                  f.o[oi] +
+                  "</option>";
+              h += "</select>";
+            } else if (f.t === "num") {
+              h +=
+                '<input name="' +
+                f.k +
+                '" type="number" value="' +
+                (parseInt(v) || 0) +
+                '">';
+            } else {
+              h +=
+                '<input name="' + f.k + '" value="' + E(String(v || "")) + '">';
+            }
+            if (f.h)
+              h += '<div class="text-xs text-muted mt-1">' + f.h + "</div>";
+            h += "</div>";
+          }
+        }
+        h +=
+          '<button class="btn btn-primary mt-2" type="submit">保存</button></form><div class="card mt-4"><h3>头像</h3><div class="flex items-center gap-3"><img id="avatarPreview" src="/images/ethan-avatar.png" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%233b82f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>\'"><div><input type="file" id="avatarInput" accept="image/*" style="display:none"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'avatarInput\').click()">选择图片</button><div class="text-xs text-muted mt-1">自动裁切 512x512</div></div></div></div></div>';
+        return h;
+      }
+
+      async function themePage() {
+        var r = await fetch("/api/admin/theme/settings?theme=VPS", {
+          credentials: "include",
+        });
+        var s = r.ok ? await r.json() : {};
+        var defaults = {
+          themeMode: "beijing",
+          dataUpdateInterval: 1,
+          nodeCardSize: "compact",
+          stopEarth:false,
+          earthRenderer:"cobe",
+          hideEarth:false,
+          hideGeneralCard: false,
+          backgroundEnabled:false,
+          lightBackgroundUrl: "",
+          darkBackgroundUrl: "",
+          backgroundBlur: 0,
+          backgroundOverlay: 0,
+        };
+        var secs = [
+          {
+            title: "通用",
+            fields: [
+              {
+                k: "themeMode",
+                l: "默认主题模式",
+                t: "select",
+                o: ["beijing", "light", "dark"],
+                h: "beijing=按北京时间自动切换",
+              },
+              { k: "dataUpdateInterval", l: "数据更新间隔(秒)", t: "num" },
+              {
+                k: "nodeCardSize",
+                l: "节点卡片尺寸",
+                t: "select",
+                o: ["compact", "comfortable", "large"],
+              },
+            ],
+          },
+          {
+            title: "首页模块",
+            fields: [
+              {
+                k: "stopEarth",
+                l: "停止地球旋转",
+                t: "bool",
+                h: "开启后地球不自动旋转，用户仍可手动拖拽",
+              },
+              {
+                k: "earthRenderer",
+                l: "地球样式",
+                t: "select",
+                o: ["realistic", "cobe", "tiled"],
+                h: "realistic=真实贴图 cobe=点阵 tiled=平铺",
+              },
+              { k: "hideEarth", l: "隐藏地球", t: "bool" },
+              { k: "hideGeneralCard", l: "隐藏头部总览卡片", t: "bool" },
+            ],
+          },
+          {
+            title: "自定义背景",
+            fields: [
+              { k: "backgroundEnabled", l: "启用自定义背景", t: "bool", h: "仅使用上传到本机的图片，不再支持视频或外部 URL。" },
+              { k: "backgroundBlur", l: "背景模糊(px)", t: "num" },
+              { k: "backgroundOverlay", l: "背景遮罩(-100~100)", t: "num" },
+            ],
+          },
+        ];
+        var h = '<div class="card"><h3>VPS 主题设置</h3><form id="themeForm">';
+        for (var si = 0; si < secs.length; si++) {
+          var sec = secs[si];
+          h += '<h4 class="sec-title">' + sec.title + "</h4>";
+          for (var fi = 0; fi < sec.fields.length; fi++) {
+            var f = sec.fields[fi];
+            var v = s[f.k] !== undefined ? s[f.k] : defaults[f.k];
+            h += '<div class="form-group"><label>' + f.l + "</label>";
+            if (f.t === "bool") {
+              h +=
+                '<select name="' +
+                f.k +
+                '"><option value="true" ' +
+                (v === true ? "selected" : "") +
+                '>开启</option><option value="false" ' +
+                (v === false ? "selected" : "") +
+                ">关闭</option></select>";
+            } else if (f.t === "select" && f.o) {
+              h += '<select name="' + f.k + '">';
+              for (var oi = 0; oi < f.o.length; oi++)
+                h +=
+                  '<option value="' +
+                  f.o[oi] +
+                  '" ' +
+                  (v === f.o[oi] ? "selected" : "") +
+                  ">" +
+                  f.o[oi] +
+                  "</option>";
+              h += "</select>";
+            } else if (f.t === "num") {
+              h +=
+                '<input name="' +
+                f.k +
+                '" type="number" value="' +
+                (parseInt(v) || 0) +
+                '">';
+            } else {
+              h +=
+                '<input name="' + f.k + '" value="' + E(String(v || "")) + '">';
+            }
+            if (f.h)
+              h += '<div class="text-xs text-muted mt-1">' + f.h + "</div>";
+            h += "</div>";
+          }
+          if (sec.title === "自定义背景") {
+            var lightBackground = typeof s.lightBackgroundUrl === "string" ? s.lightBackgroundUrl : "";
+            var darkBackground = typeof s.darkBackgroundUrl === "string" ? s.darkBackgroundUrl : "";
+            function backgroundUploadCard(slot, label, url) {
+              var inputId = "background" + (slot === "light" ? "Light" : "Dark") + "Input";
+              var preview = url
+                ? '<img src="' + E(url) + '" alt="' + label + '" style="width:100%;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">'
+                : '<div class="text-muted" style="height:150px;display:grid;place-items:center;border:1px dashed var(--border);border-radius:10px">尚未上传</div>';
+              return '<div class="card" style="padding:14px"><div style="font-weight:600;margin-bottom:10px">' + label + '</div>' + preview +
+                '<input type="file" id="' + inputId + '" accept=".png,.jpg,.jpeg,.gif,.webp,.avif,image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>' +
+                '<button class="btn btn-outline btn-sm mt-2" type="button" onclick="document.getElementById(\'' + inputId + '\').click()">选择图片并上传</button></div>';
+            }
+            h += '<div class="grid-2 mt-3">' +
+              backgroundUploadCard("light", "亮色背景图片", lightBackground) +
+              backgroundUploadCard("dark", "暗色背景图片", darkBackground) +
+              '</div><div class="text-xs text-muted mt-2">支持 PNG、JPG、GIF、WebP、AVIF，单张最大 10 MB；暗色图片未上传时沿用亮色图片。</div>';
+          }
+        }
+        h +=
+          '<button class="btn btn-primary mt-2" type="submit">保存</button></form></div>';
+        return h;
+      }
+
+      function accountPage() {
+        return '<div class="card"><h3>账户设置</h3><form id="changeUserForm"><div class="form-group"><label>修改用户名</label><div class="flex gap-2"><input name="username" required><button class="btn btn-primary btn-sm" type="submit">修改</button></div></div></form><form id="changePassForm" class="mt-4"><div class="form-group"><label>新密码</label><input name="password" type="password" required minlength="8"></div><div class="form-group"><label>重复新密码</label><input name="password_repeat" type="password" required></div><button class="btn btn-primary btn-sm" type="submit">修改密码</button></form></div>';
+      }
+
+      async function sessionsPage() {
+        var s = (await RPC("admin:getSessions")) || {
+          sessions: [],
+          current: "",
+        };
+        var list = s.sessions || s.data || [];
+        var cur = s.current || "";
+        var h =
+          '<div class="flex justify-between items-center mb-3"><h2>活跃会话 (' +
+          list.length +
+          ')</h2><div class="flex gap-2"><button class="btn btn-outline btn-sm" id="delOtherSessions">清除其他</button><button class="btn btn-danger btn-sm" id="delAllSessions">清除全部</button></div></div>';
+        if (!list.length)
+          return h + '<div class="card empty-state">暂无活跃会话</div>';
+        h +=
+          '<div class="card"><table><thead><tr><th>会话ID</th><th>IP</th><th>UA</th><th>方式</th><th>最近</th><th>过期</th><th>操作</th></tr></thead><tbody>';
+        for (var i = 0; i < list.length; i++) {
+          var s = list[i];
+          var isCur = s.session === cur;
+          var sid = E((s.session || "").substring(0, 16));
+          h +=
+            "<tr" +
+            (isCur ? ' style="background:rgba(59,130,246,.08)"' : "") +
+            '><td class="text-xs" style="max-width:100px;overflow:hidden;text-overflow:ellipsis">' +
+            sid +
+            (isCur ? ' <span class="badge badge-blue">当前</span>' : "") +
+            "</td><td>" +
+            E(s.ip || s.latest_ip || "") +
+            '</td><td class="text-xs" style="max-width:150px;overflow:hidden;text-overflow:ellipsis">' +
+            E((s.latest_user_agent || s.user_agent || "").substring(0, 60)) +
+            "</td><td>" +
+            E(s.login_method || "") +
+            "</td><td>" +
+            ago(s.latest_online || s.created_at) +
+            "</td><td>" +
+            new Date(s.expires).toLocaleString() +
+            "</td><td>" +
+            (isCur
+              ? ""
+              : '<button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delSession(\'' +
+                E(s.session).replace(/'/g, "\\'") +
+                "')\">删除</button>") +
+            "</td></tr>";
+        }
+        h += "</tbody></table></div>";
+        return h;
+      }
+
+      async function databasePage() {
+        var size = (await RPC("admin:getDatabaseSize")) || {};
+        return (
+          '<div class="card"><h3>数据库信息</h3><div class="grid-3 mb-4"><div style="padding:12px"><div style="font-size:24px;font-weight:700">' +
+          B(size.size || 0) +
+          '</div><div class="text-xs text-muted mt-1">当前大小</div></div><div style="padding:12px"><div style="font-size:24px;font-weight:700">' +
+          (size.type || "sqlite") +
+          '</div><div class="text-xs text-muted mt-1">类型</div></div></div><div class="flex gap-2 mb-4"><button class="btn btn-primary btn-sm" id="vacuumBtn">Vacuum 压缩</button><button class="btn btn-danger btn-sm" id="clearAllRecordsBtn">清空全部记录</button></div></div>'
+        );
+      }
+
+      async function logsPage() {
+        var r = (await RPC("admin:getLogs", {
+          limit: "50",
+          page: String(logsPage),
+        })) || { logs: [], total: 0 };
+        var list = r.logs || r.data || [];
+        var h =
+          '<h2 class="mb-3">审计日志 (' + (r.total || list.length) + ")</h2>";
+        if (!list.length)
+          return h + '<div class="card empty-state">暂无日志</div>';
+        h +=
+          '<div class="card"><table><thead><tr><th>时间</th><th>级别</th><th>消息</th></tr></thead><tbody>';
+        for (var i = 0; i < list.length; i++) {
+          var l = list[i];
+          var lvl = l.level || l.msg_type || "info";
+          h +=
+            '<tr><td class="text-xs" style="white-space:nowrap">' +
+            ago(l.time || l.created_at) +
+            '</td><td><span class="badge ' +
+            (lvl === "error"
+              ? "badge-red"
+              : lvl === "warning"
+                ? "badge-yellow"
+                : "badge-blue") +
+            '">' +
+            E(lvl) +
+            '</span></td><td class="text-sm">' +
+            E(l.message || l.msg || "") +
+            "</td></tr>";
+        }
+        h +=
+          '</tbody></table><div class="flex items-center gap-3 mt-4"><button class="btn btn-outline btn-sm" onclick="pageLogs(' +
+          Math.max(1, logsPage - 1) +
+          ')" ' +
+          (logsPage <= 1 ? "disabled" : "") +
+          '>上一页</button><span class="text-sm text-muted">第 ' +
+          logsPage +
+          ' 页</span><button class="btn btn-outline btn-sm" onclick="pageLogs(' +
+          (logsPage + 1) +
+          ')">下一页</button></div></div>';
+        return h;
+      }
+      function pageLogs(p) {
+        logsPage = p;
+        navigate("logs");
+      }
+
+      async function clipboardPage() {
+        var items = (await RPC("admin:listClipboard")) || [];
+        var h =
+          '<div class="flex justify-between items-center mb-3"><h2>剪贴板 (' +
+          items.length +
+          ')</h2><button class="btn btn-primary btn-sm" id="addClipBtn">+ 新建</button></div>';
+        if (!items.length)
+          return h + '<div class="card empty-state">暂无</div>';
+        h += '<div class="grid-2">';
+        for (var i = 0; i < items.length; i++) {
+          var c = items[i];
+          var txt = c.text || c.content || "";
+          var preview = txt.substring(0, 300) + (txt.length > 300 ? "..." : "");
+          h +=
+            '<div class="card"><div class="flex justify-between items-center mb-2"><span class="font-bold">' +
+            E(c.name || c.title || "无标题") +
+            '</span></div><div class="text-sm mb-3" style="white-space:pre-wrap;word-break:break-all">' +
+            E(preview) +
+            '</div><div class="flex gap-1"><button class="btn btn-outline btn-xs" id="clipCopy' +
+            c.id +
+            '">复制</button><button class="btn btn-outline btn-xs" onclick="editClip(' +
+            c.id +
+            ')">编辑</button><button class="btn btn-outline btn-xs" style="color:var(--red)" onclick="delClip(' +
+            c.id +
+            ')">删除</button></div></div>';
+        }
+        h += "</div>";
+        return h;
+      }
+
+      function backupPage() {
+        return '<div class="card"><h3>备份管理</h3><div class="flex gap-3 mb-4"><a href="/api/admin/download/backup" class="btn btn-primary btn-sm">下载备份</a></div><div class="card" style="background:rgba(255,255,255,.02)"><h4>上传恢复</h4><form id="backupForm" enctype="multipart/form-data"><input type="file" name="file" accept=".zip,.json" class="mb-2"><button class="btn btn-outline btn-sm" type="submit">上传恢复</button></form></div></div>';
+      }
+
+      // ====== ACTIONS ======
+      function uid() {
+        return "m" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+      }
+
+      async function showToken(uuid) {
+        var r = await RPC("admin:getClientToken", { uuid: uuid });
+        var t = r.token || r || "";
+        var id = uid();
+        openModal(
+          id,
+          "Token",
+          '<div class="token-box mb-3" id="tk' +
+            id +
+            '">' +
+            E(t) +
+            '</div><p class="text-xs text-muted mb-3">点击 Token 复制到剪贴板</p><button class="btn btn-outline btn-sm w-full" onclick="closeModal(\'' +
+            id +
+            "')\">关闭</button>",
+        );
+        document.getElementById("tk" + id).onclick = function () {
+          copy(this.textContent);
+        };
+      }
+
+      async function showInstall(uuid) {
+        var s = (await RPC("admin:getSettings")) || {};
+        var endpoint = s.script_domain || location.origin;
+        var r = await RPC("admin:getClientToken", { uuid: uuid });
+        var token = r.token || r || "";
+        var id = uid();
+        openModal(
+          id,
+          "生成安装命令",
+          "" +
+            '<div class="modal-grid"><div class="form-group"><label>安装路径</label><input id="path' +
+            id +
+            '" value="/usr/local/bin/monitor-agent"></div><div class="form-group"><label>上报间隔(秒)</label><input id="interval' +
+            id +
+            '" type="number" value="1"></div></div>' +
+            '<div class="sec-title">可选配置</div>' +
+            '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns' +
+            id +
+            '" placeholder="如 114.114.114.114"></div><div class="form-group"><label>包含网卡</label><input id="includeNic' +
+            id +
+            '" placeholder="如 eth0"></div></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>排除网卡</label><input id="excludeNic' +
+            id +
+            '" placeholder="如 lo"></div><div class="form-group"><label>包含挂载点</label><input id="mountpoints' +
+            id +
+            '" placeholder="如 /data"></div></div>' +
+            '<button class="btn btn-primary w-full mt-2" id="gen' +
+            id +
+            '">生成安装命令</button>' +
+            '<div id="cmdArea' +
+            id +
+            '" style="display:none;margin-top:12px"><div class="token-box mb-2" style="white-space:pre-wrap;font-size:11px" id="cmd' +
+            id +
+            '"></div><p class="text-xs text-muted">点击上方命令复制，在目标服务器上执行</p></div>',
+        );
+        document.getElementById("gen" + id).onclick = function () {
+          var path =
+            document.getElementById("path" + id).value.trim() ||
+            "/usr/local/bin/monitor-agent";
+          var interval = document.getElementById("interval" + id).value || "1";
+          var dns = document.getElementById("dns" + id).value.trim();
+          var inNic = document.getElementById("includeNic" + id).value.trim();
+          var exNic = document.getElementById("excludeNic" + id).value.trim();
+          var mps = document.getElementById("mountpoints" + id).value.trim();
+
+          if (path.charAt(0) !== "/" || /[\r\n]/.test(path)) {
+            toast("安装路径必须是有效的绝对路径");
+            return;
+          }
+          var intervalNumber = Number(interval);
+          if (!Number.isFinite(intervalNumber) || intervalNumber <= 0) {
+            toast("上报间隔必须大于 0");
+            return;
+          }
+
+          function shellQuote(value) {
+            return "'" + String(value).replace(/'/g, "'\"'\"'") + "'";
+          }
+          function systemdQuote(value) {
+            return (
+              '"' +
+              String(value)
+                .replace(/%/g, "%%")
+                .replace(/([\\"])/g, "\\$1") +
+              '"'
+            );
+          }
+          function utf8Base64(value) {
+            var bytes = new TextEncoder().encode(value),
+              binary = "";
+            for (var i = 0; i < bytes.length; i++)
+              binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+          }
+
+          endpoint = String(endpoint || location.origin).replace(/\/+$/, "");
+          var args = [
+            "-e",
+            endpoint,
+            "-t",
+            token,
+            "-i",
+            String(intervalNumber),
+          ];
+          if (dns) args.push("--custom-dns", dns);
+          if (inNic) args.push("--include-nics", inNic);
+          if (exNic) args.push("--exclude-nics", exNic);
+          if (mps) args.push("--include-mountpoint", mps);
+
+          var execStart = [path].concat(args).map(systemdQuote).join(" ");
+          var unit =
+            "[Unit]\nDescription=Monitor Agent\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart=" +
+            execStart +
+            "\nRestart=always\nRestartSec=10\n\n[Install]\nWantedBy=multi-user.target\n";
+          var release =
+            "https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64";
+          var newPath = path + ".new";
+          var cmd =
+            'set -e; [ "$(id -u)" -eq 0 ] || { echo "请使用 root 运行"; exit 1; }; [ "$(uname -m)" = "x86_64" ] || { echo "目前仅支持 AMD64"; exit 1; }; TMP=$(mktemp /tmp/monitor-agent-install.XXXXXX); trap \'rm -f "$TMP"\' EXIT; curl -fsSL ' +
+            shellQuote(release) +
+            ' -o "$TMP"; install -d -m 0755 "$(dirname -- ' +
+            shellQuote(path) +
+            ')"; install -m 0755 "$TMP" ' +
+            shellQuote(newPath) +
+            "; mv -f " +
+            shellQuote(newPath) +
+            " " +
+            shellQuote(path) +
+            "; printf %s " +
+            shellQuote(utf8Base64(unit)) +
+            " | base64 -d > /etc/systemd/system/monitor-agent.service; systemctl daemon-reload; systemctl enable monitor-agent >/dev/null; systemctl restart monitor-agent; systemctl is-active monitor-agent";
+          var el = document.getElementById("cmd" + id);
+          el.textContent = cmd;
+          el.onclick = function () {
+            copy(this.textContent);
+          };
+          document.getElementById("cmdArea" + id).style.display = "block";
+        };
+      }
+
+      async function editNode(uuid) {
+        var nodes = await RPC("admin:listClients");
+        var pingTasks = (await RPC("admin:getAllPingTasks")) || [];
+        var n = (nodes || []).find(function (x) {
+          return x.uuid === uuid;
+        });
+        if (!n) return;
+        var status = null;
+        try {
+          status = await RPC("common:getNodesLatestStatus", { uuid: uuid });
+        } catch (e) {
+          status = null;
+        }
+        var visibleBase = 0;
+        if (status && typeof status.monthly_traffic_raw === "number")
+          visibleBase = status.monthly_traffic_raw;
+        else if (status)
+          visibleBase = Math.max(
+            0,
+            (status.net_total_up || 0) +
+              (status.net_total_down || 0) -
+              (n.traffic_compensation || 0),
+          );
+        var visibleBaseGB = (visibleBase / 1073741824).toFixed(2);
+        var id = uid();
+        var nn = E(n.name || "");
+        var ng = E(n.group || "");
+        var nw = n.weight || 0;
+        var nh = n.hidden || false;
+        var ntl = Math.round((n.traffic_limit || 0) / 1073741824);
+        var ntt = n.traffic_limit_type || "sum";
+        var nrd = n.traffic_reset_day || 1;
+        var nrh = n.traffic_reset_hour || 0;
+        var ncomp = ((n.traffic_compensation || 0) / 1073741824).toFixed(2);
+        var nre =
+          n.traffic_reset_enabled !== undefined
+            ? n.traffic_reset_enabled
+            : true;
+        openModal(
+          id,
+          "编辑节点",
+          '<form id="ef' +
+            id +
+            '">' +
+            '<h4 class="sec-title">基本</h4>' +
+            '<div class="modal-grid"><div class="form-group"><label>名称</label><input name="name" value="' +
+            nn +
+            '" required></div><div class="form-group"><label>分组</label><input name="group" value="' +
+            ng +
+            '"></div></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>权重</label><input name="weight" type="number" value="' +
+            nw +
+            '"></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" ' +
+            (nh ? "" : "selected") +
+            '>否</option><option value="true" ' +
+            (nh ? "selected" : "") +
+            ">是</option></select></div></div>" +
+            '<h4 class="sec-title">流量</h4>' +
+            '<div class="modal-grid"><div class="form-group"><label>启用月度流量重置</label><select name="traffic_reset_enabled"><option value="true" ' +
+            (nre ? "selected" : "") +
+            '>开启</option><option value="false" ' +
+            (nre ? "" : "selected") +
+            '>关闭</option></select></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
+            ntl +
+            '"></div></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" ' +
+            (ntt === "sum" ? "selected" : "") +
+            '>合计</option><option value="up" ' +
+            (ntt === "up" ? "selected" : "") +
+            '>上行</option><option value="down" ' +
+            (ntt === "down" ? "selected" : "") +
+            '>下行</option></select></div><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="' +
+            ncomp +
+            '"></div></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>重置日(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="' +
+            nrd +
+            '"></div><div class="form-group"><label>重置小时(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="' +
+            nrh +
+            '"></div></div>' +
+            '<p class="text-xs text-muted mb-1">当前原始累计：' +
+            visibleBaseGB +
+            " GB。保存后前台显示 = 当前原始累计 + 流量补偿。</p>" +
+            '<p class="text-xs text-muted mb-2">流量补偿支持负数，每月重置日自动清零。</p>' +
+            renderNodePingSelector(pingTasks, n.ping_task_order || []) +
+            '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>',
+        );
+        bindNodePingSelector(document.getElementById("ef" + id));
+        document.getElementById("ef" + id).onsubmit = async function (e) {
+          e.preventDefault();
+          var f = new FormData(e.target);
+          var compGB = parseFloat(f.get("traffic_compensation")) || 0;
+          var data = {
+            uuid: uuid,
+            name: f.get("name"),
+            group: f.get("group"),
+            weight: parseInt(f.get("weight")) || 0,
+            hidden: f.get("hidden") === "true",
+            traffic_limit: (parseInt(f.get("traffic_limit")) || 0) * 1073741824,
+            traffic_limit_type: f.get("traffic_limit_type"),
+            traffic_reset_day: parseInt(f.get("traffic_reset_day")) || 1,
+            traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
+            traffic_compensation: Math.round(compGB * 1073741824),
+            traffic_compensation_base: Math.round(visibleBase),
+            traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
+            ping_task_order: collectNodePingOrder(e.target),
+          };
+          await RPC("admin:editClient", data);
+          closeModal(id);
+          toast("已保存");
+          navigate("dashboard");
+        };
+      }
+
+      async function deleteNode(uuid) {
+        var id = uid();
+        var cmd =
+          "systemctl stop monitor-agent 2>/dev/null; systemctl disable monitor-agent 2>/dev/null; rm -f /usr/local/bin/monitor-agent; rm -f /etc/systemd/system/monitor-agent.service; systemctl daemon-reload";
+        openModal(
+          id,
+          "删除节点",
+          '<p class="text-sm text-muted mb-2">第一步：在目标主机上执行以下命令清理 Agent</p><div class="token-box mb-3" style="white-space:pre-wrap;font-size:11px" id="clean' +
+            id +
+            '">' +
+            cmd +
+            '</div><p class="text-sm text-muted mb-2">第二步：确认删除此节点的所有数据</p><div class="flex gap-2 mt-4"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\'' +
+            id +
+            '\')">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="btn' +
+            id +
+            '">确认删除</button></div>',
+        );
+        document.getElementById("clean" + id).onclick = function () {
+          copy(this.textContent);
+        };
+        document.getElementById("btn" + id).onclick = async function () {
+          await RPC("admin:removeClient", { uuid: uuid });
+          closeModal(id);
+          toast("已删除");
+          navigate("dashboard");
+        };
+      }
+
+      function renderNodePingSelector(tasks, selectedOrder) {
+        tasks = tasks || [];
+        selectedOrder = (selectedOrder || []).map(function (id) {
+          return String(id);
+        });
+        var selectedSet = {};
+        selectedOrder.forEach(function (id) {
+          selectedSet[id] = true;
+        });
+        var byId = {};
+        tasks.forEach(function (task) {
+          byId[String(task.id)] = task;
+        });
+        var selected = [];
+        selectedOrder.forEach(function (id) {
+          if (byId[id]) selected.push(byId[id]);
+        });
+        tasks.forEach(function (task) {
+          if (!selectedSet[String(task.id)]) return;
+          var exists = selected.some(function (item) {
+            return String(item.id) === String(task.id);
+          });
+          if (!exists) selected.push(task);
+        });
+        var unselected = tasks.filter(function (task) {
+          return !selectedSet[String(task.id)];
+        });
+        function row(task, isSelected) {
+          return (
+            '<label class="node-ping-row" data-task-id="' +
+            task.id +
+            '" data-selected="' +
+            (isSelected ? "true" : "false") +
+            '" draggable="' +
+            (isSelected ? "true" : "false") +
+            '">' +
+            '<span class="node-ping-handle">' +
+            (isSelected ? "☰" : "") +
+            "</span>" +
+            '<input type="checkbox" ' +
+            (isSelected ? "checked" : "") +
+            ">" +
+            '<span class="node-ping-name" title="' +
+            E(task.name || "") +
+            '">' +
+            E(task.name || "任务 " + task.id) +
+            "</span>" +
+            '<span class="node-ping-badge"></span></label>'
+          );
+        }
+        var html =
+          '<h4 class="sec-title">Ping 任务</h4><div class="node-ping-selector">' +
+          '<div><div class="flex justify-between items-center mb-2"><span class="text-xs text-muted">已选择（拖动排序）</span><span class="text-xs text-muted">前三项显示在卡片</span></div>' +
+          '<div class="node-ping-list node-ping-selected">';
+        if (selected.length) {
+          selected.forEach(function (task) {
+            html += row(task, true);
+          });
+        } else html += '<div class="node-ping-empty">尚未选择任务</div>';
+        html +=
+          '</div></div><div><div class="text-xs text-muted mb-2">未选择</div><div class="node-ping-list node-ping-unselected">';
+        if (unselected.length) {
+          unselected.forEach(function (task) {
+            html += row(task, false);
+          });
+        } else html += '<div class="node-ping-empty">没有其他任务</div>';
+        html += "</div></div></div>";
+        return html;
+      }
+      function bindNodePingSelector(form) {
+        if (!form) return;
+        var selected = form.querySelector(".node-ping-selected");
+        var unselected = form.querySelector(".node-ping-unselected");
+        if (!selected || !unselected) return;
+        var dragSrc = null;
+        function ensureEmpty(container, text) {
+          var rows = container.querySelectorAll(".node-ping-row");
+          var empty = container.querySelector(".node-ping-empty");
+          if (rows.length && empty) empty.remove();
+          if (!rows.length && !empty) {
+            var e = document.createElement("div");
+            e.className = "node-ping-empty";
+            e.textContent = text;
+            container.appendChild(e);
+          }
+        }
+        function refresh() {
+          var slot = 0;
+          Array.from(selected.querySelectorAll(".node-ping-row")).forEach(
+            function (row) {
+              row.dataset.selected = "true";
+              row.draggable = true;
+              row.querySelector(".node-ping-handle").textContent = "☰";
+              var badge = row.querySelector(".node-ping-badge");
+              badge.className = "node-ping-badge";
+              slot++;
+              if (slot <= 3) {
+                badge.textContent = "卡片 " + slot;
+                badge.classList.add("card-slot");
+              } else badge.textContent = "仅详情";
+            },
+          );
+          Array.from(unselected.querySelectorAll(".node-ping-row")).forEach(
+            function (row) {
+              row.dataset.selected = "false";
+              row.draggable = false;
+              row.querySelector(".node-ping-handle").textContent = "";
+              var badge = row.querySelector(".node-ping-badge");
+              badge.className = "node-ping-badge";
+              badge.textContent = "未选择";
+            },
+          );
+          ensureEmpty(selected, "尚未选择任务");
+          ensureEmpty(unselected, "没有其他任务");
+        }
+        form.addEventListener("change", function (event) {
+          var checkbox = event.target.closest(
+            '.node-ping-row input[type="checkbox"]',
+          );
+          if (!checkbox) return;
+          var row = checkbox.closest(".node-ping-row");
+          (checkbox.checked ? selected : unselected).appendChild(row);
+          refresh();
+        });
+        form.addEventListener("dragstart", function (event) {
+          var row = event.target.closest(".node-ping-row");
+          if (!row || row.dataset.selected !== "true") return;
+          dragSrc = row;
+          event.dataTransfer.effectAllowed = "move";
+          row.style.opacity = ".45";
+        });
+        form.addEventListener("dragend", function () {
+          if (dragSrc) dragSrc.style.opacity = "1";
+          dragSrc = null;
+          form.querySelectorAll(".node-ping-row").forEach(function (row) {
+            row.classList.remove("drag-over");
+          });
+        });
+        selected.addEventListener("dragover", function (event) {
+          var row = event.target.closest(".node-ping-row");
+          if (!dragSrc || !row || row === dragSrc) return;
+          event.preventDefault();
+          row.classList.add("drag-over");
+        });
+        selected.addEventListener("dragleave", function (event) {
+          var row = event.target.closest(".node-ping-row");
+          if (row) row.classList.remove("drag-over");
+        });
+        selected.addEventListener("drop", function (event) {
+          event.preventDefault();
+          var row = event.target.closest(".node-ping-row");
+          if (!dragSrc) return;
+          if (row && row !== dragSrc) {
+            var rows = Array.from(selected.querySelectorAll(".node-ping-row"));
+            selected.insertBefore(
+              dragSrc,
+              rows.indexOf(dragSrc) < rows.indexOf(row) ? row.nextSibling : row,
+            );
+          } else selected.appendChild(dragSrc);
+          refresh();
+        });
+        refresh();
+      }
+      function collectNodePingOrder(form) {
+        return Array.from(
+          form.querySelectorAll(".node-ping-selected .node-ping-row"),
+        )
+          .map(function (row) {
+            return parseInt(row.dataset.taskId);
+          })
+          .filter(function (id) {
+            return Number.isInteger(id) && id > 0;
+          });
+      }
+
+      async function editPing(id) {
+        var tasks = await RPC("admin:getAllPingTasks");
+        var t = (tasks || []).find(function (x) {
+          return x.id === id;
+        });
+        if (!t) return;
+        var mid = uid();
+        openModal(
+          mid,
+          "编辑 Ping",
+          '<form id="epf' +
+            mid +
+            '"><div class="form-group"><label>名称</label><input name="name" value="' +
+            E(t.name || "") +
+            '" required></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" value="' +
+            E(t.target || "") +
+            '" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp" ' +
+            (t.type === "icmp" ? "selected" : "") +
+            '>ICMP</option><option value="tcp" ' +
+            (t.type === "tcp" ? "selected" : "") +
+            '>TCP</option><option value="http" ' +
+            (t.type === "http" ? "selected" : "") +
+            ">HTTP</option></select></div></div>" +
+            '<div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="' +
+            (t.interval || 60) +
+            '" required></div>' +
+            '<p class="text-xs text-muted mb-2">作用节点与显示顺序请在节点列表的“编辑节点”中设置。</p>' +
+            '<button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>',
+        );
+        document.getElementById("epf" + mid).onsubmit = async function (e) {
+          e.preventDefault();
+          var f = new FormData(e.target);
+          await RPC("admin:editPingTask", {
+            tasks: [
+              {
+                id: id,
+                name: f.get("name"),
+                target: f.get("target"),
+                type: f.get("type"),
+                interval: parseInt(f.get("interval")),
+                clients: t.clients || [],
+                default_on: false,
+              },
+            ],
+          });
+          closeModal(mid);
+          toast("已保存");
+          navigate("ping");
+        };
+      }
+
+      async function deletePing(id) {
+        var mid = uid();
+        openModal(
+          mid,
+          "删除任务",
+          '<p>确定删除此 Ping 任务？</p><div class="flex gap-2 mt-4"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\'' +
+            mid +
+            '\')">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="dp' +
+            mid +
+            '">确认</button></div>',
+        );
+        document.getElementById("dp" + mid).onclick = async function () {
+          await RPC("admin:deletePingTask", { id: [id] });
+          closeModal(mid);
+          toast("已删除");
+          navigate("ping");
+        };
+      }
+
+      async function delSession(id) {
+        await RPC("admin:deleteSession", { session: id });
+        toast("已删除");
+        navigate("sessions");
+      }
+
+      async function editClip(id) {
+        var items = await RPC("admin:listClipboard");
+        var c = (items || []).find(function (x) {
+          return x.id === id;
+        });
+        if (!c) return;
+        var mid = uid();
+        openModal(
+          mid,
+          "编辑",
+          '<form id="ecf' +
+            mid +
+            '"><div class="form-group"><label>标题</label><input name="name" value="' +
+            E(c.name || c.title || "") +
+            '"></div><div class="form-group"><label>内容</label><textarea name="text" rows="6">' +
+            E(c.text || c.content || "") +
+            '</textarea></div><button class="btn btn-primary w-full mt-2" type="submit">保存</button></form>',
+        );
+        document.getElementById("ecf" + mid).onsubmit = async function (e) {
+          e.preventDefault();
+          var f = new FormData(e.target);
+          await RPC("admin:updateClipboard", {
+            id: String(id),
+            name: f.get("name"),
+            text: f.get("text"),
+          });
+          closeModal(mid);
+          toast("已保存");
+          navigate("clipboard");
+        };
+      }
+      async function delClip(id) {
+        await RPC("admin:deleteClipboard", { id: String(id) });
+        toast("已删除");
+        navigate("clipboard");
+      }
+
+      var dragSrc = null;
+      function initDragDrop() {
+        var rows = document.querySelectorAll(".draggable-row");
+        rows.forEach(function (r) {
+          // 只在拖拽手柄上允许拖拽
+          var handle = r.querySelector(".drag-handle");
+          if (handle) {
+            r.draggable = false;
+            handle.addEventListener("mousedown", function () {
+              r.draggable = true;
+            });
+            handle.addEventListener("mouseup", function () {
+              r.draggable = false;
+            });
+            document.addEventListener(
+              "mouseup",
+              function () {
+                r.draggable = false;
+              },
+              { passive: true },
+            );
+          }
+          r.addEventListener("dragstart", function (e) {
+            if (!r.draggable) return;
+            dragSrc = this;
+            this.style.opacity = "0.4";
+            e.dataTransfer.effectAllowed = "move";
+          });
+          r.addEventListener("dragend", function () {
+            this.style.opacity = "1";
+            r.draggable = false;
+            document.querySelectorAll(".draggable-row").forEach(function (r2) {
+              r2.classList.remove("drag-over");
+              r2.style.borderTop = "";
+            });
+          });
+          r.addEventListener("dragover", function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (this !== dragSrc) this.classList.add("drag-over");
+          });
+          r.addEventListener("dragleave", function () {
+            this.classList.remove("drag-over");
+          });
+          r.addEventListener("drop", async function (e) {
+            e.stopPropagation();
+            this.classList.remove("drag-over");
+            if (dragSrc === this) return;
+            var allRows = Array.from(
+              document.querySelectorAll(".draggable-row"),
+            );
+            var fromIdx = allRows.indexOf(dragSrc);
+            var toIdx = allRows.indexOf(this);
+            if (fromIdx < toIdx) {
+              this.parentNode.insertBefore(dragSrc, this.nextSibling);
+            } else {
+              this.parentNode.insertBefore(dragSrc, this);
+            }
+            // 保存新顺序：weight 从大到小（最上面权重最大）
+            var newRows = Array.from(
+              document.querySelectorAll(".draggable-row"),
+            );
+            var total = newRows.length;
+            var order = {};
+            newRows.forEach(function (r, i) {
+              order[r.dataset.uuid] = i;
+            });
+            await RPC("admin:orderClients", order);
+            toast("排序已保存");
+            newRows.forEach(function (r, i) {
+              var wb = r.querySelector(".weight-badge");
+              if (wb) wb.textContent = total - i;
+            });
+          });
+        });
+        document.querySelectorAll(".weight-badge").forEach(function (badge) {
+          badge.addEventListener("click", function () {
+            var uuid = badge.dataset.uuid;
+            var cur = parseInt(badge.dataset.weight) || 0;
+
+            if (val === null) return;
+            var w = parseInt(val);
+            if (isNaN(w)) {
+              toast("请输入有效数字");
+              return;
+            }
+            RPC("admin:editClient", { uuid: uuid, weight: w }).then(
+              function () {
+                badge.textContent = w;
+                badge.dataset.weight = w;
+                toast("权重已更新");
+              },
+            );
+          });
+        });
+      }
+      function bindEvents() {
+        var _d = document;
+        initDragDrop();
+
+        var abtn = _d.getElementById("addNodeBtn");
+        if (abtn)
+          abtn.onclick = async function () {
+            var id = uid();
+            var pingTasks = (await RPC("admin:getAllPingTasks")) || [];
+            openModal(
+              id,
+              "\u6dfb\u52a0\u8282\u70b9",
+              '<form id="anf' +
+                id +
+                '"><div class="modal-grid"><div class="form-group"><label>\u540d\u79f0</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>\u5206\u7ec4</label><input name="group" placeholder="\u4f8b\u5982: \u65e5\u672c\u8282\u70b9"></div></div><div class="modal-grid"><div class="form-group"><label>\u6743\u91cd</label><input name="weight" type="number" value="0"></div><div class="form-group"><label>\u9690\u85cf</label><select name="hidden"><option value="false" selected>\u5426</option><option value="true">\u662f</option></select></div></div><h4 class="sec-title">\u6d41\u91cf</h4><div class="modal-grid"><div class="form-group"><label>\u542f\u7528\u6708\u5ea6\u6d41\u91cf\u91cd\u7f6e</label><select name="traffic_reset_enabled"><option value="true" selected>\u5f00\u542f</option><option value="false">\u5173\u95ed</option></select></div><div class="form-group"><label>\u6d41\u91cf\u9608\u503c (GB)</label><input name="traffic_limit" type="number" value="0"></div></div><div class="modal-grid"><div class="form-group"><label>\u9608\u503c\u7c7b\u578b</label><select name="traffic_limit_type"><option value="sum" selected>\u5408\u8ba1</option><option value="up">\u4e0a\u884c</option><option value="down">\u4e0b\u884c</option></select></div><div class="form-group"><label>\u6d41\u91cf\u8865\u507f (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="0.00"></div></div><div class="modal-grid"><div class="form-group"><label>\u91cd\u7f6e\u65e5(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="1"></div><div class="form-group"><label>\u91cd\u7f6e\u5c0f\u65f6(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="0"></div></div><div class="text-xs text-muted mt-1">\u6d41\u91cf\u8865\u507f\u652f\u6301\u8d1f\u6570\uff0c\u6bcf\u6708\u91cd\u7f6e\u65e5\u81ea\u52a8\u6e05\u96f6\u3002</div><button class="btn btn-primary w-full mt-3" type="submit">\u521b\u5efa</button></form>',
+            );
+            var addForm = _d.getElementById("anf" + id);
+            addForm
+              .querySelector('button[type="submit"]')
+              .insertAdjacentHTML(
+                "beforebegin",
+                renderNodePingSelector(pingTasks, []),
+              );
+            bindNodePingSelector(addForm);
+            addForm.onsubmit = async function (e) {
+              e.preventDefault();
+              var f = new FormData(e.target);
+              var compGB = parseFloat(f.get("traffic_compensation")) || 0;
+              var data = {
+                name: f.get("name"),
+                group: f.get("group"),
+                weight: parseInt(f.get("weight")) || 0,
+                hidden: f.get("hidden") === "true",
+                traffic_limit:
+                  (parseInt(f.get("traffic_limit")) || 0) * 1073741824,
+                traffic_limit_type: f.get("traffic_limit_type"),
+                traffic_reset_day: parseInt(f.get("traffic_reset_day")) || 1,
+                traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
+                traffic_compensation: Math.round(compGB * 1073741824),
+                traffic_reset_enabled:
+                  f.get("traffic_reset_enabled") === "true",
+                ping_task_order: collectNodePingOrder(e.target),
+              };
+              var r = await RPC("admin:addClient", data);
+              closeModal(id);
+              if (r && r.token) {
+                var id2 = uid();
+                openModal(
+                  id2,
+                  "\u5df2\u521b\u5efa",
+                  '<div class="token-box mb-3" id="ntk' +
+                    id2 +
+                    '">' +
+                    E(r.token) +
+                    '</div><p class="text-xs text-muted mb-1">UUID: ' +
+                    E(r.uuid || "") +
+                    '</p><p class="text-xs text-muted">\u70b9\u51fb Token \u590d\u5236</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\'' +
+                    id2 +
+                    "')\">\u5b8c\u6210</button>",
+                );
+                _d.getElementById("ntk" + id2).onclick = function () {
+                  copy(this.textContent);
+                };
+              }
+              navigate("dashboard");
+            };
+          };
+        var pbtn = _d.getElementById("addPingBtn");
+        if (pbtn)
+          pbtn.onclick = async function () {
+            var id = uid();
+            openModal(
+              id,
+              "添加 Ping 任务",
+              '<form id="apf' +
+                id +
+                '"><div class="form-group"><label>名称</label><input name="name" required></div>' +
+                '<div class="modal-grid"><div class="form-group"><label>目标 IP/域名</label><input name="target" required></div><div class="form-group"><label>类型</label><select name="type"><option value="icmp">ICMP</option><option value="tcp">TCP</option><option value="http">HTTP</option></select></div></div>' +
+                '<div class="form-group"><label>间隔(秒)</label><input name="interval" type="number" value="60" required></div>' +
+                '<p class="text-xs text-muted mb-2">创建后请在节点列表的“编辑节点”中选择作用节点并排序。</p>' +
+                '<button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>',
+            );
+            _d.getElementById("apf" + id).onsubmit = async function (e) {
+              e.preventDefault();
+              var f = new FormData(e.target);
+              await RPC("admin:addPingTask", {
+                name: f.get("name"),
+                target: f.get("target"),
+                type: f.get("type"),
+                interval: parseInt(f.get("interval")),
+                clients: [],
+                default_on: false,
+              });
+              closeModal(id);
+              toast("已创建");
+              navigate("ping");
+            };
+          };
+
+        var rbtn = _d.getElementById("reorderNodesBtn");
+        if (rbtn) rbtn.onclick = reorderNodes;
+
+        var sf = _d.getElementById("settingsForm");
+        if (sf)
+          sf.onsubmit = async function (e) {
+            e.preventDefault();
+            var f = new FormData(e.target);
+            var cfg = {};
+            for (var pair of f.entries()) {
+              var v = pair[1];
+              if (v === "true") cfg[pair[0]] = true;
+              else if (v === "false") cfg[pair[0]] = false;
+              else if (!isNaN(Number(v)) && v !== "") cfg[pair[0]] = Number(v);
+              else cfg[pair[0]] = v;
+            }
+            await RPC("admin:editSettings", cfg);
+            toast("设置已保存");
+          };
+
+        var tf = _d.getElementById("themeForm");
+        if (tf)
+          tf.onsubmit = async function (e) {
+            e.preventDefault();
+            var f = new FormData(e.target);
+            var cfg = {};
+            for (var pair of f.entries()) {
+              var v = pair[1];
+              if (v === "true") cfg[pair[0]] = true;
+              else if (v === "false") cfg[pair[0]] = false;
+              else if (!isNaN(Number(v)) && v !== "") cfg[pair[0]] = Number(v);
+              else cfg[pair[0]] = v;
+            }
+            await fetch("/api/admin/theme/settings?theme=VPS", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(cfg),
+            });
+            toast("主题已保存");
+          };
+
+        [
+          { id: "backgroundLightInput", slot: "light" },
+          { id: "backgroundDarkInput", slot: "dark" },
+        ].forEach(function (item) {
+          var input = _d.getElementById(item.id);
+          if (!input) return;
+          input.onchange = async function () {
+            var file = input.files && input.files[0];
+            input.value = "";
+            if (!file) return;
+            if (!file.type.startsWith("image/")) {
+              toast("请选择图片文件");
+              return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+              toast("图片不能超过 10 MB");
+              return;
+            }
+            var fd = new FormData();
+            fd.append("slot", item.slot);
+            fd.append("image", file, file.name);
+            var response = await fetch("/api/admin/theme/background", {
+              method: "POST",
+              credentials: "include",
+              body: fd,
+            });
+            var payload = await response.json().catch(function () { return {}; });
+            if (!response.ok || payload.status === "error") {
+              toast(payload.message || "背景图片上传失败");
+              return;
+            }
+            toast(item.slot === "light" ? "亮色背景已更新" : "暗色背景已更新");
+            navigate("theme");
+          };
+        });
+
+        var ai = _d.getElementById("avatarInput");
+        if (ai)
+          ai.onchange = async function () {
+            var f = ai.files[0];
+            if (!f || !f.type.startsWith("image/")) return;
+            var c = document.createElement("canvas");
+            c.width = c.height = 512;
+            var ctx = c.getContext("2d");
+            var img = new Image();
+            img.onload = function () {
+              var s = Math.min(512 / img.width, 512 / img.height);
+              var w = Math.round(img.width * s);
+              var h = Math.round(img.height * s);
+              ctx.clearRect(0, 0, 512, 512);
+              ctx.drawImage(
+                img,
+                Math.round((512 - w) / 2),
+                Math.round((512 - h) / 2),
+                w,
+                h,
+              );
+              c.toBlob(async function (b) {
+                var fd = new FormData();
+                fd.append("image", b, "avatar.png");
+                var r = await fetch("/api/avatar", {
+                  method: "POST",
+                  credentials: "include",
+                  body: fd,
+                });
+                if (r.ok) {
+                  toast("头像已更新");
+                  var ap = _d.getElementById("avatarPreview");
+                  if (ap) ap.src = c.toDataURL();
+                } else toast("上传失败");
+              }, "image/png");
+            };
+            img.src = URL.createObjectURL(f);
+          };
+        var uf = _d.getElementById("changeUserForm");
+        if (uf)
+          uf.onsubmit = async function (e) {
+            e.preventDefault();
+            var me = await RPC("public:getMe");
+            await fetch("/api/admin/update/user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                uuid: me.uuid,
+                username: e.target.username.value,
+              }),
+            });
+            toast("用户名已更新");
+          };
+
+        var pf = _d.getElementById("changePassForm");
+        if (pf)
+          pf.onsubmit = async function (e) {
+            e.preventDefault();
+            if (e.target.password.value !== e.target.password_repeat.value) {
+              toast("两次密码不一致");
+              return;
+            }
+            var me2 = await RPC("public:getMe");
+            await fetch("/api/admin/update/user", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                uuid: me2.uuid,
+                password: e.target.password.value,
+              }),
+            });
+            toast("密码已更新");
+            e.target.reset();
+          };
+
+        var dob = _d.getElementById("delOtherSessions");
+        if (dob)
+          dob.onclick = async function () {
+            var s = (await RPC("admin:getSessions")) || {
+              sessions: [],
+              current: "",
+            };
+            var list = s.sessions || s.data || [];
+            for (var i = 0; i < list.length; i++) {
+              if (list[i].session !== s.current)
+                await RPC("admin:deleteSession", { session: list[i].session });
+            }
+            toast("已清除其他会话");
+            navigate("sessions");
+          };
+
+        var dab = _d.getElementById("delAllSessions");
+        if (dab)
+          dab.onclick = async function () {
+            await RPC("admin:deleteAllSessions");
+            toast("全部会话已清除，请重新登录");
+            setTimeout(logout, 1500);
+          };
+
+        var vb = _d.getElementById("vacuumBtn");
+        if (vb)
+          vb.onclick = async function () {
+            var r = await RPC("admin:vacuumDatabase");
+            if (r)
+              toast(
+                "压缩完成: " +
+                  B(r.before || 0) +
+                  " → " +
+                  B(r.after || r.size || 0),
+              );
+            else toast("已压缩");
+          };
+
+        var cpb = _d.getElementById("clearPingBtn");
+        if (cpb)
+          cpb.onclick = async function () {
+            var mid = uid();
+            var htm =
+              '<p class=\"mb-3\">确定要清空所有Ping记录吗？此操作不可撤销。</p><div class=\"flex gap-2\"><button class=\"btn btn-outline btn-sm\" style=\"flex:1\" onclick=\"closeModal(\\x27' +
+              mid +
+              '\\x27)\">取消</button><button class=\"btn btn-danger btn-sm\" style=\"flex:1\" id=\"btn' +
+              mid +
+              '\">确认清空</button></div>';
+            openModal(mid, "清空Ping记录", htm);
+            document.getElementById("btn" + mid).onclick = async function () {
+              await RPC("admin:clearPingRecords");
+              closeModal(mid);
+              toast("Ping记录已清空");
+            };
+          };
+        var crb = _d.getElementById("clearRecordsBtn");
+        if (crb)
+          crb.onclick = async function () {
+            await RPC("admin:clearRecords");
+            toast("监控记录已清空");
+          };
+
+        var cab = _d.getElementById("clearAllRecordsBtn");
+        if (cab)
+          cab.onclick = async function () {
+            var mid = uid();
+            openModal(
+              mid,
+              "清空全部记录",
+              '<p class="mb-3">确定清空所有记录？此操作不可恢复。</p><div class="flex gap-2"><button class="btn btn-outline btn-sm" style="flex:1" onclick="closeModal(\'' +
+                mid +
+                '\')">取消</button><button class="btn btn-danger btn-sm" style="flex:1" id="clearAll' +
+                mid +
+                '">确认清空</button></div>',
+            );
+            document.getElementById("clearAll" + mid).onclick =
+              async function () {
+                await RPC("admin:clearAllRecords");
+                closeModal(mid);
+                toast("全部记录已清空");
+              };
+          };
+
+        var acb = _d.getElementById("addClipBtn");
+        if (acb)
+          acb.onclick = async function () {
+            var id = uid();
+            openModal(
+              id,
+              "新建",
+              '<form id="ncf' +
+                id +
+                '"><div class="form-group"><label>标题</label><input name="name" required></div><div class="form-group"><label>内容</label><textarea name="text" rows="6" required></textarea></div><button class="btn btn-primary w-full mt-2" type="submit">创建</button></form>',
+            );
+            _d.getElementById("ncf" + id).onsubmit = async function (e) {
+              e.preventDefault();
+              var f = new FormData(e.target);
+              await RPC("admin:createClipboard", {
+                name: f.get("name"),
+                text: f.get("text"),
+              });
+              closeModal(id);
+              toast("已创建");
+              navigate("clipboard");
+            };
+          };
+
+        var bf = _d.getElementById("backupForm");
+        if (bf)
+          bf.onsubmit = async function (e) {
+            e.preventDefault();
+            var fd = new FormData(e.target);
+            var r = await fetch("/api/admin/upload/backup", {
+              method: "POST",
+              credentials: "include",
+              body: fd,
+            });
+            if (r.ok) toast("备份已上传恢复");
+            else toast("上传失败");
+          };
+
+        // Clipboard copy buttons
+        var copyBtns = _d.querySelectorAll("[id^='clipCopy']");
+        for (var i = 0; i < copyBtns.length; i++) {
+          (function (btn) {
+            var cid = parseInt(btn.id.replace("clipCopy", ""));
+            btn.onclick = async function () {
+              var items = await RPC("admin:listClipboard");
+              var c = (items || []).find(function (x) {
+                return x.id === cid;
+              });
+              if (c) copy(c.text || c.content || "");
+            };
+          })(copyBtns[i]);
+        }
+      }
+
+      async function init() {
+        buildSidebar();
+        await checkSession();
+        if (session) {
+          navigate("dashboard");
+        }
+      }
+      init();
+    </script>
+  </body>
+</html>
