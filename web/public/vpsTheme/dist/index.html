@@ -33,12 +33,9 @@
         z-index: 0;
       }
       html[data-vps-custom-background="true"] .loading-cover {
-        background-color: rgba(248, 250, 252, 0.12) !important;
-        -webkit-backdrop-filter: blur(2px) !important;
-        backdrop-filter: blur(2px) !important;
-      }
-      html.dark[data-vps-custom-background="true"] .loading-cover {
-        background-color: rgba(2, 6, 23, 0.18) !important;
+        background-color: transparent !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
       }
       html[data-vps-custom-background="true"] .default-background,
       html[data-vps-custom-background="true"] .background-loading {
@@ -141,6 +138,7 @@
       const bootstrapHost = document.getElementById('vps-background-bootstrap');
       if (bootstrapHost && document.documentElement.dataset.vpsCustomBackground === 'true') {
         let released = false;
+        let releaseScheduled = false;
         let observer;
         const releaseBootstrap = () => {
           if (released) return;
@@ -150,10 +148,13 @@
           delete document.documentElement.dataset.vpsCustomBackground;
         };
         const detectAppBackground = () => {
+          if (releaseScheduled || document.querySelector('.loading-cover')) return;
           const image = document.querySelector('.background-image');
-          if (image) {
-            requestAnimationFrame(releaseBootstrap);
-          }
+          if (!image || !image.style.backgroundImage || image.style.backgroundImage === 'none') return;
+          releaseScheduled = true;
+          Promise.resolve(window.__VPS_BACKGROUND_READY__).then(() => {
+            requestAnimationFrame(() => requestAnimationFrame(releaseBootstrap));
+          });
         };
         observer = new MutationObserver(detectAppBackground);
         observer.observe(document.documentElement, { childList: true, subtree: true });
