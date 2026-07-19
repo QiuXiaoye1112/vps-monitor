@@ -90,12 +90,14 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`data-vps-custom-background="true"] #vps-background-bootstrap`,
 		`data-vps-custom-background="true"] .loading-cover`,
 		`background-color: transparent !important`,
+		`backdrop-filter: blur(8px) !important`,
 		`id="vps-background-bootstrap"`,
 		`new MutationObserver(detectAppBackground)`,
 		`document.querySelector('.loading-cover')`,
 		`image.style.backgroundImage`,
 		`requestAnimationFrame(() => requestAnimationFrame(releaseBootstrap))`,
 		`background-image-dark-fix-20260719`,
+		`src="/assets/index-BmdGcRWR-vpsbundle1449.js?v=custom-background-no-default-20260719"`,
 		`href="/assets/index-zYil-n0Q.css?v=background-image-dark-fix-20260719"`,
 	} {
 		if !strings.Contains(html, required) {
@@ -124,6 +126,7 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 		`I=k(()=>"image")`,
 		`F=k(()=>"dark"===D.value?A.value||O.value:O.value)`,
 		`t.backgroundEnabled&&!!t.currentBackgroundUrl`,
+		`w=k(()=>!p.value&&"true"!==document.documentElement.dataset.vpsCustomBackground)`,
 	} {
 		if !strings.Contains(bundle, required) {
 			t.Fatalf("image-only background runtime guard %q is missing", required)
