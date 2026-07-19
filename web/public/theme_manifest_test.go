@@ -89,6 +89,7 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`data-vps-custom-background="true"] .default-background`,
 		`id="vps-background-bootstrap"`,
 		`new MutationObserver(detectAppBackground)`,
+		`background-image-dark-fix-20260719`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("background bootstrap guard %q is missing", required)
@@ -115,9 +116,24 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 	for _, required := range []string{
 		`I=k(()=>"image")`,
 		`F=k(()=>"dark"===D.value?A.value||O.value:O.value)`,
+		`t.backgroundEnabled&&!!t.currentBackgroundUrl`,
 	} {
 		if !strings.Contains(bundle, required) {
 			t.Fatalf("image-only background runtime guard %q is missing", required)
 		}
+	}
+}
+
+func TestVPSThemeDefaultDarkBackgroundIsOpaque(t *testing.T) {
+	raw, err := PublicFS.ReadFile("vpsTheme/dist/assets/index-zYil-n0Q.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(raw)
+	if !strings.Contains(css, `.dark .default-background[data-v-f4798363]{background:#0f172a}`) {
+		t.Fatal("default dark background must use an opaque base color")
+	}
+	if strings.Contains(css, `.dark .default-background[data-v-f4798363]{background:#0f172a80}`) {
+		t.Fatal("translucent default dark background must not be restored")
 	}
 }
