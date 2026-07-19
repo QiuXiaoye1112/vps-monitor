@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>VPS Monitor</title>
+    <meta name="description" content="VPS Monitor" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- VPS_THEME_BOOTSTRAP -->
+    <style>
+      #vps-background-bootstrap {
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        pointer-events: none;
+        overflow: hidden;
+        background-color: var(--vps-bootstrap-color, #f8fafc);
+        background-image: var(--vps-bootstrap-image, none);
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        box-shadow: inset 0 0 0 100vmax rgba(0, 0, 0, var(--vps-bootstrap-overlay, 0));
+        opacity: var(--vps-bootstrap-opacity, 1);
+        filter: blur(var(--vps-bootstrap-blur, 0px));
+        transform: scale(var(--vps-bootstrap-scale, 1));
+      }
+      html[data-vps-custom-background='true'],
+      html[data-vps-custom-background='true'] body {
+        background-color: transparent !important;
+      }
+      html[data-vps-custom-background='true'] #vps-background-bootstrap {
+        z-index: 0;
+      }
+      html[data-vps-custom-background='true'] .loading-cover {
+        background-color: transparent !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
+      }
+      html[data-vps-custom-background='true'] .default-background,
+      html[data-vps-custom-background='true'] .background-loading {
+        background: transparent !important;
+        opacity: 0 !important;
+      }
+    </style>
+    <script>
+      ;(() => {
+        const publicInfo = window.__VPS_THEME_BOOTSTRAP__
+        const settings =
+          publicInfo && publicInfo.theme_settings && typeof publicInfo.theme_settings === 'object'
+            ? publicInfo.theme_settings
+            : {}
+        const enabled = settings.backgroundEnabled === true
+        let preference = 'auto'
+        try {
+          preference = localStorage.getItem('themeMode') || 'auto'
+          const parsed = JSON.parse(preference)
+          if (typeof parsed === 'string') preference = parsed
+        } catch (_) {}
+        if (!['auto', 'light', 'dark'].includes(preference)) preference = 'auto'
+        const managedMode = ['beijing', 'light', 'dark'].includes(settings.themeMode) ? settings.themeMode : 'beijing'
+        const beijingHour =
+          Number(
+            new Intl.DateTimeFormat('en-US', {
+              hour: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Shanghai',
+            }).format(new Date()),
+          ) % 24
+        const beijingDaytime = beijingHour >= 7 && beijingHour < 19
+        const dark =
+          preference === 'dark' ||
+          (preference !== 'light' && (managedMode === 'dark' || (managedMode === 'beijing' && !beijingDaytime)))
+        document.documentElement.classList.toggle('dark', dark)
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+
+        const lightUrl = typeof settings.lightBackgroundUrl === 'string' ? settings.lightBackgroundUrl.trim() : ''
+        const darkUrl = typeof settings.darkBackgroundUrl === 'string' ? settings.darkBackgroundUrl.trim() : ''
+        const url = (dark ? darkUrl || lightUrl : lightUrl).trim()
+        window.__VPS_BACKGROUND_READY__ = Promise.resolve()
+        window.__VPS_BACKGROUND_PRELOADED__ = ''
+        if (!enabled || !url) return
+
+        document.documentElement.dataset.vpsCustomBackground = 'true'
+        document.documentElement.style.setProperty('--vps-bootstrap-color', dark ? '#0f172a' : '#f8fafc')
+        const blur = Number.isFinite(settings.backgroundBlur) ? Math.max(0, settings.backgroundBlur) : 0
+        document.documentElement.style.setProperty('--vps-bootstrap-blur', `${blur}px`)
+        document.documentElement.style.setProperty('--vps-bootstrap-scale', blur > 0 ? '1.04' : '1')
+        const overlay = Number.isFinite(settings.backgroundOverlay)
+          ? Math.max(-100, Math.min(100, settings.backgroundOverlay))
+          : 0
+        if (overlay < 0) {
+          document.documentElement.style.setProperty('--vps-bootstrap-opacity', String(1 - Math.abs(overlay) / 100))
+        } else if (overlay > 0) {
+          document.documentElement.style.setProperty('--vps-bootstrap-overlay', String(overlay / 100))
+        }
+        document.documentElement.style.setProperty('--vps-bootstrap-image', `url(${JSON.stringify(url)})`)
+
+        window.__VPS_BACKGROUND_READY__ = new Promise((resolve) => {
+          let settled = false
+          const finish = (loaded) => {
+            if (settled) return
+            settled = true
+            if (loaded) window.__VPS_BACKGROUND_PRELOADED__ = url
+            resolve()
+          }
+          const timeout = window.setTimeout(() => finish(false), 4000)
+          const done = (loaded) => {
+            window.clearTimeout(timeout)
+            finish(loaded)
+          }
+          const preload = document.createElement('link')
+          preload.rel = 'preload'
+          preload.as = 'image'
+          preload.href = url
+          preload.fetchPriority = 'high'
+          document.head.appendChild(preload)
+          const image = new Image()
+          image.decoding = 'async'
+          image.fetchPriority = 'high'
+          image.onload = () => done(true)
+          image.onerror = () => done(false)
+          image.src = url
+        })
+      })()
+    </script>
+    <style>
+      .legacy-browser-message {
+        display: none;
+        padding: 24px;
+        font:
+          16px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      .no-esm .legacy-browser-message {
+        display: block;
+      }
+    </style>
+    <script>
+      ;(function () {
+        try {
+          var officialAppRoute = /^\/(admin|terminal|manage)(\/|$)/
+          if (officialAppRoute.test(location.pathname)) {
+            var officialRoute = location.pathname + location.search + location.hash
+            var adminEntry = '/admin-app/index.html'
+            try {
+              sessionStorage.setItem('komariOfficialAppRoute', officialRoute)
+              location.replace(adminEntry)
+            } catch {
+              location.replace(adminEntry + '?__komari_route=' + encodeURIComponent(officialRoute))
+            }
+            return
+          }
+
+          var root = document.documentElement
+          var css = window.CSS
+          var supportsModernColor =
+            !!css &&
+            css.supports('color', 'oklch(0.5 0.1 120)') &&
+            css.supports('color', 'color-mix(in srgb, red 50%, white)')
+          if (!supportsModernColor) root.classList.add('legacy-webkit')
+          if (!('noModule' in document.createElement('script'))) root.classList.add('no-esm')
+
+          var mode = localStorage.getItem('themeMode')
+          var isDark = mode === 'dark'
+
+          if (mode !== 'dark' && mode !== 'light') {
+            var hour = Number(
+              new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Shanghai',
+              }).format(new Date()),
+            )
+            if (hour === 24) hour = 0
+            isDark = Number.isFinite(hour) ? hour < 7 || hour >= 19 : true
+          }
+
+          root.classList.toggle('dark', isDark)
+          root.style.colorScheme = isDark ? 'dark' : 'light'
+        } catch (error) {
+          document.documentElement.classList.add('dark')
+          document.documentElement.classList.add('legacy-webkit')
+          document.documentElement.style.colorScheme = 'dark'
+        }
+      })()
+    </script>
+  </head>
+
+  <body>
+    <div class="legacy-browser-message" role="alert">
+      当前 iOS 浏览器内核版本过低，请升级到 iOS 15.4 或更高版本后访问。
+    </div>
+    <div id="vps-background-bootstrap" aria-hidden="true"></div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      const bootstrapHost = document.getElementById('vps-background-bootstrap')
+      if (bootstrapHost && document.documentElement.dataset.vpsCustomBackground === 'true') {
+        let released = false
+        let releaseScheduled = false
+        let observer
+        const releaseBootstrap = () => {
+          if (released) return
+          released = true
+          if (observer) observer.disconnect()
+          bootstrapHost.remove()
+          delete document.documentElement.dataset.vpsCustomBackground
+        }
+        const detectAppBackground = () => {
+          if (releaseScheduled || document.querySelector('.loading-cover')) return
+          const image = document.querySelector('.background-image')
+          if (!image || !image.style.backgroundImage || image.style.backgroundImage === 'none') return
+          releaseScheduled = true
+          Promise.resolve(window.__VPS_BACKGROUND_READY__).then(() => {
+            requestAnimationFrame(() => requestAnimationFrame(releaseBootstrap))
+          })
+        }
+        observer = new MutationObserver(detectAppBackground)
+        observer.observe(document.documentElement, { childList: true, subtree: true })
+        detectAppBackground()
+      }
+    </script>
+  </body>
+</html>

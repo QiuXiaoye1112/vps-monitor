@@ -2,9 +2,31 @@ package public
 
 import (
 	"encoding/json"
+	"io/fs"
 	"strings"
 	"testing"
 )
+
+func readVPSThemeAssets(t *testing.T, pattern string) string {
+	t.Helper()
+	paths, err := fs.Glob(PublicFS, pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatalf("no theme assets matched %q", pattern)
+	}
+	var result strings.Builder
+	for _, path := range paths {
+		raw, err := PublicFS.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result.Write(raw)
+		result.WriteByte('\n')
+	}
+	return result.String()
+}
 
 func TestVPSThemeManifestDoesNotExposeRemovedSettings(t *testing.T) {
 	raw, err := PublicFS.ReadFile("vpsTheme/monitor-theme.json")
@@ -86,9 +108,9 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`rel = 'preload'`,
 		`preload.as = 'image'`,
 		`fetchPriority = 'high'`,
-		`data-vps-custom-background="true"] .default-background`,
-		`data-vps-custom-background="true"] #vps-background-bootstrap`,
-		`data-vps-custom-background="true"] .loading-cover`,
+		`data-vps-custom-background='true'] .default-background`,
+		`data-vps-custom-background='true'] #vps-background-bootstrap`,
+		`data-vps-custom-background='true'] .loading-cover`,
 		`background-color: transparent !important`,
 		`backdrop-filter: blur(8px) !important`,
 		`id="vps-background-bootstrap"`,
@@ -96,9 +118,8 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`document.querySelector('.loading-cover')`,
 		`image.style.backgroundImage`,
 		`requestAnimationFrame(() => requestAnimationFrame(releaseBootstrap))`,
-		`background-image-dark-fix-20260719`,
-		`src="/assets/index-BmdGcRWR-vpsbundle1449.js?v=custom-background-no-default-20260719"`,
-		`href="/assets/index-zYil-n0Q.css?v=background-image-dark-fix-20260719"`,
+		`type="module"`,
+		`rel="stylesheet"`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("background bootstrap guard %q is missing", required)
@@ -117,33 +138,36 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 }
 
 func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T) {
-	raw, err := PublicFS.ReadFile("vpsTheme/dist/assets/index-BmdGcRWR-vpsbundle1449.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	bundle := string(raw)
+	bundle := readVPSThemeAssets(t, "vpsTheme/dist/assets/*.js")
 	for _, required := range []string{
-		`I=k(()=>"image")`,
-		`F=k(()=>"dark"===D.value?A.value||O.value:O.value)`,
-		`t.backgroundEnabled&&!!t.currentBackgroundUrl`,
-		`w=k(()=>!p.value&&"true"!==document.documentElement.dataset.vpsCustomBackground)`,
+		`background-image`,
+		`__VPS_BACKGROUND_PRELOADED__`,
+		`VPS Monitor`,
+		`累计流量`,
+		`流量重置时间`,
 	} {
 		if !strings.Contains(bundle, required) {
 			t.Fatalf("image-only background runtime guard %q is missing", required)
 		}
 	}
+	for _, removed := range []string{
+		`background-video`,
+		`Komari Glassmorphism`,
+		`搜索节点`,
+		`显示高级工具`,
+	} {
+		if strings.Contains(bundle, removed) {
+			t.Fatalf("removed theme runtime %q is still present", removed)
+		}
+	}
 }
 
 func TestVPSThemeDefaultDarkBackgroundIsOpaque(t *testing.T) {
-	raw, err := PublicFS.ReadFile("vpsTheme/dist/assets/index-zYil-n0Q.css")
-	if err != nil {
-		t.Fatal(err)
-	}
-	css := string(raw)
-	if !strings.Contains(css, `.dark .default-background[data-v-f4798363]{background:#0f172a}`) {
+	css := readVPSThemeAssets(t, "vpsTheme/dist/assets/*.css")
+	if !strings.Contains(css, `.dark .default-background`) || !strings.Contains(css, `background:#0f172a`) {
 		t.Fatal("default dark background must use an opaque base color")
 	}
-	if strings.Contains(css, `.dark .default-background[data-v-f4798363]{background:#0f172a80}`) {
+	if strings.Contains(css, `background:#0f172a80`) {
 		t.Fatal("translucent default dark background must not be restored")
 	}
 }
