@@ -33,7 +33,7 @@
 - 还原迁移前亮色/暗色主题的核心 token，避免直接采用上游 v3.2.0 的灰蓝色视觉变化；生成后的页面保持当前白色亮色卡片和既有暗色对比度。
 - 最终验证：主题源码类型检查、lint、生产构建通过；`go test ./web/public ./web/api/admin ./web/api/client ./web/rpc/jsonrpc` 通过；首页、详情和 `/api/public` 本地响应为 200；入口引用资产完整且最终 bundle 不包含 Komari 可见文案、视频背景和废弃默认资源。
 - 后续维护约束：所有前台改动必须先修改 `web/theme-src/vps-theme/src`，再运行根目录的 `web/theme-src/build-vps-theme.sh`；不得直接修改 `web/public/vpsTheme/dist/assets` 中的压缩产物。
-- 发布记录：运行代码提交 `8746349` 已推送到 `agent/native-theme-source`，Draft PR #2 面向 `main`；同一提交构建的 Linux amd64 静态二进制已部署到 DMIT，公网首页、后台登录页和公开 API 均返回 200，部署前数据及旧二进制备份保存在服务器 `backups/deploy-20260719T115950Z`。
+- 发布记录：运行代码提交 `8746349` 已通过 PR #2 合并到 `main`，合并提交为 `70ed0fa`；同一运行代码构建的 Linux amd64 静态二进制已部署到 DMIT，并更新 Release `v1.0.0` 的 `vps-monitor-linux-amd64` 资产，SHA-256 为 `78253719e0fa6154c9b973b3635cd828a16dcd71bdf01e87f35ab2b8c9d5310b`。公网首页、后台登录页和公开 API 均返回 200，部署前数据及旧二进制备份保存在服务器 `backups/deploy-20260719T115950Z`。
 
 ### 2026-07-16 exact Linux integration bundle
 
