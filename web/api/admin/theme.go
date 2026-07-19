@@ -811,6 +811,7 @@ func GetThemeSettings(c *gin.Context) {
 	if data == nil {
 		data = map[string]any{}
 	}
+	public.NormalizeVPSBackgroundSettings(data)
 	c.JSON(http.StatusOK, data)
 }
 
@@ -843,9 +844,15 @@ func UpdateThemeSettings(c *gin.Context) {
 	if existing == nil {
 		existing = map[string]any{}
 	}
+	// 背景地址只能由本地图片上传接口维护，不能再通过普通设置
+	// 写入外部 URL 或重新开启已经移除的视频模式。
+	delete(req, "backgroundType")
+	delete(req, "lightBackgroundUrl")
+	delete(req, "darkBackgroundUrl")
 	for k, v := range req {
 		existing[k] = v
 	}
+	public.NormalizeVPSBackgroundSettings(existing)
 	merged, _ := json.Marshal(existing)
 	themeCfg.Data = string(merged)
 	if err := db.Save(&themeCfg).Error; err != nil {

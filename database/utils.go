@@ -135,6 +135,9 @@ func GetPublicInfo() (map[string]interface{}, error) {
 			}
 		}
 	}
+	if cst.Theme == public.VpsTheme {
+		public.NormalizeVPSBackgroundSettings(tc_data)
+	}
 
 	return gin.H{
 		"sitename":                  cst.Sitename,

@@ -1073,7 +1073,6 @@
           hideEarth:false,
           hideGeneralCard: false,
           backgroundEnabled:false,
-          backgroundType: "image",
           lightBackgroundUrl: "",
           darkBackgroundUrl: "",
           backgroundBlur: 0,
@@ -1122,23 +1121,7 @@
           {
             title: "自定义背景",
             fields: [
-              { k: "backgroundEnabled", l: "启用自定义背景", t: "bool" },
-              {
-                k: "backgroundType",
-                l: "背景类型",
-                t: "select",
-                o: ["image", "video"],
-              },
-              {
-                k: "lightBackgroundUrl",
-                l: "亮色背景 URL",
-                h: "亮色模式下的背景地址",
-              },
-              {
-                k: "darkBackgroundUrl",
-                l: "暗色背景 URL",
-                h: "暗色模式下的背景地址，为空则用亮色背景",
-              },
+              { k: "backgroundEnabled", l: "启用自定义背景", t: "bool", h: "仅使用上传到本机的图片，不再支持视频或外部 URL。" },
               { k: "backgroundBlur", l: "背景模糊(px)", t: "num" },
               { k: "backgroundOverlay", l: "背景遮罩(-100~100)", t: "num" },
             ],
@@ -1187,6 +1170,23 @@
             if (f.h)
               h += '<div class="text-xs text-muted mt-1">' + f.h + "</div>";
             h += "</div>";
+          }
+          if (sec.title === "自定义背景") {
+            var lightBackground = typeof s.lightBackgroundUrl === "string" ? s.lightBackgroundUrl : "";
+            var darkBackground = typeof s.darkBackgroundUrl === "string" ? s.darkBackgroundUrl : "";
+            function backgroundUploadCard(slot, label, url) {
+              var inputId = "background" + (slot === "light" ? "Light" : "Dark") + "Input";
+              var preview = url
+                ? '<img src="' + E(url) + '" alt="' + label + '" style="width:100%;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">'
+                : '<div class="text-muted" style="height:150px;display:grid;place-items:center;border:1px dashed var(--border);border-radius:10px">尚未上传</div>';
+              return '<div class="card" style="padding:14px"><div style="font-weight:600;margin-bottom:10px">' + label + '</div>' + preview +
+                '<input type="file" id="' + inputId + '" accept=".png,.jpg,.jpeg,.gif,.webp,.avif,image/png,image/jpeg,image/gif,image/webp,image/avif" hidden>' +
+                '<button class="btn btn-outline btn-sm mt-2" type="button" onclick="document.getElementById(\'' + inputId + '\').click()">选择图片并上传</button></div>';
+            }
+            h += '<div class="grid-2 mt-3">' +
+              backgroundUploadCard("light", "亮色背景图片", lightBackground) +
+              backgroundUploadCard("dark", "暗色背景图片", darkBackground) +
+              '</div><div class="text-xs text-muted mt-2">支持 PNG、JPG、GIF、WebP、AVIF，单张最大 10 MB；暗色图片未上传时沿用亮色图片。</div>';
           }
         }
         h +=
@@ -2148,6 +2148,42 @@
             });
             toast("主题已保存");
           };
+
+        [
+          { id: "backgroundLightInput", slot: "light" },
+          { id: "backgroundDarkInput", slot: "dark" },
+        ].forEach(function (item) {
+          var input = _d.getElementById(item.id);
+          if (!input) return;
+          input.onchange = async function () {
+            var file = input.files && input.files[0];
+            input.value = "";
+            if (!file) return;
+            if (!file.type.startsWith("image/")) {
+              toast("请选择图片文件");
+              return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+              toast("图片不能超过 10 MB");
+              return;
+            }
+            var fd = new FormData();
+            fd.append("slot", item.slot);
+            fd.append("image", file, file.name);
+            var response = await fetch("/api/admin/theme/background", {
+              method: "POST",
+              credentials: "include",
+              body: fd,
+            });
+            var payload = await response.json().catch(function () { return {}; });
+            if (!response.ok || payload.status === "error") {
+              toast(payload.message || "背景图片上传失败");
+              return;
+            }
+            toast(item.slot === "light" ? "亮色背景已更新" : "暗色背景已更新");
+            navigate("theme");
+          };
+        });
 
         var ai = _d.getElementById("avatarInput");
         if (ai)

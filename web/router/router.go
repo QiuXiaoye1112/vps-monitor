@@ -122,6 +122,7 @@ func registerAdminRoutes(r *gin.Engine) {
 	{
 		theme.GET("/settings", admin.GetThemeSettings)
 		theme.POST("/settings", admin.UpdateThemeSettings)
+		theme.POST("/background", admin.UploadThemeBackground)
 	}
 
 	// --- 以下全部 JSON -> RPC2 ---

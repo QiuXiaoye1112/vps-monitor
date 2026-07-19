@@ -25,11 +25,6 @@
         filter: blur(var(--vps-bootstrap-blur, 0px));
         transform: scale(var(--vps-bootstrap-scale, 1));
       }
-      #vps-background-bootstrap video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
       html[data-vps-custom-background="true"],
       html[data-vps-custom-background="true"] body {
         background-color: transparent !important;
@@ -47,7 +42,6 @@
           ? publicInfo.theme_settings
           : {};
         const enabled = settings.backgroundEnabled === true;
-        const type = settings.backgroundType === 'video' ? 'video' : 'image';
         let preference = 'auto';
         try {
           preference = localStorage.getItem('themeMode') || 'auto';
@@ -70,7 +64,9 @@
         document.documentElement.classList.toggle('dark', dark);
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
 
-        const rawUrl = dark ? settings.darkBackgroundUrl : settings.lightBackgroundUrl;
+        const lightUrl = typeof settings.lightBackgroundUrl === 'string' ? settings.lightBackgroundUrl.trim() : '';
+        const darkUrl = typeof settings.darkBackgroundUrl === 'string' ? settings.darkBackgroundUrl.trim() : '';
+        const rawUrl = dark ? (darkUrl || lightUrl) : lightUrl;
         const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
         window.__VPS_BACKGROUND_READY__ = Promise.resolve();
         window.__VPS_BACKGROUND_PRELOADED__ = '';
@@ -87,9 +83,7 @@
         } else if (overlay > 0) {
           document.documentElement.style.setProperty('--vps-bootstrap-overlay', String(overlay / 100));
         }
-        if (type === 'image') {
-          document.documentElement.style.setProperty('--vps-bootstrap-image', `url(${JSON.stringify(url)})`);
-        }
+        document.documentElement.style.setProperty('--vps-bootstrap-image', `url(${JSON.stringify(url)})`);
 
         window.__VPS_BACKGROUND_READY__ = new Promise((resolve) => {
           let settled = false;
@@ -104,21 +98,6 @@
             window.clearTimeout(timeout);
             finish(loaded);
           };
-
-          if (type === 'video') {
-            const video = document.createElement('video');
-            video.src = url;
-            video.preload = 'auto';
-            video.autoplay = true;
-            video.loop = true;
-            video.muted = true;
-            video.playsInline = true;
-            video.addEventListener('canplay', () => done(true), { once: true });
-            video.addEventListener('error', () => done(false), { once: true });
-            window.__VPS_BACKGROUND_BOOTSTRAP_VIDEO__ = video;
-            video.load();
-            return;
-          }
 
           const preload = document.createElement('link');
           preload.rel = 'preload';
@@ -148,9 +127,7 @@
     <div id="vps-background-bootstrap" aria-hidden="true"></div>
     <div id="app"></div>
     <script>
-      const bootstrapVideo = window.__VPS_BACKGROUND_BOOTSTRAP_VIDEO__;
       const bootstrapHost = document.getElementById('vps-background-bootstrap');
-      if (bootstrapVideo && bootstrapHost) bootstrapHost.appendChild(bootstrapVideo);
       if (bootstrapHost && document.documentElement.dataset.vpsCustomBackground === 'true') {
         let released = false;
         let observer;
@@ -158,23 +135,13 @@
           if (released) return;
           released = true;
           if (observer) observer.disconnect();
-          if (bootstrapVideo) bootstrapVideo.pause();
           bootstrapHost.remove();
           delete document.documentElement.dataset.vpsCustomBackground;
-          window.__VPS_BACKGROUND_BOOTSTRAP_VIDEO__ = null;
         };
         const detectAppBackground = () => {
           const image = document.querySelector('.background-image');
           if (image) {
             requestAnimationFrame(releaseBootstrap);
-            return;
-          }
-          const video = document.querySelector('.background-video');
-          if (!video) return;
-          if (video.readyState >= 2) {
-            requestAnimationFrame(releaseBootstrap);
-          } else {
-            video.addEventListener('loadeddata', () => requestAnimationFrame(releaseBootstrap), { once: true });
           }
         };
         observer = new MutationObserver(detectAppBackground);

@@ -47,6 +47,7 @@ func buildVPSThemeBootstrap(siteName string) string {
 	if err := dbcore.GetDBInstance().Where("short = ?", VpsTheme).First(&themeConfiguration).Error; err == nil {
 		_ = json.Unmarshal([]byte(themeConfiguration.Data), &settings)
 	}
+	NormalizeVPSBackgroundSettings(settings)
 
 	payload, err := json.Marshal(map[string]any{
 		"sitename":       siteName,
@@ -548,6 +549,7 @@ self.addEventListener('activate', (event) => {
 	})
 
 	r.GET("/terminal", serveTerminalPage)
+	r.GET("/background/:slot", serveBackgroundImage)
 
 	r.GET("/terminal-assets/*path", func(c *gin.Context) {
 		filePath := strings.TrimPrefix(c.Param("path"), "/")

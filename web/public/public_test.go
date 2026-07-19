@@ -97,7 +97,7 @@ func TestInjectVPSThemeBootstrap(t *testing.T) {
 
 	configuration := models.ThemeConfiguration{
 		Short: VpsTheme,
-		Data:  `{"backgroundEnabled":true,"backgroundType":"image","darkBackgroundUrl":"https://cdn.example/dark.webp?x=</script>"}`,
+		Data:  `{"backgroundEnabled":true,"backgroundType":"image","darkBackgroundUrl":"/background/dark?v=1</script>"}`,
 	}
 	if err := db.Save(&configuration).Error; err != nil {
 		t.Fatal(err)
@@ -107,6 +107,7 @@ func TestInjectVPSThemeBootstrap(t *testing.T) {
 	for _, required := range []string{
 		`window.__VPS_THEME_BOOTSTRAP__=`,
 		`"backgroundEnabled":true`,
+		`"darkBackgroundUrl":"/background/dark?v=1\u003c/script\u003e"`,
 		`"sitename":"Test Monitor"`,
 		`\u003c/script\u003e`,
 	} {

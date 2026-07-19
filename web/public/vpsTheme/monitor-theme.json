@@ -22,10 +22,7 @@
       { "key": "generalCardKeys", "name": "自定义头部卡片", "type": "string", "default": "onlineNodes,totalTraffic,uploadSpeed,downloadSpeed", "help": "用英文逗号分隔 key，例如 onlineNodes,totalTraffic,uploadSpeed,downloadSpeed。" },
       { "key": "hideAdminEntryWhenLoggedOut", "name": "隐藏后台入口", "type": "switch", "default": false, "help": "未登录时隐藏顶部后台管理入口。" },
       { "name": "自定义背景", "type": "title" },
-      { "key": "backgroundEnabled", "name": "启用自定义背景", "type": "switch", "default": false, "help": "启用后可设置自定义图片或视频作为页面背景。" },
-      { "key": "backgroundType", "name": "背景类型", "type": "select", "default": "image", "options": "image,video", "help": "选择背景类型：图片或视频。" },
-      { "key": "lightBackgroundUrl", "name": "亮色模式背景地址", "type": "string", "default": "", "help": "亮色模式下的背景图片/视频 URL。" },
-      { "key": "darkBackgroundUrl", "name": "暗色模式背景地址", "type": "string", "default": "", "help": "暗色模式下的背景图片/视频 URL。" },
+      { "key": "backgroundEnabled", "name": "启用自定义背景", "type": "switch", "default": false, "help": "使用后台手动上传到本机的图片作为页面背景。" },
       { "key": "backgroundBlur", "name": "背景模糊半径", "type": "number", "default": 0, "help": "背景的高斯模糊半径，单位 px。" },
       { "key": "backgroundOverlay", "name": "背景遮罩强度", "type": "number", "default": 0, "help": "背景遮罩强度，-100 到 100。" }
     ]

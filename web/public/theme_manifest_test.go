@@ -21,7 +21,13 @@ func TestVPSThemeManifestDoesNotExposeRemovedSettings(t *testing.T) {
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	removed := map[string]bool{"rpcTransportMode": true, "disablePageAnimation": true}
+	removed := map[string]bool{
+		"rpcTransportMode":     true,
+		"disablePageAnimation": true,
+		"backgroundType":       true,
+		"lightBackgroundUrl":   true,
+		"darkBackgroundUrl":    true,
+	}
 	for _, item := range manifest.Configuration.Data {
 		if removed[item.Key] {
 			t.Fatalf("removed theme setting %q is still exposed", item.Key)
@@ -35,7 +41,17 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := string(raw)
-	for _, removed := range []string{"任务记录", "admin:getTasks", "tasksPage", "rpcTransportMode", "disablePageAnimation"} {
+	for _, removed := range []string{
+		"任务记录",
+		"admin:getTasks",
+		"tasksPage",
+		"rpcTransportMode",
+		"disablePageAnimation",
+		`l: "背景类型"`,
+		`l: "亮色背景 URL"`,
+		`l: "暗色背景 URL"`,
+		`o: ["image", "video"]`,
+	} {
 		if strings.Contains(html, removed) {
 			t.Fatalf("removed admin feature %q is still present", removed)
 		}
@@ -47,6 +63,10 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 		`backgroundEnabled:false`,
 		`Math.max(0,(Date.now()-ms)/1000)`,
 		`return"刚刚"`,
+		`id: "backgroundLightInput", slot: "light"`,
+		`id: "backgroundDarkInput", slot: "dark"`,
+		`/api/admin/theme/background`,
+		`选择图片并上传`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("expected admin regression guard %q", required)
@@ -69,10 +89,35 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 		`data-vps-custom-background="true"] .default-background`,
 		`id="vps-background-bootstrap"`,
 		`new MutationObserver(detectAppBackground)`,
-		`bootstrapVideo.pause()`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("background bootstrap guard %q is missing", required)
+		}
+	}
+	for _, removed := range []string{
+		`settings.backgroundType === 'video'`,
+		`document.createElement('video')`,
+		`__VPS_BACKGROUND_BOOTSTRAP_VIDEO__`,
+		`bootstrapVideo.pause()`,
+	} {
+		if strings.Contains(html, removed) {
+			t.Fatalf("removed video bootstrap %q is still present", removed)
+		}
+	}
+}
+
+func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T) {
+	raw, err := PublicFS.ReadFile("vpsTheme/dist/assets/index-BmdGcRWR-vpsbundle1449.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle := string(raw)
+	for _, required := range []string{
+		`I=k(()=>"image")`,
+		`F=k(()=>"dark"===D.value?A.value||O.value:O.value)`,
+	} {
+		if !strings.Contains(bundle, required) {
+			t.Fatalf("image-only background runtime guard %q is missing", required)
 		}
 	}
 }
