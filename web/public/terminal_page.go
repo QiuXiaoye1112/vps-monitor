@@ -23,7 +23,7 @@ func serveTerminalPage(c *gin.Context) {
   <title>节点控制台 - ` + escapedSiteName + `</title>
   <link rel="icon" href="/favicon.ico?t=` + getFaviconTimestamp() + `" />
   <link rel="stylesheet" href="/terminal-assets/xterm.css" />
-  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260715-1" />
+  <link rel="stylesheet" href="/terminal-assets/terminal-page.css?v=20260723-1" />
 </head>
 <body data-site-name="` + escapedSiteName + `">
   <main class="shell">
@@ -74,6 +74,11 @@ func serveTerminalPage(c *gin.Context) {
           <button type="button" id="newFileButton">新建文件</button>
           <button type="button" id="newFolderButton">新建文件夹</button>
           <button type="button" id="pasteButton" disabled>粘贴</button>
+          <button type="button" id="batchCopyButton" disabled>复制所选</button>
+          <button type="button" id="batchCutButton" disabled>剪切所选</button>
+          <button type="button" id="batchArchiveButton" disabled>压缩所选</button>
+          <button type="button" id="batchDeleteButton" class="danger-button" disabled>删除所选</button>
+          <label class="check-control"><input type="checkbox" id="showHiddenInput" /> 显示隐藏文件</label>
           <input type="file" id="uploadInput" hidden multiple />
         </div>
         <div class="transfer" id="transfer" hidden>
@@ -82,8 +87,16 @@ func serveTerminalPage(c *gin.Context) {
         </div>
         <div class="file-list-wrap">
           <table class="file-list">
-            <thead><tr><th>名称</th><th>大小</th><th>修改时间</th></tr></thead>
-            <tbody id="fileRows"><tr><td colspan="3" class="empty">正在连接 Agent...</td></tr></tbody>
+            <thead><tr>
+              <th class="select-column"><input id="selectAllFiles" type="checkbox" aria-label="全选当前目录" /></th>
+              <th><button class="sort-button" data-sort="name" type="button">名称</button></th>
+              <th>类型</th>
+              <th><button class="sort-button" data-sort="size" type="button">大小</button></th>
+              <th>权限</th>
+              <th>所有者/组</th>
+              <th><button class="sort-button" data-sort="modified" type="button">修改时间</button></th>
+            </tr></thead>
+            <tbody id="fileRows"><tr><td colspan="7" class="empty">正在连接 Agent...</td></tr></tbody>
           </table>
         </div>
       </aside>
@@ -92,10 +105,16 @@ func serveTerminalPage(c *gin.Context) {
 
   <div class="context-menu" id="contextMenu" hidden>
     <button data-action="open">打开</button>
+    <button data-action="edit">编辑</button>
     <button data-action="download">下载</button>
     <button data-action="copy">复制</button>
     <button data-action="cut">剪切</button>
+    <button data-action="move">移动</button>
     <button data-action="rename">重命名</button>
+    <button data-action="archive">压缩</button>
+    <button data-action="extract">解压</button>
+    <button data-action="permissions">权限</button>
+    <button data-action="properties">属性</button>
     <button data-action="delete" class="danger">删除</button>
   </div>
 
@@ -105,14 +124,14 @@ func serveTerminalPage(c *gin.Context) {
       <div id="modalMessage" class="modal-message"></div>
       <input id="modalInput" class="modal-input" hidden />
       <textarea id="modalEditor" class="modal-editor" hidden spellcheck="false"></textarea>
-      <div class="modal-actions"><button id="modalCancel" type="button">取消</button><button id="modalConfirm" type="button" class="primary">确定</button></div>
+      <div class="modal-actions"><button id="modalCancel" type="button">取消</button><span id="modalChoices"></span><button id="modalConfirm" type="button" class="primary">确定</button></div>
     </section>
   </div>
 
   <div class="toast" id="toast" hidden></div>
   <script src="/terminal-assets/xterm.js"></script>
   <script src="/terminal-assets/xterm-addon-fit.js"></script>
-  <script src="/terminal-assets/terminal-page.js?v=20260715-1"></script>
+  <script src="/terminal-assets/terminal-page.js?v=20260723-1"></script>
 </body>
 </html>`
 	c.Header("Cache-Control", "no-store")
