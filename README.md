@@ -17,7 +17,7 @@
 
 ```bash
 mkdir -p /opt/monitor
-curl -fsSL https://github.com/QiuXiaoye1112/vps-monitor/releases/download/v1.0.0/vps-monitor-linux-amd64 -o /opt/monitor/vps-monitor
+curl -fsSL https://github.com/QiuXiaoye1112/vps-monitor/releases/latest/download/vps-monitor-linux-amd64 -o /opt/monitor/vps-monitor
 chmod +x /opt/monitor/vps-monitor
 ```
 
