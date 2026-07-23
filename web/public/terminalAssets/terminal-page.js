@@ -15,7 +15,8 @@
   var toastTimer = null;
   var currentTransfer = null;
   var fileClipboard = null;
-  var fileState = { path: '', parent: '', offset: 0, total: 0, hasMore: false, items: [], selected: null, home: '' };
+  var fileBusy = 0;
+  var fileState = { path: '', parent: '', offset: 0, total: 0, hasMore: false, items: [], selected: null, selectedPaths: new Set(), home: '', showHidden: false, sort: 'name', order: 'asc' };
 
   function byId(id) { return document.getElementById(id); }
   var nodeNameEl = byId('nodeName');
@@ -31,6 +32,23 @@
   var contextMenu = byId('contextMenu');
   var fileListWrap = document.querySelector('.file-list-wrap');
   var pasteButton = byId('pasteButton');
+
+  function isDirectoryItem(item) { return !!(item && (item.is_dir || item.link_is_dir)); }
+  function selectedItems() { return fileState.items.filter(function (item) { return fileState.selectedPaths.has(item.path); }); }
+  function setFileBusy(busy) {
+    fileBusy += busy ? 1 : -1;
+    if (fileBusy < 0) fileBusy = 0;
+    var disabled = fileBusy > 0;
+    if (filePanel) filePanel.querySelectorAll('button').forEach(function (button) {
+      if (button.id !== 'cancelTransfer') button.disabled = disabled || (button.dataset.selectionAction && !selectedItems().length);
+    });
+    updateClipboardUI();
+    updateSelectionUI();
+  }
+  async function runFileOperation(action) {
+    setFileBusy(true);
+    try { return await action(); } finally { setFileBusy(false); }
+  }
 
   function setStatus(text, state) {
     statusText.textContent = text;
@@ -198,7 +216,12 @@
           pendingRequests.delete(message.id);
           clearTimeout(pending.timer);
           if (message.ok) pending.resolve(message.data);
-          else pending.reject(new Error(message.error || '文件操作失败'));
+          else {
+            var error = new Error(message.error || '文件操作失败');
+            error.code = message.code || '';
+            error.details = message.details || null;
+            pending.reject(error);
+          }
         }
       };
       if (typeof event.data === 'string') parse(event.data);
@@ -256,7 +279,7 @@
     fileRows.replaceChildren();
     var row = document.createElement('tr');
     var cell = document.createElement('td');
-    cell.colSpan = 3;
+    cell.colSpan = 7;
     cell.className = 'empty';
     cell.textContent = message;
     row.appendChild(cell);
@@ -268,7 +291,7 @@
     hideContextMenu();
     renderFileError('正在读取目录...');
     try {
-      var data = await fileRequest('list', { path: path || '', offset: 0, limit: 1000 });
+      var data = await fileRequest('list', { path: path || fileState.home, offset: 0, limit: 1000, show_hidden: fileState.showHidden, sort: fileState.sort, order: fileState.order });
       fileState.path = data.path;
       fileState.parent = data.parent;
       fileState.offset = 0;
@@ -276,6 +299,7 @@
       fileState.hasMore = !!data.has_more;
       fileState.items = Array.isArray(data.items) ? data.items : [];
       fileState.selected = null;
+      fileState.selectedPaths = new Set();
       pathInput.value = data.path;
       renderFiles();
       requestAnimationFrame(function () {
@@ -305,54 +329,85 @@
       fileState.items.forEach(function (item) {
         var row = document.createElement('tr');
         row.className = 'file-row';
-        if (fileClipboard && fileClipboard.mode === 'move' && fileClipboard.path === item.path) row.classList.add('clipboard-cut');
+        if (fileState.selectedPaths.has(item.path)) row.classList.add('selected');
+        if (fileClipboard && fileClipboard.mode === 'move' && fileClipboard.paths.indexOf(item.path) >= 0) row.classList.add('clipboard-cut');
         row.dataset.path = item.path;
-        row.title = item.mode || '';
+        row.title = [item.mode, item.link_target ? '→ ' + item.link_target : ''].filter(Boolean).join('\n');
+
+        var selectedCell = document.createElement('td');
+        selectedCell.className = 'select-column';
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = fileState.selectedPaths.has(item.path);
+        checkbox.setAttribute('aria-label', '选择 ' + item.name);
+        checkbox.addEventListener('click', function (event) { event.stopPropagation(); });
+        checkbox.addEventListener('change', function () { selectFile(item, row, true, checkbox.checked); });
+        selectedCell.appendChild(checkbox);
 
         var nameCell = document.createElement('td');
         var nameWrap = document.createElement('div');
         nameWrap.className = 'file-name';
         var icon = document.createElement('span');
         icon.className = 'file-icon';
-        icon.textContent = item.is_dir ? '📁' : (item.is_link ? '🔗' : '📄');
+        icon.textContent = isDirectoryItem(item) ? '📁' : (item.is_link ? '🔗' : '📄');
         var name = document.createElement('span');
-        name.textContent = item.name;
+        name.textContent = item.name + (item.is_link && item.link_target ? ' → ' + item.link_target : '');
         nameWrap.append(icon, name);
         nameCell.appendChild(nameWrap);
 
+        var typeCell = document.createElement('td');
+        typeCell.className = 'file-meta file-type';
+        typeCell.textContent = item.type || (isDirectoryItem(item) ? '目录' : '文件');
         var sizeCell = document.createElement('td');
         sizeCell.className = 'file-meta';
-        sizeCell.textContent = item.is_dir ? '--' : formatBytes(item.size);
+        sizeCell.textContent = isDirectoryItem(item) ? '--' : formatBytes(item.size);
+        var permissionsCell = document.createElement('td');
+        permissionsCell.className = 'file-meta';
+        permissionsCell.textContent = item.permissions || item.mode || '--';
+        var ownerCell = document.createElement('td');
+        ownerCell.className = 'file-meta file-owner';
+        ownerCell.textContent = (item.owner || '--') + '/' + (item.group || '--');
         var modifiedCell = document.createElement('td');
         modifiedCell.className = 'file-meta';
         modifiedCell.textContent = formatModified(item.modified);
-        row.append(nameCell, sizeCell, modifiedCell);
-        row.addEventListener('click', function () { selectFile(item, row); });
+        row.append(selectedCell, nameCell, typeCell, sizeCell, permissionsCell, ownerCell, modifiedCell);
+        row.addEventListener('click', function (event) { selectFile(item, row, event.metaKey || event.ctrlKey || event.shiftKey); });
         row.addEventListener('dblclick', function () { openItem(item); });
         row.addEventListener('contextmenu', function (event) {
           event.preventDefault();
-          selectFile(item, row);
+          if (!fileState.selectedPaths.has(item.path)) selectFile(item, row, false);
           showContextMenu(event.clientX, event.clientY, item);
         });
         fileRows.appendChild(row);
       });
     }
     updateClipboardUI();
+    updateSelectionUI();
+    updateSortUI();
   }
 
-  function selectFile(item, row) {
+  function selectFile(item, row, toggle, checked) {
     fileState.selected = item;
-    fileRows.querySelectorAll('.selected').forEach(function (node) { node.classList.remove('selected'); });
-    if (row) row.classList.add('selected');
+    if (!toggle) fileState.selectedPaths = new Set([item.path]);
+    else if (checked === false || (checked === undefined && fileState.selectedPaths.has(item.path))) fileState.selectedPaths.delete(item.path);
+    else fileState.selectedPaths.add(item.path);
+    fileRows.querySelectorAll('.file-row').forEach(function (node) { node.classList.toggle('selected', fileState.selectedPaths.has(node.dataset.path)); });
+    var selectAll = byId('selectAllFiles');
+    if (selectAll) selectAll.checked = fileState.items.length > 0 && fileState.selectedPaths.size === fileState.items.length;
+    updateSelectionUI();
   }
 
   function showContextMenu(x, y, item) {
     fileState.selected = item;
     contextMenu.hidden = false;
     var openButton = contextMenu.querySelector('[data-action="open"]');
+    var editButton = contextMenu.querySelector('[data-action="edit"]');
     var downloadButton = contextMenu.querySelector('[data-action="download"]');
-    openButton.textContent = item.is_dir ? '打开' : '编辑';
-    downloadButton.hidden = !!item.is_dir;
+    var extractButton = contextMenu.querySelector('[data-action="extract"]');
+    openButton.textContent = '打开';
+    editButton.hidden = !item.text_candidate;
+    downloadButton.hidden = isDirectoryItem(item);
+    extractButton.hidden = !isArchiveName(item.name);
     var width = contextMenu.offsetWidth;
     var height = contextMenu.offsetHeight;
     contextMenu.style.left = Math.min(x, window.innerWidth - width - 8) + 'px';
@@ -370,45 +425,67 @@
   }
 
   function updateClipboardUI() {
-    pasteButton.disabled = !fileClipboard;
+    pasteButton.disabled = fileBusy > 0 || !fileClipboard;
     pasteButton.textContent = fileClipboard ? (fileClipboard.mode === 'move' ? '粘贴（剪切）' : '粘贴（复制）') : '粘贴';
-    pasteButton.title = fileClipboard ? fileClipboard.name + ' → ' + fileState.path : '请先右键复制或剪切文件';
+    pasteButton.title = fileClipboard ? fileClipboard.items.length + ' 项 → ' + fileState.path : '请先复制或剪切文件';
     fileRows.querySelectorAll('.clipboard-cut').forEach(function (row) { row.classList.remove('clipboard-cut'); });
     if (fileClipboard && fileClipboard.mode === 'move') {
       Array.from(fileRows.querySelectorAll('.file-row')).forEach(function (row) {
-        if (row.dataset.path === fileClipboard.path) row.classList.add('clipboard-cut');
+        if (fileClipboard.paths.indexOf(row.dataset.path) >= 0) row.classList.add('clipboard-cut');
       });
     }
   }
 
-  function setFileClipboard(item, mode) {
-    fileClipboard = { path: item.path, name: item.name, isDir: !!item.is_dir, mode: mode };
+  function setFileClipboard(items, mode) {
+    items = Array.isArray(items) ? items : [items];
+    if (!items.length) return;
+    fileClipboard = { paths: items.map(function (item) { return item.path; }), items: items, mode: mode };
     updateClipboardUI();
-    showToast((mode === 'move' ? '已剪切：' : '已复制：') + item.name);
+    showToast((mode === 'move' ? '已剪切 ' : '已复制 ') + items.length + ' 项');
   }
 
   async function pasteFileClipboard() {
     if (!fileClipboard) return;
     var operation = fileClipboard.mode === 'move' ? 'move' : 'copy';
     var scrollTop = currentFileScroll();
-    pasteButton.disabled = true;
-    try {
-      await fileRequest(operation, { path: fileClipboard.path, destination: fileState.path }, 1800000);
-      var completed = fileClipboard;
-      if (operation === 'move') fileClipboard = null;
-      showToast((operation === 'move' ? '移动完成：' : '复制完成：') + completed.name);
-      await loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      updateClipboardUI();
+    await runFileOperation(async function () {
+      try {
+        var completed = fileClipboard;
+        var result = await requestWithConflict(operation + '_many', { paths: completed.paths, destination: fileState.path }, operation === 'move' ? '移动' : '复制', 1800000);
+        if (operation === 'move') fileClipboard = null;
+        showBatchResult(result, operation === 'move' ? '移动' : '复制');
+        await loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
+      } catch (err) { showToast(err.message, true); }
+      finally { updateClipboardUI(); }
+    });
+  }
+
+  function updateSelectionUI() {
+    var count = selectedItems().length;
+    ['batchCopyButton', 'batchCutButton', 'batchArchiveButton', 'batchDeleteButton'].forEach(function (id) {
+      var button = byId(id);
+      if (button) button.disabled = fileBusy > 0 || !count;
+    });
+    var selectAll = byId('selectAllFiles');
+    if (selectAll) {
+      selectAll.indeterminate = count > 0 && count < fileState.items.length;
+      selectAll.checked = fileState.items.length > 0 && count === fileState.items.length;
     }
+  }
+
+  function updateSortUI() {
+    document.querySelectorAll('.sort-button').forEach(function (button) {
+      var active = button.dataset.sort === fileState.sort;
+      button.classList.toggle('active', active);
+      button.classList.toggle('desc', active && fileState.order === 'desc');
+    });
   }
 
   async function openItem(item) {
     hideContextMenu();
-    if (item.is_dir) { loadDirectory(item.path, 0); return; }
-    await editFile(item);
+    if (isDirectoryItem(item)) { loadDirectory(item.path, 0); return; }
+    if (item.text_candidate) { await editFile(item); return; }
+    showToast('该文件不是已识别的文本文件，可使用“下载”或在属性中查看详情', true);
   }
 
   function modal(options) {
@@ -422,6 +499,7 @@
       var confirm = byId('modalConfirm');
       var cancel = byId('modalCancel');
       var close = byId('modalClose');
+      var choices = byId('modalChoices');
       var mode = options.editor ? 'editor' : (options.input ? 'input' : 'confirm');
       title.textContent = options.title || '提示';
       message.textContent = options.message || '';
@@ -433,6 +511,10 @@
       confirm.textContent = options.confirmLabel || '确定';
       confirm.style.background = options.danger ? '#dc2626' : '';
       confirm.style.borderColor = options.danger ? 'rgba(239,68,68,.6)' : '';
+      choices.replaceChildren();
+      var optionChoices = Array.isArray(options.choices) ? options.choices : [];
+      choices.hidden = !optionChoices.length;
+      confirm.hidden = !!optionChoices.length;
       overlay.hidden = false;
 
       var settled = false;
@@ -445,6 +527,9 @@
         close.removeEventListener('click', reject);
         overlay.removeEventListener('click', backdrop);
         document.removeEventListener('keydown', keydown);
+        choices.replaceChildren();
+        choices.hidden = true;
+        confirm.hidden = false;
         resolve(value);
       }
       function accept() { finish(mode === 'input' ? input.value : (mode === 'editor' ? editor.value : true)); }
@@ -452,24 +537,39 @@
       function backdrop(event) { if (event.target === overlay) reject(); }
       function keydown(event) {
         if (event.key === 'Escape') reject();
-        if (event.key === 'Enter' && mode !== 'editor' && (event.metaKey || event.ctrlKey || mode === 'confirm')) accept();
+        if (!optionChoices.length && event.key === 'Enter' && mode !== 'editor' && (event.metaKey || event.ctrlKey || mode === 'confirm')) accept();
       }
       confirm.addEventListener('click', accept);
       cancel.addEventListener('click', reject);
       close.addEventListener('click', reject);
       overlay.addEventListener('click', backdrop);
       document.addEventListener('keydown', keydown);
+      optionChoices.forEach(function (choice) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = choice.label;
+        if (choice.danger) button.classList.add('danger-button');
+        button.addEventListener('click', function () { finish(choice.value); });
+        choices.appendChild(button);
+      });
       setTimeout(function () { if (mode === 'input') input.select(); else if (mode === 'editor') editor.focus(); }, 0);
     });
   }
 
   async function editFile(item) {
     try {
-      var data = await fileRequest('read', { path: item.path });
+      var data;
+      try { data = await fileRequest('read', { path: item.path }); }
+      catch (err) {
+        if (err.code !== 'text_confirmation_required') throw err;
+        var accepted = await modal({ title: '打开大文件', message: err.message, confirmLabel: '继续打开', danger: true });
+        if (!accepted) return;
+        data = await fileRequest('read', { path: item.path, force: true }, 90000);
+      }
       var original = data.content_base64 ? new TextDecoder().decode(base64ToBytes(data.content_base64)) : (data.content || '');
       var content = await modal({ title: '编辑 ' + item.name, message: '最大支持 2 MiB 的 UTF-8 文本文件', editor: true, value: original, confirmLabel: '保存' });
       if (content === null) return;
-      await fileRequest('write', { path: item.path, content_base64: bytesToBase64(new TextEncoder().encode(content)) }, 45000);
+      await runFileOperation(function () { return fileRequest('write', { path: item.path, content_base64: bytesToBase64(new TextEncoder().encode(content)) }, 45000); });
       showToast('文件已保存');
       reloadCurrentDirectory();
     } catch (err) { showToast(err.message, true); }
@@ -479,28 +579,42 @@
     var name = await modal({ title: '重命名', message: item.path, input: true, value: item.name, confirmLabel: '保存' });
     if (name === null || !name.trim() || name === item.name) return;
     try {
-      await fileRequest('rename', { path: item.path, new_name: name.trim() });
+      await runFileOperation(function () { return fileRequest('rename', { path: item.path, new_name: name.trim() }); });
       showToast('重命名完成');
-      if (fileClipboard && fileClipboard.path === item.path) fileClipboard = null;
+      if (fileClipboard && fileClipboard.paths.indexOf(item.path) >= 0) fileClipboard = null;
       reloadCurrentDirectory();
     } catch (err) { showToast(err.message, true); }
   }
 
-  async function deleteItem(item) {
+  async function deleteItems(items) {
+    items = Array.isArray(items) ? items : [items];
+    if (!items.length) return;
+    var protectedNames = items.filter(function (item) { return item.protected; }).map(function (item) { return item.path; });
     var accepted = await modal({
       title: '确认删除',
-      message: '确定删除“' + item.name + '”吗？非空文件夹不会被删除。',
+      message: '确定删除 ' + items.length + ' 项吗？' + (protectedNames.length ? '\n包含系统目录：' + protectedNames.join('、') + '，请特别确认。' : ''),
       confirmLabel: '删除',
       danger: true
     });
     if (!accepted) return;
     var scrollTop = currentFileScroll();
-    try {
-      await fileRequest('delete', { path: item.path });
-      if (fileClipboard && fileClipboard.path === item.path) fileClipboard = null;
-      showToast('已删除');
-      loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
-    } catch (err) { showToast(err.message, true); }
+    await runFileOperation(async function () {
+      try {
+        var paths = items.map(function (item) { return item.path; });
+        var result = await fileRequest('delete_many', { paths: paths, recursive: false }, 1800000);
+        var retry = (result.results || []).filter(function (entry) { return !entry.ok && entry.code === 'directory_not_empty'; }).map(function (entry) { return entry.path; });
+        if (retry.length) {
+          var recursiveAccepted = await modal({ title: '目录包含文件', message: '该目录包含文件，删除后无法恢复，是否继续？', confirmLabel: '递归删除', danger: true });
+          if (recursiveAccepted) {
+            var recursiveResult = await fileRequest('delete_many', { paths: retry, recursive: true }, 1800000);
+            result.results = (result.results || []).filter(function (entry) { return retry.indexOf(entry.path) < 0; }).concat(recursiveResult.results || []);
+          }
+        }
+        if (fileClipboard && paths.some(function (path) { return fileClipboard.paths.indexOf(path) >= 0; })) fileClipboard = null;
+        showBatchResult(result, '删除');
+        await loadDirectory(fileState.path, fileState.offset, { scrollTop: scrollTop });
+      } catch (err) { showToast(err.message, true); }
+    });
   }
 
   function bytesToBase64(bytes) {
@@ -519,6 +633,47 @@
     return bytes;
   }
 
+  function isArchiveName(name) {
+    var lower = String(name || '').toLowerCase();
+    return lower.endsWith('.zip') || lower.endsWith('.tar.gz') || lower.endsWith('.tgz');
+  }
+
+  async function chooseConflict(label) {
+    return modal({
+      title: label + '遇到同名文件',
+      message: '目标目录中已有同名文件，请选择处理方式。',
+      choices: [
+        { label: '覆盖', value: 'overwrite', danger: true },
+        { label: '跳过', value: 'skip' },
+        { label: '重命名', value: 'rename' }
+      ]
+    });
+  }
+
+  async function requestWithConflict(type, payload, label, timeout) {
+    var conflict = 'ask';
+    while (true) {
+      try { return await fileRequest(type, Object.assign({}, payload, { conflict: conflict }), timeout); }
+      catch (err) {
+        if (err.code !== 'conflict') throw err;
+        conflict = await chooseConflict(label);
+        if (!conflict) throw new Error('已取消' + label);
+      }
+    }
+  }
+
+  function showBatchResult(result, label) {
+    var rows = result && Array.isArray(result.results) ? result.results : [];
+    if (!rows.length) { showToast(label + '完成'); return; }
+    var failures = rows.filter(function (row) { return !row.ok; });
+    var skipped = rows.filter(function (row) { return row.data && row.data.skipped; });
+    if (failures.length) {
+      showToast(label + '完成，但有 ' + failures.length + ' 项失败：' + (failures[0].error || '请查看日志'), true);
+    } else if (skipped.length) {
+      showToast(label + '完成，已跳过 ' + skipped.length + ' 项');
+    } else showToast(label + '完成');
+  }
+
   function beginTransfer(name, size, cancel) {
     var transfer = byId('transfer');
     currentTransfer = { canceled: false, cancel: cancel || null };
@@ -534,16 +689,8 @@
 
   async function uploadOne(file) {
     if (file.size > 1073741824) throw new Error(file.name + ' 超过 1 GiB 限制');
-    var overwrite = false;
-    var started;
-    try {
-      started = await fileRequest('upload_start', { path: fileState.path, name: file.name, size: file.size, overwrite: false });
-    } catch (err) {
-      if (String(err.message).indexOf('已存在') < 0) throw err;
-      overwrite = await modal({ title: '覆盖文件', message: '“' + file.name + '”已经存在，是否覆盖？', confirmLabel: '覆盖', danger: true });
-      if (!overwrite) return;
-      started = await fileRequest('upload_start', { path: fileState.path, name: file.name, size: file.size, overwrite: true });
-    }
+    var started = await requestWithConflict('upload_start', { path: fileState.path, name: file.name, size: file.size }, '上传');
+    if (started && started.skipped) { showToast(file.name + ' 已跳过'); return; }
     var uploadID = started.upload_id;
     var chunkSize = Number(started.chunk_size || 262144);
     var transferState = beginTransfer('上传 ' + file.name, file.size, function () {
@@ -568,10 +715,12 @@
   }
 
   async function uploadFiles(files) {
-    for (var i = 0; i < files.length; i++) {
-      try { await uploadOne(files[i]); } catch (err) { showToast(err.message, true); break; }
-    }
-    reloadCurrentDirectory();
+    await runFileOperation(async function () {
+      for (var i = 0; i < files.length; i++) {
+        try { await uploadOne(files[i]); } catch (err) { showToast(err.message, true); break; }
+      }
+      await reloadCurrentDirectory();
+    });
   }
 
   async function downloadItem(item) {
@@ -638,9 +787,89 @@
     var name = await modal({ title: folder ? '新建文件夹' : '新建文件', input: true, value: '', confirmLabel: '创建' });
     if (name === null || !name.trim()) return;
     try {
-      await fileRequest(type, { path: fileState.path, name: name.trim() });
+      await runFileOperation(function () { return fileRequest(type, { path: fileState.path, name: name.trim() }); });
       showToast('创建完成');
       reloadCurrentDirectory();
+    } catch (err) { showToast(err.message, true); }
+  }
+
+  async function moveItems(items) {
+    items = Array.isArray(items) ? items : [items];
+    if (!items.length) return;
+    var destination = await modal({ title: '移动到目录', message: '请输入目标目录的绝对路径', input: true, value: fileState.path, confirmLabel: '移动' });
+    if (destination === null || !destination.trim()) return;
+    await runFileOperation(async function () {
+      try {
+        var result = await requestWithConflict('move_many', { paths: items.map(function (item) { return item.path; }), destination: destination.trim() }, '移动', 1800000);
+        showBatchResult(result, '移动');
+        await reloadCurrentDirectory();
+      } catch (err) { showToast(err.message, true); }
+    });
+  }
+
+  async function archiveItems(items) {
+    items = Array.isArray(items) ? items : [items];
+    if (!items.length) return;
+    var format = await modal({ title: '创建压缩包', message: '选择压缩格式', choices: [{ label: '.zip', value: 'zip' }, { label: '.tar.gz', value: 'tar.gz' }] });
+    if (!format) return;
+    var defaultName = (items.length === 1 ? items[0].name : 'archive') + (format === 'zip' ? '.zip' : '.tar.gz');
+    var name = await modal({ title: '压缩包名称', message: '压缩包将保存到当前目录', input: true, value: defaultName, confirmLabel: '创建' });
+    if (name === null || !name.trim()) return;
+    await runFileOperation(async function () {
+      try {
+        await fileRequest('archive', { paths: items.map(function (item) { return item.path; }), path: fileState.path, name: name.trim(), format: format }, 1800000);
+        showToast('压缩包已创建');
+        await reloadCurrentDirectory();
+      } catch (err) { showToast(err.message, true); }
+    });
+  }
+
+  async function extractItem(item) {
+    var destination = await modal({ title: '解压到目录', message: '请输入解压目标目录；不会覆盖已存在文件。', input: true, value: fileState.path, confirmLabel: '解压' });
+    if (destination === null || !destination.trim()) return;
+    await runFileOperation(async function () {
+      try {
+        await fileRequest('extract', { path: item.path, destination: destination.trim() }, 1800000);
+        showToast('解压完成');
+        await reloadCurrentDirectory();
+      } catch (err) { showToast(err.message, true); }
+    });
+  }
+
+  function propertyText(data) {
+    return [
+      '路径：' + (data.path || '--'),
+      '类型：' + (data.type || '--'),
+      '大小：' + (isDirectoryItem(data) ? '--' : formatBytes(data.size)),
+      '权限：' + (data.permissions || data.mode || '--'),
+      '所有者/组：' + (data.owner || '--') + '/' + (data.group || '--'),
+      '修改时间：' + formatModified(data.modified),
+      data.is_link ? '软链接目标：' + (data.link_target || '目标不存在或无法读取') : '',
+      data.protected ? '警告：这是系统关键目录，修改前请确认。' : ''
+    ].filter(Boolean).join('\n');
+  }
+
+  async function propertiesItem(item) {
+    try {
+      var data = await fileRequest('properties', { path: item.path });
+      var action = await modal({ title: '文件属性', message: propertyText(data), choices: [
+        { label: '修改权限', value: 'chmod', danger: true },
+        { label: '修改所有者', value: 'chown', danger: true },
+        { label: '修改用户组', value: 'chgrp', danger: true }
+      ] });
+      if (!action) return;
+      var labels = { chmod: '权限（如 755）', chown: '所有者（用户名或 UID）', chgrp: '用户组（组名或 GID）' };
+      var value = await modal({ title: '确认修改' + labels[action], message: (data.protected ? '系统关键目录：' + data.path + '\n' : '') + '此操作可能影响服务运行，请确认输入。', input: true, value: action === 'chmod' ? (data.permissions || '644').replace(/^0/, '') : (action === 'chown' ? (data.owner || '') : (data.group || '')), confirmLabel: '保存', danger: true });
+      if (value === null || !value.trim()) return;
+      await runFileOperation(async function () {
+        try {
+          var payload = { path: item.path };
+          payload[action === 'chmod' ? 'mode' : (action === 'chown' ? 'owner' : 'group')] = value.trim();
+          await fileRequest(action, payload);
+          showToast('属性已更新');
+          await reloadCurrentDirectory();
+        } catch (err) { showToast(err.message, true); }
+      });
     } catch (err) { showToast(err.message, true); }
   }
 
@@ -652,6 +881,24 @@
     byId('newFileButton').addEventListener('click', function () { createEntry('create'); });
     byId('newFolderButton').addEventListener('click', function () { createEntry('mkdir'); });
     pasteButton.addEventListener('click', pasteFileClipboard);
+    byId('showHiddenInput').addEventListener('change', function () { fileState.showHidden = this.checked; reloadCurrentDirectory(); });
+    byId('selectAllFiles').addEventListener('change', function () {
+      fileState.selectedPaths = this.checked ? new Set(fileState.items.map(function (item) { return item.path; })) : new Set();
+      if (!this.checked) fileState.selected = null;
+      renderFiles();
+    });
+    document.querySelectorAll('.sort-button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var sort = button.dataset.sort;
+        fileState.order = fileState.sort === sort && fileState.order === 'asc' ? 'desc' : 'asc';
+        fileState.sort = sort;
+        reloadCurrentDirectory();
+      });
+    });
+    byId('batchCopyButton').addEventListener('click', function () { setFileClipboard(selectedItems(), 'copy'); });
+    byId('batchCutButton').addEventListener('click', function () { setFileClipboard(selectedItems(), 'move'); });
+    byId('batchArchiveButton').addEventListener('click', function () { archiveItems(selectedItems()); });
+    byId('batchDeleteButton').addEventListener('click', function () { deleteItems(selectedItems()); });
     byId('uploadButton').addEventListener('click', function () { byId('uploadInput').click(); });
     byId('uploadInput').addEventListener('change', function () {
       var files = Array.from(this.files || []);
@@ -670,11 +917,16 @@
       hideContextMenu();
       var action = button.dataset.action;
       if (action === 'open') openItem(item);
+      if (action === 'edit') editFile(item);
       if (action === 'download') downloadItem(item);
-      if (action === 'copy') setFileClipboard(item, 'copy');
-      if (action === 'cut') setFileClipboard(item, 'move');
+      if (action === 'copy') setFileClipboard(selectedItems().length ? selectedItems() : [item], 'copy');
+      if (action === 'cut') setFileClipboard(selectedItems().length ? selectedItems() : [item], 'move');
+      if (action === 'move') moveItems(selectedItems().length ? selectedItems() : [item]);
       if (action === 'rename') renameItem(item);
-      if (action === 'delete') deleteItem(item);
+      if (action === 'archive') archiveItems(selectedItems().length ? selectedItems() : [item]);
+      if (action === 'extract') extractItem(item);
+      if (action === 'permissions' || action === 'properties') propertiesItem(item);
+      if (action === 'delete') deleteItems(selectedItems().length ? selectedItems() : [item]);
     });
     document.addEventListener('click', function (event) { if (!contextMenu.contains(event.target)) hideContextMenu(); });
   }
