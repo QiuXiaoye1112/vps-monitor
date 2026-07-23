@@ -193,6 +193,8 @@ type trafficTotalPoint struct {
 	Time      time.Time
 	TotalUp   int64
 	TotalDown int64
+	UpSpeed   int64
+	DownSpeed int64
 }
 
 type cachedTrafficSummary struct {
@@ -206,6 +208,8 @@ func summarizeCachedTraffic(reports []v1.Report) cachedTrafficSummary {
 			Time:      report.UpdatedAt,
 			TotalUp:   report.Network.TotalUp,
 			TotalDown: report.Network.TotalDown,
+			UpSpeed:   report.Network.Up,
+			DownSpeed: report.Network.Down,
 		})
 	}
 	sort.SliceStable(points, func(i, j int) bool {
@@ -349,19 +353,83 @@ func sumCachedTrafficDeltas(summary cachedTrafficSummary, previous *previousTraf
 		startIndex = 1
 	}
 
-	var totalUp int64
-	var totalDown int64
-	for _, point := range summary.Points[startIndex:] {
+	totalUp := sumPlausibleCachedTrafficDeltas(
+		summary.Points,
+		startIndex,
+		previousUp,
+		previousTime,
+		func(point trafficTotalPoint) int64 { return point.TotalUp },
+		func(point trafficTotalPoint) int64 { return point.UpSpeed },
+	)
+	totalDown := sumPlausibleCachedTrafficDeltas(
+		summary.Points,
+		startIndex,
+		previousDown,
+		previousTime,
+		func(point trafficTotalPoint) int64 { return point.TotalDown },
+		func(point trafficTotalPoint) int64 { return point.DownSpeed },
+	)
+	return totalUp, totalDown
+}
+
+const (
+	cachedTrafficJumpAllowance = int64(256 << 20)
+	cachedTrafficSpeedMargin   = 8.0
+)
+
+func sumPlausibleCachedTrafficDeltas(
+	points []trafficTotalPoint,
+	startIndex int,
+	previousTotal int64,
+	previousTime time.Time,
+	totalOf func(trafficTotalPoint) int64,
+	speedOf func(trafficTotalPoint) int64,
+) int64 {
+	var total int64
+	for index := startIndex; index < len(points); index++ {
+		point := points[index]
 		if !point.Time.After(previousTime) {
 			continue
 		}
-		totalUp += utils.ComputeTrafficDelta(point.TotalUp, previousUp)
-		totalDown += utils.ComputeTrafficDelta(point.TotalDown, previousDown)
-		previousUp = point.TotalUp
-		previousDown = point.TotalDown
+
+		current := totalOf(point)
+		delta := utils.ComputeTrafficDelta(current, previousTotal)
+		if plausibleCachedTrafficDelta(delta, speedOf(point), point.Time.Sub(previousTime)) {
+			total += delta
+			previousTotal = current
+			previousTime = point.Time
+			continue
+		}
+
+		// A large cumulative counter that immediately falls back is a stale
+		// report delivered after a reconnect. Ignore it without moving the
+		// baseline so that the following current sample is still counted.
+		if current >= previousTotal && index+1 < len(points) && totalOf(points[index+1]) < current {
+			continue
+		}
+
+		// A persistent discontinuity usually means an interface set change.
+		// Rebase without charging its historical bytes as new traffic.
+		previousTotal = current
 		previousTime = point.Time
 	}
-	return totalUp, totalDown
+	return total
+}
+
+func plausibleCachedTrafficDelta(delta, reportedSpeed int64, elapsed time.Duration) bool {
+	if delta <= cachedTrafficJumpAllowance {
+		return true
+	}
+	if reportedSpeed < 0 {
+		reportedSpeed = 0
+	}
+	seconds := elapsed.Seconds()
+	if seconds < 1 {
+		seconds = 1
+	}
+	limit := float64(cachedTrafficJumpAllowance) +
+		float64(reportedSpeed)*seconds*cachedTrafficSpeedMargin
+	return float64(delta) <= limit
 }
 
 func getLatestTrafficRecordsBefore(db *gorm.DB, clientUUIDs []string, before time.Time) (map[string]previousTrafficRecord, error) {

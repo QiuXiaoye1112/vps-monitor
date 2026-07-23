@@ -207,6 +207,84 @@ func TestSaveClientReportToDBSumsCachedTrafficAcrossIntraMinuteReset(t *testing.
 	assert.Equal(t, int64(95), saved.TrafficDown)
 }
 
+func TestSaveClientReportToDBRejectsTransientHistoricalTrafficSpike(t *testing.T) {
+	resetReportCache(t)
+	db := openReportCacheTestDB(t)
+
+	clientUUID := "client-stale-traffic-spike"
+	now := time.Date(2026, 7, 23, 7, 9, 5, 0, time.UTC)
+	require.NoError(t, db.Create(&models.Record{
+		Client:       clientUUID,
+		Time:         models.FromTime(now.Add(-time.Minute)),
+		NetTotalUp:   29_793_330,
+		NetTotalDown: 98_493_419,
+	}).Error)
+
+	Records.Set(clientUUID, []v1.Report{
+		{
+			UpdatedAt: now.Add(-40 * time.Second),
+			Network: v1.NetworkReport{
+				Up: 1_000_000, Down: 1_000_000,
+				TotalUp: 31_000_000, TotalDown: 98_600_000,
+			},
+		},
+		{
+			UpdatedAt: now.Add(-20 * time.Second),
+			Network: v1.NetworkReport{
+				Up: 1_000_000, Down: 1_000_000,
+				TotalUp: 115_649_673_671, TotalDown: 120_646_297_075,
+			},
+		},
+		{
+			UpdatedAt: now.Add(-5 * time.Second),
+			Network: v1.NetworkReport{
+				Up: 1_000_000, Down: 1_000_000,
+				TotalUp: 44_194_763, TotalDown: 99_276_909,
+			},
+		},
+	}, cache.DefaultExpiration)
+
+	require.NoError(t, saveClientReportToDB(db, now))
+
+	var saved models.Record
+	require.NoError(t, db.Where("client = ? AND time = ?", clientUUID, models.FromTime(now)).First(&saved).Error)
+	assert.Equal(t, int64(44_194_763), saved.NetTotalUp)
+	assert.Equal(t, int64(99_276_909), saved.NetTotalDown)
+	assert.Equal(t, int64(14_401_433), saved.TrafficUp)
+	assert.Equal(t, int64(783_490), saved.TrafficDown)
+}
+
+func TestSaveClientReportToDBAcceptsHighTrafficWhenSpeedMatches(t *testing.T) {
+	resetReportCache(t)
+	db := openReportCacheTestDB(t)
+
+	clientUUID := "client-valid-high-traffic"
+	now := time.Date(2026, 7, 23, 7, 9, 5, 0, time.UTC)
+	require.NoError(t, db.Create(&models.Record{
+		Client:       clientUUID,
+		Time:         models.FromTime(now.Add(-time.Minute)),
+		NetTotalUp:   10 << 30,
+		NetTotalDown: 20 << 30,
+	}).Error)
+
+	Records.Set(clientUUID, []v1.Report{{
+		UpdatedAt: now.Add(-5 * time.Second),
+		Network: v1.NetworkReport{
+			Up:        64 << 20,
+			Down:      64 << 20,
+			TotalUp:   11 << 30,
+			TotalDown: 21 << 30,
+		},
+	}}, cache.DefaultExpiration)
+
+	require.NoError(t, saveClientReportToDB(db, now))
+
+	var saved models.Record
+	require.NoError(t, db.Where("client = ? AND time = ?", clientUUID, models.FromTime(now)).First(&saved).Error)
+	assert.Equal(t, int64(1<<30), saved.TrafficUp)
+	assert.Equal(t, int64(1<<30), saved.TrafficDown)
+}
+
 func TestSaveClientReportToDBDoesNotRecountRetainedCachePoints(t *testing.T) {
 	resetReportCache(t)
 	db := openReportCacheTestDB(t)
