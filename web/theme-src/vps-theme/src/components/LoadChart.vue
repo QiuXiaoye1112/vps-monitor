@@ -1752,9 +1752,9 @@ onMounted(() => {
           <template #header>
             <MetricChartHeader title="内存与 Swap" icon="tabler:database" tone="violet">
               <div class="text-xs flex gap-1 items-baseline">
-                <template v-if="latestStatus?.ram != null">
-                  <span>{{ formatBytesSplit(latestStatus.ram).value }}</span>
-                  <span>{{ formatBytesSplit(latestStatus.ram).unit }}</span>
+                <template v-if="nodeInfo?.ram != null">
+                  <span>{{ formatBytesSplit(nodeInfo.ram).value }}</span>
+                  <span>{{ formatBytesSplit(nodeInfo.ram).unit }}</span>
                 </template>
                 <span v-else>-</span>
                 <span>·</span>
@@ -1777,9 +1777,9 @@ onMounted(() => {
           <template #header>
             <MetricChartHeader title="磁盘" icon="tabler:device-floppy" tone="emerald" :subtitle="diskPredictionSummary">
               <div class="text-xs flex gap-1 items-baseline shrink-0">
-                <template v-if="latestStatus?.disk != null">
-                  <span>{{ formatBytesSplit(latestStatus.disk).value }}</span>
-                  <span>{{ formatBytesSplit(latestStatus.disk).unit }}</span>
+                <template v-if="nodeInfo?.disk != null">
+                  <span>{{ formatBytesSplit(nodeInfo.disk).value }}</span>
+                  <span>{{ formatBytesSplit(nodeInfo.disk).unit }}</span>
                 </template>
                 <span v-else>-</span>
                 <span>·</span>
