@@ -39,7 +39,10 @@ const nodesStore = useNodesStore()
 // 从 publicSettings 获取记录保留时间
 const maxRecordPreserveTime = computed(() => Math.min(appStore.publicSettings?.record_preserve_time || 168, 168))
 
-const dataUpdateInterval = computed(() => Math.max(appStore.dataUpdateInterval * 1000, 60_000))
+const observedReportIntervalSeconds = ref<number | null>(null)
+const dataUpdateInterval = computed(() =>
+  Math.max(1, observedReportIntervalSeconds.value ?? appStore.dataUpdateInterval) * 1000,
+)
 const detailLoadStatsHours = computed(() => maxRecordPreserveTime.value)
 
 // 使用 store 中的 isDark computed
@@ -83,6 +86,7 @@ const CUSTOM_VIEW_LABEL = '自定义'
 const PING_METRIC_KEYS = ['ping.latency_ms', 'ping.loss'] as const
 const METRIC_HISTORY_MAX_POINTS = 700
 const REALTIME_METRIC_REFRESH_MS = 30_000
+const FULL_HISTORY_REFRESH_MS = 60_000
 
 interface MetricChartSeriesData {
   name: string
@@ -235,6 +239,7 @@ const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
 let lastRealtimeMetricFetchAt = 0
+let lastFullHistoryFetchAt = 0
 let fetchInFlight = false
 let pendingVisibleFetch = false
 
@@ -330,6 +335,57 @@ function statusToRecordFormat(records: StatusRecord[]): RecordFormat[] {
       connections_udp: r.connections_udp ?? null,
     }
   })
+}
+
+function updateObservedReportInterval(records: StatusRecord[]): void {
+  const timestamps = records
+    .map(record => dayjs(record.time).valueOf())
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)
+  const gaps: number[] = []
+  for (let index = 1; index < timestamps.length; index++) {
+    const gap = (timestamps[index]! - timestamps[index - 1]!) / 1000
+    if (gap >= 0.5 && gap <= 60)
+      gaps.push(gap)
+  }
+  if (!gaps.length)
+    return
+  gaps.sort((a, b) => a - b)
+  observedReportIntervalSeconds.value = Math.min(60, Math.max(1, Math.round(gaps[Math.floor(gaps.length / 2)]!)))
+}
+
+function mergeStatusRecords(base: StatusRecord[], recent: StatusRecord[]): StatusRecord[] {
+  const records = new Map<number, StatusRecord>()
+  for (const record of [...base, ...recent]) {
+    const timestamp = dayjs(record.time).valueOf()
+    if (Number.isFinite(timestamp))
+      records.set(timestamp, record)
+  }
+  return [...records.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, record]) => record)
+}
+
+function mergeMetricRecords(base: RecordFormat[], recent: StatusRecord[]): RecordFormat[] {
+  const records = new Map<number, RecordFormat>()
+  for (const record of [...base, ...statusToRecordFormat(recent)]) {
+    const timestamp = dayjs(record.time).valueOf()
+    if (Number.isFinite(timestamp))
+      records.set(timestamp, record)
+  }
+  return [...records.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, record]) => record)
+}
+
+async function refreshRecentHistoryData(): Promise<void> {
+  const result = await rpc.getNodeRecentStatus(props.uuid)
+  const records = result?.records ?? []
+  updateObservedReportInterval(records)
+  if (metricData.value)
+    metricData.value = mergeMetricRecords(metricData.value, records)
+  else
+    remoteData.value = mergeStatusRecords(remoteData.value, records)
 }
 
 function metricValue(value: number | null | undefined): number | null {
@@ -666,6 +722,17 @@ async function fetchHistoryData(silent = false) {
     return
   }
 
+  if (silent && selectedView.value === '1 小时' && Date.now() - lastFullHistoryFetchAt < FULL_HISTORY_REFRESH_MS) {
+    try {
+      await refreshRecentHistoryData()
+      error.value = null
+    }
+    catch {
+      // 短时实时请求失败时保留已有图表，下一次轮询自动重试。
+    }
+    return
+  }
+
   const range = customRange.value
   const hours = effectiveHistoryHours.value
   const metricParams: Pick<MetricQueryParams, 'hours' | 'start' | 'end'> = isCustomRange.value && range
@@ -688,6 +755,9 @@ async function fetchHistoryData(silent = false) {
       rawMetricSeries.value = []
       remoteData.value = await loadNodeLoadRecords(props.uuid, hours, LOAD_RECORD_MAX_COUNT)
     }
+    lastFullHistoryFetchAt = Date.now()
+    if (selectedView.value === '1 小时')
+      await refreshRecentHistoryData().catch(() => undefined)
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
@@ -743,7 +813,7 @@ const chartData = computed(() => {
   let maxGap: number
 
   if (hours <= 4) {
-    intervalSec = minute
+    intervalSec = Math.max(1, observedReportIntervalSeconds.value ?? minute)
     maxGap = minute * 2
   }
   else if (hours > 120) {
@@ -1628,7 +1698,9 @@ watch(() => props.uuid, () => {
   remoteData.value = []
   metricData.value = null
   rawMetricSeries.value = []
+  observedReportIntervalSeconds.value = null
   lastRealtimeMetricFetchAt = 0
+  lastFullHistoryFetchAt = 0
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
 })
