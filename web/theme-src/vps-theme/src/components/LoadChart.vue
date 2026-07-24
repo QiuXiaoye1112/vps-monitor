@@ -10,6 +10,7 @@ import { computed, onMounted, reactive, ref, shallowRef, watch, watchEffect } fr
 import VChart from 'vue-echarts'
 import MetricChartHeader from '@/components/MetricChartHeader.vue'
 import MetricSeriesChartCard from '@/components/MetricSeriesChartCard.vue'
+import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { CardX } from '@/components/ui/card-x'
 import { Empty } from '@/components/ui/empty'
@@ -36,10 +37,10 @@ const appStore = useAppStore()
 const nodesStore = useNodesStore()
 
 // 从 publicSettings 获取记录保留时间
-const maxRecordPreserveTime = computed(() => appStore.publicSettings?.record_preserve_time || 720)
+const maxRecordPreserveTime = computed(() => Math.min(appStore.publicSettings?.record_preserve_time || 168, 168))
 
 const dataUpdateInterval = computed(() => appStore.dataUpdateInterval * 1000)
-const detailLoadStatsHours = computed(() => appStore.publicSettings?.record_preserve_time || 720)
+const detailLoadStatsHours = computed(() => maxRecordPreserveTime.value)
 
 // 使用 store 中的 isDark computed
 const isDark = computed(() => appStore.isDark)
@@ -147,15 +148,18 @@ const chartMarginWithLegend = { top: 30, right: 24, bottom: 52, left: 56 }
 
 // 视图选项
 const presetViews = [
-  { label: '4 小时', hours: 4 },
+  { label: '1 小时', hours: 1 },
+  { label: '6 小时', hours: 6 },
+  { label: '12 小时', hours: 12 },
   { label: '1 天', hours: 24 },
+  { label: '3 天', hours: 72 },
+  { label: '5 天', hours: 120 },
   { label: '7 天', hours: 168 },
-  { label: '30 天', hours: 720 },
 ]
 
 // 可用视图列表
 const availableViews = computed(() => {
-  const views: { label: string, hours?: number }[] = [{ label: '实时' }]
+  const views: { label: string, hours?: number }[] = []
   const maxHours = maxRecordPreserveTime.value
 
   for (const v of presetViews) {
@@ -171,7 +175,7 @@ const availableViews = computed(() => {
       : `${maxHours} 小时`
     views.push({ label, hours: maxHours })
   }
-  else if (maxHours > 4 && !presetViews.some(v => v.hours === maxHours)) {
+  else if (maxHours > 1 && !presetViews.some(v => v.hours === maxHours)) {
     const label = maxHours % 24 === 0
       ? `${Math.floor(maxHours / 24)} 天`
       : `${maxHours} 小时`
@@ -183,14 +187,14 @@ const availableViews = computed(() => {
 })
 
 // 当前选中的视图
-const selectedView = ref<string>('实时')
+const selectedView = ref<string>('1 小时')
 const customStartInput = ref('')
 const customEndInput = ref('')
 const selectedHours = computed(() => {
   const view = availableViews.value.find(v => v.label === selectedView.value)
   return view?.hours
 })
-const isRealtime = computed(() => selectedView.value === '实时')
+const isRealtime = computed(() => false)
 const isCustomRange = computed(() => selectedView.value === CUSTOM_VIEW_LABEL)
 const customRange = computed<CustomRange | null>(() => {
   if (!customStartInput.value || !customEndInput.value)
@@ -199,6 +203,11 @@ const customRange = computed<CustomRange | null>(() => {
   const start = dayjs(customStartInput.value)
   const end = dayjs(customEndInput.value)
   if (!start.isValid() || !end.isValid() || !end.isAfter(start))
+    return null
+  const now = dayjs()
+  if (end.isAfter(now.add(1, 'minute')) || start.isBefore(now.subtract(maxRecordPreserveTime.value, 'hour')))
+    return null
+  if (end.diff(start, 'hour', true) > maxRecordPreserveTime.value)
     return null
 
   return {
@@ -212,9 +221,9 @@ const customRangeError = computed(() => {
     return ''
   if (!customStartInput.value || !customEndInput.value)
     return '请选择开始和结束时间'
-  return customRange.value ? '' : '结束时间必须晚于开始时间'
+  return customRange.value ? '' : '只能查看最近 7 天内的数据，且结束时间必须晚于开始时间'
 })
-const effectiveHistoryHours = computed(() => isCustomRange.value ? customRange.value?.hours ?? 4 : selectedHours.value ?? 4)
+const effectiveHistoryHours = computed(() => isCustomRange.value ? customRange.value?.hours ?? 1 : selectedHours.value ?? 1)
 
 // 数据状态
 const remoteData = shallowRef<StatusRecord[]>([])
@@ -1521,6 +1530,52 @@ const processChartOption = computed(() => ({
   ],
 }))
 
+type ExpandableChartKey = 'cpu' | 'memory' | 'disk' | 'network' | 'connections' | 'process'
+
+const expandedChart = ref<ExpandableChartKey | null>(null)
+const expandedChartMeta: Record<ExpandableChartKey, { title: string, description: string }> = {
+  cpu: { title: 'CPU 与负载', description: 'CPU 使用率与系统负载历史' },
+  memory: { title: '内存与 Swap', description: '内存与交换空间使用历史' },
+  disk: { title: '磁盘', description: '磁盘使用历史' },
+  network: { title: '实时网络', description: '网络上传与下载速率历史' },
+  connections: { title: '网络连接', description: 'TCP 与 UDP 连接数历史' },
+  process: { title: '进程', description: '系统进程数量历史' },
+}
+const expandedChartOption = computed(() => {
+  switch (expandedChart.value) {
+    case 'cpu': return cpuChartOption.value
+    case 'memory': return memoryChartOption.value
+    case 'disk': return diskChartOption.value
+    case 'network': return networkChartOption.value
+    case 'connections': return connectionsChartOption.value
+    case 'process': return processChartOption.value
+    default: return {}
+  }
+})
+const expandedChartTitle = computed(() => expandedChart.value ? expandedChartMeta[expandedChart.value].title : '')
+const expandedChartDescription = computed(() => expandedChart.value ? expandedChartMeta[expandedChart.value].description : '')
+
+function openExpandedChart(key: ExpandableChartKey) {
+  selectedView.value = '1 小时'
+  expandedChart.value = key
+}
+
+function setExpandedOpen(open: boolean) {
+  if (open)
+    return
+  expandedChart.value = null
+  if (selectedView.value !== '1 小时')
+    selectedView.value = '1 小时'
+}
+
+function ensureDefaultCustomRange() {
+  if (customStartInput.value && customEndInput.value)
+    return
+  const end = dayjs()
+  customStartInput.value = end.subtract(24, 'hour').format('YYYY-MM-DDTHH:mm')
+  customEndInput.value = end.format('YYYY-MM-DDTHH:mm')
+}
+
 // ==================== 实时更新 ====================
 
 // 使用 VueUse 的 useIntervalFn 自动管理定时器
@@ -1530,9 +1585,9 @@ const { pause: pauseRealtimeUpdate, resume: resumeRealtimeUpdate } = useInterval
   { immediate: false },
 )
 
-// 根据是否为实时模式控制定时器
-watch(isRealtime, (realtime) => {
-  if (realtime) {
+// 小卡片保持最近一小时自动更新；展开历史图后停止轮询，避免长区间重复查询。
+watch([expandedChart, selectedView], ([expanded, view]) => {
+  if (expanded === null && view === '1 小时') {
     resumeRealtimeUpdate()
   }
   else {
@@ -1543,6 +1598,8 @@ watch(isRealtime, (realtime) => {
 // 生命周期 ====================
 
 watch(selectedView, () => {
+  if (isCustomRange.value)
+    ensureDefaultCustomRange()
   isInitialLoad.value = true // 切换视图时重置首次加载状态
   if (!isCustomRange.value || customRange.value)
     fetchData()
@@ -1572,50 +1629,6 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col gap-4">
-    <!-- 时间选择器 -->
-    <div class="flex flex-col items-center gap-2">
-      <Tabs v-model="selectedView" class="w-full items-center">
-        <TabsList class="h-8 bg-background/50 backdrop-blur-xl pointer-events-auto rounded-md">
-          <TabsTrigger
-            v-for="view in availableViews" :key="view.label" :value="view.label"
-            class="h-6.5 text-xs border-none data-[state=active]:text-green-600 shadow-none rounded-sm"
-          >
-            {{ view.label }}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div v-if="isCustomRange" class="flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center">
-        <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(0,13rem)_minmax(0,13rem)_auto]">
-          <Input
-            v-model="customStartInput"
-            type="datetime-local"
-            aria-label="负载图开始时间"
-            class="h-8 bg-background/50 text-xs"
-          />
-          <Input
-            v-model="customEndInput"
-            type="datetime-local"
-            aria-label="负载图结束时间"
-            class="h-8 bg-background/50 text-xs"
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            :disabled="!customRange"
-            class="h-8 text-xs"
-            @click="fetchData"
-          >
-            应用
-          </Button>
-        </div>
-        <div v-if="customRangeError" class="text-[11px] text-orange-500">
-          {{ customRangeError }}
-        </div>
-      </div>
-    </div>
-
     <!-- 内容区域 -->
     <Spinner :show="loading">
       <div v-if="error" class="text-red-500 py-8 text-center">
@@ -1628,7 +1641,7 @@ onMounted(() => {
       <!-- 图表网格 -->
       <div v-else class="gap-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         <!-- CPU 卡片 -->
-        <CardX v-if="isChartCardEnabled('cpu')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('cpu')">
+        <CardX v-if="isChartCardEnabled('cpu')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('cpu')" role="button" tabindex="0" @click="openExpandedChart('cpu')" @keydown.enter="openExpandedChart('cpu')">
           <template #header>
             <MetricChartHeader title="CPU 与负载" icon="tabler:cpu" tone="rose">
               <div v-if="latestStatus?.cpu != null" class="text-xs flex gap-0.5 items-baseline">
@@ -1644,7 +1657,7 @@ onMounted(() => {
         </CardX>
 
         <!-- 内存卡片 -->
-        <CardX v-if="isChartCardEnabled('memory')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('memory')">
+        <CardX v-if="isChartCardEnabled('memory')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('memory')" role="button" tabindex="0" @click="openExpandedChart('memory')" @keydown.enter="openExpandedChart('memory')">
           <template #header>
             <MetricChartHeader title="内存与 Swap" icon="tabler:database" tone="violet">
               <div class="text-xs flex gap-1 items-baseline">
@@ -1669,7 +1682,7 @@ onMounted(() => {
         </CardX>
 
         <!-- 磁盘卡片 -->
-        <CardX v-if="isChartCardEnabled('disk')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('disk')">
+        <CardX v-if="isChartCardEnabled('disk')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('disk')" role="button" tabindex="0" @click="openExpandedChart('disk')" @keydown.enter="openExpandedChart('disk')">
           <template #header>
             <MetricChartHeader title="磁盘" icon="tabler:device-floppy" tone="emerald" :subtitle="diskPredictionSummary">
               <div class="text-xs flex gap-1 items-baseline shrink-0">
@@ -1693,7 +1706,7 @@ onMounted(() => {
         </CardX>
 
         <!-- 网络卡片 -->
-        <CardX v-if="isChartCardEnabled('network')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('network')">
+        <CardX v-if="isChartCardEnabled('network')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('network')" role="button" tabindex="0" @click="openExpandedChart('network')" @keydown.enter="openExpandedChart('network')">
           <template #header>
             <MetricChartHeader title="实时网络" icon="tabler:network" tone="sky">
               <div class="text-xs flex gap-2 items-baseline">
@@ -1767,7 +1780,7 @@ onMounted(() => {
         />
 
         <!-- 连接数卡片 -->
-        <CardX v-if="isChartCardEnabled('connections')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('connections')">
+        <CardX v-if="isChartCardEnabled('connections')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('connections')" role="button" tabindex="0" @click="openExpandedChart('connections')" @keydown.enter="openExpandedChart('connections')">
           <template #header>
             <MetricChartHeader title="网络连接" icon="tabler:binary-tree" tone="amber">
               <div class="text-xs flex gap-1 items-baseline">
@@ -1783,7 +1796,7 @@ onMounted(() => {
         </CardX>
 
         <!-- 进程卡片 -->
-        <CardX v-if="isChartCardEnabled('process')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('process')">
+        <CardX v-if="isChartCardEnabled('process')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('process')" role="button" tabindex="0" @click="openExpandedChart('process')" @keydown.enter="openExpandedChart('process')">
           <template #header>
             <MetricChartHeader title="进程" icon="tabler:activity" tone="slate">
               <span class="text-xs">
@@ -1816,5 +1829,69 @@ onMounted(() => {
         />
       </div>
     </Spinner>
+
+    <AppDialog
+      :open="expandedChart !== null"
+      :title="expandedChartTitle"
+      :description="expandedChartDescription"
+      content-class="max-w-6xl"
+      @update:open="setExpandedOpen"
+    >
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-2">
+          <Tabs v-model="selectedView" class="w-full items-center">
+            <div class="min-w-0 flex-1 overflow-x-auto rounded-sm pointer-events-auto">
+              <TabsList class="w-max h-8 bg-background/50 backdrop-blur-xl rounded-md">
+                <TabsTrigger
+                  v-for="view in availableViews" :key="view.label" :value="view.label"
+                  class="h-6.5 flex-none shrink-0 text-xs border-none data-[state=active]:text-green-600 shadow-none rounded-sm"
+                >
+                  {{ view.label }}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </Tabs>
+
+          <div v-if="isCustomRange" class="flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(0,13rem)_minmax(0,13rem)_auto]">
+              <Input
+                v-model="customStartInput"
+                type="datetime-local"
+                aria-label="负载图开始时间"
+                class="h-8 bg-background/50 text-xs"
+              />
+              <Input
+                v-model="customEndInput"
+                type="datetime-local"
+                aria-label="负载图结束时间"
+                class="h-8 bg-background/50 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                :disabled="!customRange"
+                class="h-8 text-xs"
+                @click="fetchData"
+              >
+                应用
+              </Button>
+            </div>
+            <div v-if="customRangeError" class="text-[11px] text-orange-500">
+              {{ customRangeError }}
+            </div>
+          </div>
+        </div>
+
+        <Spinner :show="loading">
+          <div v-if="error" class="py-8 text-center text-red-500">
+            {{ error }}
+          </div>
+          <div v-else class="h-[min(62vh,34rem)] min-h-80 rounded-md bg-background/35 p-2">
+            <VChart :option="expandedChartOption" autoresize />
+          </div>
+        </Spinner>
+      </div>
+    </AppDialog>
   </div>
 </template>

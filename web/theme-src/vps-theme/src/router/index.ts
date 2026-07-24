@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { verifyLogin } from '@/services/auth.service'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,6 +15,15 @@ const router = createRouter({
       component: () => import('@/views/InstanceDetail.vue'),
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (to.name !== 'instance-detail')
+    return true
+  const session = await verifyLogin({ force: true })
+  if (session.authenticated)
+    return true
+  return { name: 'home' }
 })
 
 export default router

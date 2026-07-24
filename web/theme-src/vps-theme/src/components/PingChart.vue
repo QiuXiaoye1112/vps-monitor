@@ -51,7 +51,7 @@ watchEffect(() => {
 })
 
 // 从 publicSettings 获取记录保留时间
-const maxPingRecordPreserveTime = computed(() => appStore.publicSettings?.ping_record_preserve_time || 168)
+const maxPingRecordPreserveTime = computed(() => Math.min(appStore.publicSettings?.ping_record_preserve_time || 168, 168))
 
 // 视图选项
 const presetViews = [
@@ -109,6 +109,11 @@ const customRange = computed<CustomRange | null>(() => {
   const end = dayjs(customEndInput.value)
   if (!start.isValid() || !end.isValid() || !end.isAfter(start))
     return null
+  const now = dayjs()
+  if (end.isAfter(now.add(1, 'minute')) || start.isBefore(now.subtract(maxPingRecordPreserveTime.value, 'hour')))
+    return null
+  if (end.diff(start, 'hour', true) > maxPingRecordPreserveTime.value)
+    return null
 
   return {
     start,
@@ -121,7 +126,7 @@ const customRangeError = computed(() => {
     return ''
   if (!customStartInput.value || !customEndInput.value)
     return '请选择开始和结束时间'
-  return customRange.value ? '' : '结束时间必须晚于开始时间'
+  return customRange.value ? '' : '只能查看最近 7 天内的数据，且结束时间必须晚于开始时间'
 })
 const selectedHours = computed(() => {
   if (isCustomRange.value)

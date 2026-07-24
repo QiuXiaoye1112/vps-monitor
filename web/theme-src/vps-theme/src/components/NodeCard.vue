@@ -16,8 +16,10 @@ import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 const props = withDefaults(defineProps<{
   node: NodeData
   reduceMotion?: boolean
+  disabled?: boolean
 }>(), {
   reduceMotion: false,
+  disabled: false,
 })
 const emit = defineEmits<{
   click: []
@@ -97,18 +99,30 @@ function barsFor(row: PingTaskRow, metric: 'latency' | 'loss') {
 function displayFor(row: PingTaskRow, metric: 'latency' | 'loss') {
   return metric === 'latency' ? row.latencyDisplay : row.lossDisplay
 }
+
+function activateCard() {
+  if (!props.disabled)
+    emit('click')
+}
 </script>
 
 <template>
   <CardX
-    hoverable
+    :hoverable="!props.disabled"
     :size="nodeCardXSize"
-    class="node-card w-full cursor-pointer border-none shadow-[0_0_0_3px] shadow-transparent transition-all duration-200 rounded-xl"
-    :class="[!props.node.online && '!shadow-red-500/30']"
+    class="node-card w-full border-none shadow-[0_0_0_3px] shadow-transparent transition-all duration-200 rounded-xl"
+    :class="[
+      !props.node.online && '!shadow-red-500/30',
+      props.disabled ? 'cursor-not-allowed opacity-80' : 'cursor-pointer',
+    ]"
     role="button"
-    tabindex="0"
-    :aria-label="`查看节点 ${props.node.name} 详情`"
-    @click="emit('click')"
+    :tabindex="props.disabled ? -1 : 0"
+    :aria-disabled="props.disabled"
+    :aria-label="props.disabled ? `节点 ${props.node.name}，登录后可查看详情` : `查看节点 ${props.node.name} 详情`"
+    :title="props.disabled ? '登录后可查看节点详情' : undefined"
+    @click="activateCard"
+    @keydown.enter.prevent="activateCard"
+    @keydown.space.prevent="activateCard"
   >
     <template #header>
       <div class="flex items-center gap-2 min-w-0">

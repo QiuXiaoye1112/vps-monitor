@@ -50,41 +50,43 @@ func AddPingTask(clients []string, defaultOn, enabled bool, name string, target,
 
 func DeletePingTask(id []uint) error {
 	db := dbcore.GetDBInstance()
-	removed := make(map[uint]struct{}, len(id))
-	for _, taskID := range id {
-		removed[taskID] = struct{}{}
-	}
-	err := db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where("id IN ?", id).Delete(&models.PingTask{})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		var clients []models.Client
-		if err := tx.Select("uuid", "ping_task_order").Find(&clients).Error; err != nil {
-			return err
-		}
-		for _, client := range clients {
-			filtered := make(models.UintArray, 0, len(client.PingTaskOrder))
-			for _, taskID := range client.PingTaskOrder {
-				if _, deleted := removed[taskID]; !deleted {
-					filtered = append(filtered, taskID)
-				}
-			}
-			if len(filtered) != len(client.PingTaskOrder) {
-				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("ping_task_order", filtered).Error; err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+	err := db.Transaction(func(tx *gorm.DB) error { return deletePingTasksTx(tx, id) })
 	if err != nil {
 		return err
 	}
 	ReloadPingSchedule()
+	return nil
+}
+
+func deletePingTasksTx(tx *gorm.DB, id []uint) error {
+	removed := make(map[uint]struct{}, len(id))
+	for _, taskID := range id {
+		removed[taskID] = struct{}{}
+	}
+	result := tx.Where("id IN ?", id).Delete(&models.PingTask{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	var clients []models.Client
+	if err := tx.Select("uuid", "ping_task_order").Find(&clients).Error; err != nil {
+		return err
+	}
+	for _, client := range clients {
+		filtered := make(models.UintArray, 0, len(client.PingTaskOrder))
+		for _, taskID := range client.PingTaskOrder {
+			if _, deleted := removed[taskID]; !deleted {
+				filtered = append(filtered, taskID)
+			}
+		}
+		if len(filtered) != len(client.PingTaskOrder) {
+			if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Update("ping_task_order", filtered).Error; err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -247,30 +249,38 @@ func RemoveClientFromPingTasks(uuid string) error {
 		return nil
 	}
 	db := dbcore.GetDBInstance()
-	err := db.Transaction(func(tx *gorm.DB) error {
-		var pingTasks []models.PingTask
-		if err := tx.Find(&pingTasks).Error; err != nil {
-			return err
-		}
-		for _, task := range pingTasks {
-			updated := make(models.StringArray, 0, len(task.Clients))
-			for _, clientUUID := range task.Clients {
-				if clientUUID != uuid {
-					updated = append(updated, clientUUID)
-				}
-			}
-			if len(updated) != len(task.Clients) {
-				if err := tx.Model(&models.PingTask{}).Where("id = ?", task.Id).Update("clients", updated).Error; err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+	err := db.Transaction(func(tx *gorm.DB) error { return RemoveClientFromPingTasksTx(tx, uuid) })
 	if err != nil {
 		return err
 	}
 	return ReloadPingSchedule()
+}
+
+// RemoveClientFromPingTasksTx removes a node from Ping task scopes using the
+// caller's transaction. Historical Ping records are intentionally untouched;
+// the seven-day retention cleanup removes them later.
+func RemoveClientFromPingTasksTx(tx *gorm.DB, uuid string) error {
+	if uuid == "" {
+		return nil
+	}
+	var pingTasks []models.PingTask
+	if err := tx.Find(&pingTasks).Error; err != nil {
+		return err
+	}
+	for _, task := range pingTasks {
+		updated := make(models.StringArray, 0, len(task.Clients))
+		for _, clientUUID := range task.Clients {
+			if clientUUID != uuid {
+				updated = append(updated, clientUUID)
+			}
+		}
+		if len(updated) != len(task.Clients) {
+			if err := tx.Model(&models.PingTask{}).Where("id = ?", task.Id).Update("clients", updated).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func GetEnabledPingTasks() ([]models.PingTask, error) {

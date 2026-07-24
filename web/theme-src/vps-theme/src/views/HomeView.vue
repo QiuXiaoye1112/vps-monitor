@@ -41,6 +41,8 @@ const nodeGridClass = computed(() => [
 ])
 
 function handleNodeClick(node: NodeData) {
+  if (!appStore.privateFeaturesAllowed)
+    return
   router.push({ name: 'instance-detail', params: { id: node.uuid } })
 }
 
@@ -78,7 +80,11 @@ function getNodeItemTransitionStyle(index: number): Record<string, string> {
           class="min-w-0 pointer-events-auto"
           :style="getNodeItemTransitionStyle(index)"
         >
-          <NodeCard :node="node" @click="handleNodeClick(node)" />
+          <NodeCard
+            :node="node"
+            :disabled="!appStore.privateFeaturesAllowed"
+            @click="handleNodeClick(node)"
+          />
         </div>
       </div>
       <div v-else class="pointer-events-auto text-muted-foreground text-center py-8">

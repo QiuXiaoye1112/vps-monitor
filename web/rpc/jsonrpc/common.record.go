@@ -14,18 +14,36 @@ import (
 	"github.com/monitor-monitor/monitor/pkg/rpc"
 )
 
-const maxPingRecordWindow = 7 * 24 * time.Hour
+const (
+	maxLoadRecordWindow = 7 * 24 * time.Hour
+	maxPingRecordWindow = 7 * 24 * time.Hour
+)
 
 func init() {
 	Register("getRecords", getRecords)
 }
 
 func clampPingRecordRange(start, end time.Time) (time.Time, time.Time) {
-	if end.IsZero() {
-		end = time.Now()
+	return clampRecordRange(start, end, time.Now(), maxPingRecordWindow)
+}
+
+func clampLoadRecordRange(start, end time.Time) (time.Time, time.Time) {
+	return clampRecordRange(start, end, time.Now(), maxLoadRecordWindow)
+}
+
+func clampRecordRange(start, end, now time.Time, window time.Duration) (time.Time, time.Time) {
+	oldest := now.Add(-window)
+	if end.IsZero() || end.After(now) {
+		end = now
 	}
-	if start.IsZero() || end.Sub(start) > maxPingRecordWindow {
-		start = end.Add(-maxPingRecordWindow)
+	if end.Before(oldest) {
+		end = oldest
+	}
+	if start.IsZero() || start.Before(oldest) {
+		start = oldest
+	}
+	if start.After(end) {
+		start = end
 	}
 	return start, end
 }
@@ -100,6 +118,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 
 	switch params.Type {
 	case "load":
+		startTime, endTime = clampLoadRecordRange(startTime, endTime)
 		// fetch load records
 		recs, err := getLoadRecordsCombined(params.UUID, startTime, endTime)
 		if err != nil {

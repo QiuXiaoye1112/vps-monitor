@@ -46,15 +46,10 @@ func GetPublicInfo() (map[string]interface{}, error) {
 	if !hasKey("record_enabled") {
 		cst.RecordEnabled = true
 	}
-	if !hasKey("record_preserve_time") {
-		cst.RecordPreserveTime = 720
-	}
-	if !hasKey("ping_record_preserve_time") {
-		cst.PingRecordPreserveTime = config.DefaultPingRecordPreserveTime
-	}
-	if cst.PingRecordPreserveTime < config.DefaultPingRecordPreserveTime {
-		cst.PingRecordPreserveTime = config.DefaultPingRecordPreserveTime
-	}
+	// 历史数据统一固定为最近 7 天。数据库中可能仍有旧版的 720 小时配置，
+	// 不能把它暴露给前端，否则界面会允许查询已经被清理的数据。
+	cst.RecordPreserveTime = config.DefaultRecordPreserveTime
+	cst.PingRecordPreserveTime = config.DefaultPingRecordPreserveTime
 
 	// Fallback defaults if we couldn't enumerate keys.
 	if allErr != nil {

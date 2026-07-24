@@ -23,6 +23,17 @@ var Records = cache.New(1*time.Minute, 1*time.Minute)
 var reportCacheMu sync.Mutex
 var saveClientReportMu sync.Mutex
 
+// DeleteClientReports waits for an active persistence pass and then removes
+// every buffered report for a deleted node, preventing it from being written
+// back after the database cleanup transaction completes.
+func DeleteClientReports(uuid string) {
+	saveClientReportMu.Lock()
+	defer saveClientReportMu.Unlock()
+	reportCacheMu.Lock()
+	defer reportCacheMu.Unlock()
+	Records.Delete(uuid)
+}
+
 func AppendClientReport(uuid string, report v1.Report) (v1.Report, error) {
 	reportCacheMu.Lock()
 	defer reportCacheMu.Unlock()

@@ -74,7 +74,7 @@ func TestSumLegacyTrafficDeltasUsesAllRawRowsWithoutArchive(t *testing.T) {
 	require.Equal(t, int64(120), down)
 }
 
-func TestDeleteLegacyRecordsBeforePreservesCurrentBillingWindow(t *testing.T) {
+func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	db := newTrafficTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.Client{}))
 	now := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
@@ -85,8 +85,8 @@ func TestDeleteLegacyRecordsBeforePreservesCurrentBillingWindow(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&client).Error)
 
-	// The current Shanghai billing period started on July 21, which is more
-	// than 30 days ago at this instant. It must survive a 30-day history cleanup.
+	// The current Shanghai billing period started on July 21. The old history
+	// row is deleted, but its traffic is folded into compensation.
 	recordTime := time.Date(2026, 7, 21, 5, 0, 0, 0, time.UTC)
 	require.True(t, recordTime.Before(historyCutoff))
 	require.NoError(t, db.Table("records_long_term").Create(&models.Record{
@@ -96,10 +96,13 @@ func TestDeleteLegacyRecordsBeforePreservesCurrentBillingWindow(t *testing.T) {
 	require.NoError(t, deleteLegacyRecordsBefore(db, historyCutoff, now))
 	var count int64
 	require.NoError(t, db.Table("records_long_term").Where("client = ?", client.UUID).Count(&count).Error)
-	require.Equal(t, int64(1), count)
+	require.Zero(t, count)
+	var updated models.Client
+	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
+	require.Equal(t, int64(123), updated.TrafficComp)
 }
 
-func TestDeleteLegacyRecordsBeforeKeepsCumulativeLedgerWhenResetDisabled(t *testing.T) {
+func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *testing.T) {
 	db := newTrafficTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.Client{}))
 	now := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
@@ -114,5 +117,8 @@ func TestDeleteLegacyRecordsBeforeKeepsCumulativeLedgerWhenResetDisabled(t *test
 	require.NoError(t, deleteLegacyRecordsBefore(db, now.Add(-30*24*time.Hour), now))
 	var count int64
 	require.NoError(t, db.Table("records_long_term").Where("client = ?", client.UUID).Count(&count).Error)
-	require.Equal(t, int64(1), count)
+	require.Zero(t, count)
+	var updated models.Client
+	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
+	require.Equal(t, int64(456), updated.TrafficComp)
 }

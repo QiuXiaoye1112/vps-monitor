@@ -105,6 +105,9 @@ func adminGetSettings(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonR
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to get settings: "+err.Error(), nil)
 	}
+	cst[config.RecordPreserveTimeKey] = config.DefaultRecordPreserveTime
+	cst[config.PingRecordPreserveTimeKey] = config.DefaultPingRecordPreserveTime
+	cst["metric_retention_days"] = 7
 	return cst, nil
 }
 
@@ -147,6 +150,8 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	} {
 		delete(cfg, key)
 	}
+	cfg[config.RecordPreserveTimeKey] = config.DefaultRecordPreserveTime
+	cfg[config.PingRecordPreserveTimeKey] = config.DefaultPingRecordPreserveTime
 
 	if err := config.SetMany(cfg); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to update settings: "+err.Error(), nil)

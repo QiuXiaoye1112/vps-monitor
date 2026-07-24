@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
+	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/utils"
@@ -18,12 +20,88 @@ import (
 )
 
 func DeleteClient(clientUuid string) error {
+	if strings.TrimSpace(clientUuid) == "" {
+		return fmt.Errorf("invalid client UUID")
+	}
+
+	// The metric store is a separate database and cannot participate in the
+	// GORM transaction below. Delete it first so a metric-store error cannot
+	// leave a deleted node's history behind.
+	if err := metricstore.DeleteEntity(context.Background(), clientUuid); err != nil {
+		return fmt.Errorf("delete client metrics: %w", err)
+	}
+
 	db := dbcore.GetDBInstance()
-	err := db.Delete(&models.Client{}, "uuid = ?", clientUuid).Error
+	err := db.Transaction(func(tx *gorm.DB) error {
+		return deleteClientData(tx, clientUuid)
+	})
 	if err != nil {
 		return err
 	}
-	return tasks.RemoveClientFromPingTasks(clientUuid)
+	if err := tasks.ReloadPingSchedule(); err != nil {
+		log.Printf("failed to reload ping schedule after deleting client %s: %v", clientUuid, err)
+	}
+	return nil
+}
+
+func deleteClientData(tx *gorm.DB, clientUUID string) error {
+	var client models.Client
+	if err := tx.Select("uuid").Where("uuid = ?", clientUUID).First(&client).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("client = ?", clientUUID).Delete(&models.Record{}).Error; err != nil {
+		return fmt.Errorf("delete records: %w", err)
+	}
+	if err := tx.Table("records_long_term").Where("client = ?", clientUUID).Delete(&models.Record{}).Error; err != nil {
+		return fmt.Errorf("delete records_long_term: %w", err)
+	}
+	if err := tx.Where("client = ?", clientUUID).Delete(&models.PingRecord{}).Error; err != nil {
+		return fmt.Errorf("delete ping_records: %w", err)
+	}
+	if err := tx.Where("client = ?", clientUUID).Delete(&models.TaskResult{}).Error; err != nil {
+		return fmt.Errorf("delete task_results: %w", err)
+	}
+
+	var commandTasks []models.Task
+	if err := tx.Find(&commandTasks).Error; err != nil {
+		return err
+	}
+	for _, task := range commandTasks {
+		remaining := make(models.StringArray, 0, len(task.Clients))
+		for _, uuid := range task.Clients {
+			if uuid != clientUUID {
+				remaining = append(remaining, uuid)
+			}
+		}
+		if len(remaining) == len(task.Clients) {
+			continue
+		}
+		if len(remaining) == 0 {
+			if err := tx.Where("task_id = ?", task.TaskId).Delete(&models.TaskResult{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("task_id = ?", task.TaskId).Delete(&models.Task{}).Error; err != nil {
+				return err
+			}
+			continue
+		}
+		if err := tx.Model(&models.Task{}).Where("task_id = ?", task.TaskId).Update("clients", remaining).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := tasks.RemoveClientFromPingTasksTx(tx, clientUUID); err != nil {
+		return err
+	}
+	result := tx.Where("uuid = ?", clientUUID).Delete(&models.Client{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func SaveClientInfo(update map[string]interface{}) error {

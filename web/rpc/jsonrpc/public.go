@@ -58,11 +58,17 @@ func publicGetNodesInformation(ctx context.Context, _ *rpc.JsonRpcRequest) (any,
 		if node.Hidden && !isLogin {
 			continue
 		}
-		node.IPv4 = ""
-		node.IPv6 = ""
-		result = append(result, publicClientInfo(node))
+		result = append(result, publicClientInfoForSession(node, isLogin))
 	}
 	return result, nil
+}
+
+func publicClientInfoForSession(node models.Client, isLogin bool) map[string]any {
+	if !isLogin {
+		node.IPv4 = ""
+		node.IPv6 = ""
+	}
+	return publicClientInfo(node)
 }
 
 func publicClientInfo(node models.Client) map[string]any {
@@ -185,6 +191,13 @@ func publicGetRecordsByUUID(ctx context.Context, req *rpc.JsonRpcRequest) (any, 
 	hoursInt, err := strconv.Atoi(hours)
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid hours parameter", nil)
+	}
+	if hoursInt <= 0 {
+		hoursInt = 1
+	}
+	maxLoadHours := int(maxLoadRecordWindow / time.Hour)
+	if hoursInt > maxLoadHours {
+		hoursInt = maxLoadHours
 	}
 	validLoadTypes := map[string]bool{
 		"cpu": true, "ram": true, "swap": true,

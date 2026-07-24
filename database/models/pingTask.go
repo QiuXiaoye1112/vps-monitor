@@ -4,7 +4,7 @@ type PingRecord struct {
 	Client     string    `json:"client" gorm:"type:varchar(36);not null;index"`
 	ClientInfo Client    `json:"client_info" gorm:"foreignKey:Client;references:UUID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	TaskId     uint      `json:"task_id" gorm:"not null;index"`
-	Task       PingTask  `json:"task" gorm:"foreignKey:TaskId;references:Id;constraint:OnDelete:CASCADE,OnUpdate:CASCADE;"`
+	Task       PingTask  `json:"task" gorm:"-"` // 任务删除后历史记录仍保留到七天清理期限
 	Time       LocalTime `json:"time" gorm:"index;not null"`
 	Value      int       `json:"value" gorm:"type:int;not null"` // Ping 值，单位毫秒
 }

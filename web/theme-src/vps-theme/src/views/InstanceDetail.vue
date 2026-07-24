@@ -9,11 +9,12 @@ import { Empty } from '@/components/ui/empty'
 import { ProgressThin } from '@/components/ui/progress-thin'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 
 const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
+const LoadChart = defineAsyncComponent(() => import('@/components/LoadChart.vue'))
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
@@ -24,6 +25,10 @@ const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byt
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, 'minute')
 const getRegionAltText = (region: string) => getRegionDisplayName(region) || getRegionCode(region)
+const lastReportTime = computed(() => {
+  const timestamp = data.value?.status_updated_at || data.value?.time
+  return timestamp ? formatDateTime(timestamp) : '--'
+})
 
 const memPercentage = computed(() => data.value ? getMemoryPercentage(data.value) : 0)
 const diskPercentage = computed(() => data.value ? getDiskPercentage(data.value) : 0)
@@ -65,17 +70,35 @@ const trafficResetText = computed(() => {
     </div>
 
     <template v-else>
-      <div class="px-4 flex gap-4 items-center">
+      <div class="px-4 flex gap-3 items-start sm:items-center">
         <Button variant="ghost" size="icon-sm" class="bg-background/50 hover:bg-background" aria-label="返回首页" @click="router.push('/')">
           <Icon icon="tabler:arrow-left" :width="16" :height="16" />
         </Button>
-        <div class="text-lg font-bold flex gap-2 items-center">
-          <img :src="`/images/flags/${getRegionCode(data.region)}.svg`" :alt="getRegionAltText(data.region)" class="size-6">
-          <span>{{ data.name }}</span>
+        <div class="min-w-0 flex-1 space-y-2">
+          <div class="flex flex-wrap gap-2 items-center">
+            <div class="text-lg font-bold flex gap-2 items-center">
+              <img :src="`/images/flags/${getRegionCode(data.region)}.svg`" :alt="getRegionAltText(data.region)" class="size-6">
+              <span>{{ data.name }}</span>
+            </div>
+            <Badge :variant="data.online ? 'default' : 'destructive'" class="text-xs !rounded">
+              {{ data.online ? '在线' : '离线' }}
+            </Badge>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span class="detail-meta">
+              <Icon icon="tabler:clock" :width="14" :height="14" />
+              最后上报 {{ lastReportTime }}
+            </span>
+            <span class="detail-meta">
+              <Icon icon="tabler:number-4" :width="14" :height="14" />
+              IPv4 {{ data.ipv4 || '--' }}
+            </span>
+            <span class="detail-meta min-w-0">
+              <Icon icon="tabler:number-6" :width="14" :height="14" class="shrink-0" />
+              <span class="break-all">IPv6 {{ data.ipv6 || '--' }}</span>
+            </span>
+          </div>
         </div>
-        <Badge :variant="data.online ? 'default' : 'destructive'" class="text-xs !rounded">
-          {{ data.online ? '在线' : '离线' }}
-        </Badge>
       </div>
 
       <div class="px-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -190,6 +213,10 @@ const trafficResetText = computed(() => {
       </div>
 
       <div class="px-4">
+        <LoadChart :uuid="data.uuid" />
+      </div>
+
+      <div class="px-4">
         <CardX size="small" class="bg-background/50 border-none rounded-md">
           <PingChart :uuid="data.uuid" />
         </CardX>
@@ -209,5 +236,11 @@ const trafficResetText = computed(() => {
   border: 1px solid rgb(100 116 139 / 0.1);
   border-radius: 0.5rem;
   background: rgb(100 116 139 / 0.05);
+}
+
+.detail-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 </style>

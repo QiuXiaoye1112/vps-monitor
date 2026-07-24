@@ -62,19 +62,38 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 		clientUUIDs := make([]string, 0, len(clients))
 		for _, client := range clients {
 			clientUUIDs = append(clientUUIDs, client.UUID)
-			if !client.TrafficResetEnabled {
-				// With reset disabled, records_long_term is the persistent cumulative
-				// traffic ledger. Deleting it would make the displayed total decrease.
-				continue
-			}
 
-			periodStart, _ := TrafficWindow(client, now)
-			deleteBefore := before
-			if periodStart.Before(deleteBefore) {
-				deleteBefore = periodStart
+			// Fold traffic deltas that still belong to the active billing window
+			// into the client's compensation before deleting old chart history.
+			// This keeps cumulative traffic stable while allowing every historical
+			// record row (CPU/RAM/etc.) older than seven days to be removed.
+			foldStart := time.Time{}
+			if client.TrafficResetEnabled {
+				foldStart, _ = TrafficWindow(client, now)
+			}
+			var folded struct {
+				Up   int64
+				Down int64
+			}
+			foldQuery := tx.Table("records_long_term").
+				Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
+				Where("client = ? AND time < ?", client.UUID, before)
+			if !foldStart.IsZero() {
+				foldQuery = foldQuery.Where("time >= ?", foldStart)
+			}
+			if err := foldQuery.Scan(&folded).Error; err != nil {
+				return err
+			}
+			if total := folded.Up + folded.Down; total > 0 {
+				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Updates(map[string]interface{}{
+					"traffic_compensation":          gorm.Expr("traffic_compensation + ?", total),
+					"traffic_compensation_reset_at": now,
+				}).Error; err != nil {
+					return err
+				}
 			}
 			if err := tx.Table("records_long_term").
-				Where("client = ? AND time < ?", client.UUID, deleteBefore).
+				Where("client = ? AND time < ?", client.UUID, before).
 				Delete(&models.Record{}).Error; err != nil {
 				return err
 			}

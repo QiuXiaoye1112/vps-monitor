@@ -63,13 +63,12 @@ const summaries = ref<NodeHealthSummary[]>([])
 let summaryRequestId = 0
 
 const rangeOptions = computed<HealthRangeOption[]>(() => {
-  const preserveHours = appStore.publicSettings?.record_preserve_time || 720
+  const preserveHours = Math.min(appStore.publicSettings?.record_preserve_time || 168, 168)
   const allHours = Math.max(1, preserveHours)
   const options: HealthRangeOption[] = [
     { key: 'day', label: '日', hours: 24 },
     { key: 'week', label: '周', hours: 168 },
-    { key: 'month', label: '月', hours: 720 },
-    { key: 'all', label: '有史以来', hours: allHours },
+    { key: 'all', label: '近 7 天', hours: allHours },
   ]
   return options.filter(option => option.key === 'all' || allHours >= option.hours)
 })

@@ -171,10 +171,10 @@ func DoScheduledWork() {
 }
 
 func cleanupScheduledData() {
-	cfg, _ := config.GetManyAs[config.Settings]()
+	clients.ResetTrafficCompensationForDueClients()
 	records.CompactRecord()
-	records.DeleteRecordBefore(time.Now().Add(-time.Hour * time.Duration(cfg.RecordPreserveTime)))
-	tasks.ClearTaskResultsByTimeBefore(time.Now().Add(-time.Hour * time.Duration(cfg.RecordPreserveTime)))
+	records.DeleteRecordBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultRecordPreserveTime)))
+	tasks.ClearTaskResultsByTimeBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultRecordPreserveTime)))
 	tasks.DeletePingRecordsBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultPingRecordPreserveTime)))
 	auditlog.RemoveOldLogs()
 	accounts.RemoveExpiredSessions()

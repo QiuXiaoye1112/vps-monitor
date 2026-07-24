@@ -15,6 +15,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
+	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
 
 // admin.client.go
@@ -333,6 +334,7 @@ func adminRemoveClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	if params.UUID == "" {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
+	report_cache.DeleteClientReports(params.UUID)
 	if err := clients.DeleteClient(params.UUID); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to delete client"+err.Error(), nil)
 	}

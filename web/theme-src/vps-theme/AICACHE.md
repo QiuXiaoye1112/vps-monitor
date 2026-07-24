@@ -12,15 +12,32 @@
 
 ## 当前任务
 
-- 状态：completed，已完成源码迁移、可重复构建、回归验证、GitHub 上传和 DMIT 部署。
-- 目标：把 VPS Monitor 当前通过压缩产物补丁实现的主题定制迁回 Vue/TypeScript 源码，重新构建后保持现有页面、文案、布局和后端契约一致。
-- 来源：官方 `sanrokamlan-prog/komari-theme-Glassmorphism` v3.2.0，导入提交记录在 `UPSTREAM_COMMIT`；本项目定制以迁移前 `web/public/vpsTheme/dist` 为行为基线。
-- 构建：在项目根目录执行 `web/theme-src/build-vps-theme.sh`；脚本使用 Bun 完成依赖锁定、类型检查、lint、生产构建，并同步到 `web/public/vpsTheme/dist`，后台页面继续使用 `web/theme-src/admin/admin.html`。
-- 已迁移：纯卡片首页、四项总览与三种地球、节点卡三任务 Ping 顺序/分级格、详情页状态与流量布局、3/5/7 天 Ping 范围、流量重置字段、图片背景首帧预加载、VPS Monitor 头部与后台头像。
-- 明确移除：官方新版高级工具、搜索/列表首页、访客悬浮信息、主题页脚、视频背景、RPC 模式和减弱动画设置；这些能力不进入最终 bundle。
-- 验证结果：`bun run type-check`、`bun run lint`、嵌入式生产构建、Go 主题/管理端/客户端/RPC 回归测试全部通过；本地首页、详情页和公开 API 均返回 200，生成资产引用与禁止项扫描通过。浏览器自动化工具在本次环境中不可用，最终像素级视觉确认由本地预览完成。
+- 状态：completed。
+- 目标：在现有节点详情页保留“系统状态、流量、Ping”，接入官方 `LoadChart` 的 CPU、内存、磁盘、网络、连接和进程历史图表，并在标题区展示最后上报时间与 IPv4/IPv6。
+- 来源：官方 `sanrokamlan-prog/komari-theme-Glassmorphism` v3.2.0 已导入的 `src/components/LoadChart.vue`，上游提交记录在 `UPSTREAM_COMMIT`。
+- 范围：只做节点详情页编排与生成主题产物同步；复用现有历史数据服务、实时刷新、时间范围和深色样式。
+- 不做：不加入硬件信息、系统信息、存储信息、网络信息卡；不改首页和 Ping 图表。
+- 验证结果：`web/theme-src/build-vps-theme.sh` 完整通过类型检查、lint 和生产构建并同步嵌入式主题；本地前端连接 `ded` 真实 API 后确认六个图表有数据，桌面端 3×2、390px 移动端单列且无横向溢出，“实时→4 小时”切换、首页↔详情页往返正常，控制台无错误，且未渲染图二的信息卡。
 
 ## 执行日志
+
+### 2026-07-25 authenticated node detail (M4)
+
+- 首页节点卡在访客状态下使用禁用样式、移出键盘 Tab 顺序并阻止鼠标/Enter/Space 进入详情；已登录状态保持原交互。
+- 路由层对 `/instance/:id` 强制重新验证会话，访客直接输入详情 URL 也会返回首页。
+- 节点信息 RPC 仅对已登录会话返回 IPv4/IPv6，访客继续收到空地址；增加单元测试覆盖两种会话。
+- 删除逻辑审计：当前节点删除只删 Client 和 Ping 任务成员关系，没有同步删除 legacy/metric 历史；Ping 任务删除没有显式清理 Ping 历史，且 `ded` SQLite 运行时 `foreign_keys=0`。远程只读检查发现 `records_long_term` 已有 424 条孤儿记录，独立 metric store 当前关闭。
+- 验证：主题 type-check、lint、生产构建通过，`web/rpc/jsonrpc` 测试通过；访客浏览器中四张节点卡均呈 disabled，点击不可执行，直接访问详情 URL 在会话验证后返回首页。
+
+### 2026-07-24 node detail load charts (M4)
+
+- 复用已导入的官方 `LoadChart.vue`，在现有节点详情的系统状态/流量卡之后、Ping 图表之前按节点 UUID 懒加载。
+- 接入 CPU 与负载、内存与 Swap、磁盘、实时网络、网络连接和进程六个历史图表，继续使用现有历史服务、Metric 回退、实时刷新和时间范围逻辑。
+- 节点详情标题区增加最后上报时间、IPv4 和 IPv6；IPv6 允许换行，避免移动端横向溢出。
+- 面板节点信息接口仅对已登录会话返回 IPv4/IPv6，访客继续得到空地址；节点详情路由与首页节点卡同样限制为登录后才能进入。
+- 对照 Agent 上报与前端消费关系后，保留首页、地图、图表、节点列表、任务功能仍在使用的数据；Agent 仅停止发送服务端未消费的 Ping 结果 `ping_type` 和可由 `detailed_info` 推导的 GPU `count`。
+- 未加入硬件信息、系统信息、存储信息、网络信息卡；未修改首页或 Ping 图表。
+- 验证：`web/theme-src/build-vps-theme.sh` 通过；生成 `LoadChart` 独立懒加载资产并同步到 `web/public/vpsTheme/dist`。浏览器使用真实 `ded` 数据验证桌面 3×2、移动端单列、7 个 canvas（六个负载图加一个 Ping 图）、时间范围切换、路由往返、最后上报时间/IP 信息和无横向溢出。Agent 新增的 JSON 契约测试及不触网全包测试通过，Linux AMD64 交叉编译成功；仓库原有真实公网 ICMP/HTTP 测试在本机因原始套接字权限和外部目标响应失败。
 
 ### 2026-07-19 realistic globe vertical alignment (M4)
 
@@ -487,3 +504,12 @@
 - v3.2.0 validation: `bun run lint` and `bun run build` passed; the local archive contains manifest version `3.2.0`, `preview.png`, and `dist/index.html`. Browser checks covered all three earth renderers on desktop/mobile and home -> detail -> home. The only build warnings are the existing VueUse annotation and large globe chunk notices.
 - Default-theme updater validation: `go test ./web/api/admin ./web/public` and targeted `go vet` passed. A broader `go test ./web/...` reached unrelated SQLite-backed packages and failed because the local Go binary uses `CGO_ENABLED=0`; do not treat that environment failure as a regression in these packages.
 - komari-web updater UI: i18n sync is clean, lint reports 0 errors / 27 existing warnings, and both root-base and `/admin-app/` production builds pass.
+
+## 2026-07-25 node deletion, seven-day retention, and expandable load charts (M4/M5/M6)
+
+- Node deletion now removes the client, raw and compacted load records, Ping records, command results, command-task memberships, Ping-task memberships, metric-store raw/rollup points, runtime connection/latest-report state, and buffered reports. Command tasks with no remaining clients are deleted. Main-database cleanup is transactional.
+- Removing a Ping task intentionally leaves its historical Ping rows; the scheduled seven-day cleanup removes those orphaned history rows. The Ping record model no longer creates a task-delete cascade for new databases.
+- Load, Ping, task-result, and metric-store history are fixed at 168 hours. Public/admin settings and backend query clamps report and enforce the same limit, including custom ranges.
+- Legacy long-term load rows older than seven days are removed. Before removal, traffic deltas still belonging to the active billing period are atomically folded into the node compensation field so cumulative traffic remains stable.
+- Node-detail load cards default to the latest hour with no page-level timeline. CPU, memory, disk, network, connections, and process cards open a blurred, `max-w-6xl` dialog on click; the dialog contains the same `1h/6h/12h/1d/3d/5d/7d/custom` choices as Ping.
+- Validation completed: theme type-check, ESLint, and production build passed; full `go test ./...` passed. Browser/live deployment verification remains pending.

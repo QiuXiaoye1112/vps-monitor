@@ -39,6 +39,7 @@ const (
 	MetricConnections    = "connections.tcp"
 	MetricConnectionsUDP = "connections.udp"
 	MetricPingLatency    = "ping.latency_ms"
+	metricRetentionDays  = 7
 )
 
 var (
@@ -53,7 +54,7 @@ type MetricStoreConfig struct {
 	Enabled         bool   `json:"metric_store_enabled" default:"false"`          // 是否启用独立 metrics 数据库
 	Driver          string `json:"metric_db_driver" default:"sqlite"`             // 数据库类型: sqlite, mysql, postgresql
 	DSN             string `json:"metric_db_dsn" default:"./data/metrics.db"`     // 数据库连接串
-	RetentionDays   int    `json:"metric_retention_days" default:"30"`            // 数据保留天数
+	RetentionDays   int    `json:"metric_retention_days" default:"7"`             // 数据固定保留7天
 	TablePrefix     string `json:"metric_table_prefix" default:"metric_"`         // 表名前缀
 	MaxOpenConns    int    `json:"metric_max_open_conns" default:"25"`            // 最大连接数
 	MaxIdleConns    int    `json:"metric_max_idle_conns" default:"5"`             // 最大空闲连接数
@@ -82,14 +83,9 @@ func buildMetricConfig(cfg *MetricStoreConfig, autoMigrate bool) (metric.Config,
 	if tablePrefix == "" {
 		tablePrefix = "metric_"
 	}
-	retention := cfg.RetentionDays
-	if retention <= 0 {
-		retention = 30
-	}
-
 	opts := []metric.Option{
 		metric.WithTablePrefix(tablePrefix),
-		metric.WithDefaultRetention(retention),
+		metric.WithDefaultRetention(metricRetentionDays),
 		metric.WithAutoMigrate(autoMigrate),
 	}
 
@@ -317,7 +313,7 @@ func InitializeStore() error {
 		store = s
 		storeMu.Unlock()
 
-		log.Printf("Metric store initialized successfully (driver=%s, retention=%d days)", ResolveDriverFromConfig(cfg.Driver, cfg.DSN), cfg.RetentionDays)
+		log.Printf("Metric store initialized successfully (driver=%s, retention=%d days)", ResolveDriverFromConfig(cfg.Driver, cfg.DSN), metricRetentionDays)
 	})
 
 	return initErr
@@ -367,7 +363,7 @@ func Reload(ctx context.Context) error {
 		}
 	}
 
-	log.Printf("Metric store reloaded successfully (driver=%s, retention=%d days)", ResolveDriverFromConfig(cfg.Driver, cfg.DSN), cfg.RetentionDays)
+	log.Printf("Metric store reloaded successfully (driver=%s, retention=%d days)", ResolveDriverFromConfig(cfg.Driver, cfg.DSN), metricRetentionDays)
 	return nil
 }
 
@@ -381,6 +377,16 @@ func GetStore() *metric.Store {
 // IsEnabled 检查 metric store 是否已启用
 func IsEnabled() bool {
 	return GetStore() != nil
+}
+
+// DeleteEntity removes every raw and rollup metric belonging to one node.
+func DeleteEntity(ctx context.Context, entityID string) error {
+	s := GetStore()
+	if s == nil {
+		return nil
+	}
+	_, err := s.DeleteEntity(ctx, entityID)
+	return err
 }
 
 // CloseStore 关闭 metric store
