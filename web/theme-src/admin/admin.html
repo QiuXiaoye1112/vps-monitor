@@ -1457,7 +1457,7 @@
             execStart +
             "\nRestart=always\nRestartSec=10\n\n[Install]\nWantedBy=multi-user.target\n";
           var release =
-            "https://github.com/QiuXiaoye1112/monitor-agent/releases/download/v1.0.0/monitor-agent-linux-amd64";
+            "https://github.com/QiuXiaoye1112/monitor-agent/releases/latest/download/monitor-agent-linux-amd64";
           var newPath = path + ".new";
           var cmd =
             'set -e; [ "$(id -u)" -eq 0 ] || { echo "请使用 root 运行"; exit 1; }; [ "$(uname -m)" = "x86_64" ] || { echo "目前仅支持 AMD64"; exit 1; }; TMP=$(mktemp /tmp/monitor-agent-install.XXXXXX); trap \'rm -f "$TMP"\' EXIT; curl -fsSL ' +

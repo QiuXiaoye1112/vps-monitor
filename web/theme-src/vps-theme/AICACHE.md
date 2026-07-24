@@ -513,3 +513,5 @@
 - Legacy long-term load rows older than seven days are removed. Before removal, traffic deltas still belonging to the active billing period are atomically folded into the node compensation field so cumulative traffic remains stable.
 - Node-detail load cards default to the latest hour with no page-level timeline. CPU, memory, disk, network, connections, and process cards open a blurred, `max-w-6xl` dialog on click; the dialog contains the same `1h/6h/12h/1d/3d/5d/7d/custom` choices as Ping.
 - Validation completed: theme type-check, ESLint, and production build passed; full `go test ./...` passed. Browser/live deployment verification remains pending.
+- Production follow-up fixed a blocking-spinner loop in the new one-hour cards: historical refreshes now run at most once per 60 seconds, are silent after initial load, reject overlapping requests, and queue a visible refresh when the user changes the selected range during a background request.
+- Generated Agent installation commands now use GitHub's `releases/latest/download/monitor-agent-linux-amd64` endpoint instead of pinning `v1.0.0`.

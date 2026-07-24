@@ -39,7 +39,7 @@ const nodesStore = useNodesStore()
 // 从 publicSettings 获取记录保留时间
 const maxRecordPreserveTime = computed(() => Math.min(appStore.publicSettings?.record_preserve_time || 168, 168))
 
-const dataUpdateInterval = computed(() => appStore.dataUpdateInterval * 1000)
+const dataUpdateInterval = computed(() => Math.max(appStore.dataUpdateInterval * 1000, 60_000))
 const detailLoadStatsHours = computed(() => maxRecordPreserveTime.value)
 
 // 使用 store 中的 isDark computed
@@ -235,6 +235,8 @@ const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
 let lastRealtimeMetricFetchAt = 0
+let fetchInFlight = false
+let pendingVisibleFetch = false
 
 // 节点信息
 const nodeInfo = computed(() => nodesStore.nodesByUuid.get(props.uuid))
@@ -652,7 +654,7 @@ async function fetchRecentData() {
   }
 }
 
-async function fetchHistoryData() {
+async function fetchHistoryData(silent = false) {
   if (!props.uuid)
     return
 
@@ -670,7 +672,8 @@ async function fetchHistoryData() {
     ? { start: range.start.toDate().toISOString(), end: range.end.toDate().toISOString() }
     : { hours }
 
-  loading.value = true
+  if (!silent)
+    loading.value = true
   error.value = null
 
   try {
@@ -693,16 +696,32 @@ async function fetchHistoryData() {
     rawMetricSeries.value = []
   }
   finally {
-    loading.value = false
+    if (!silent)
+      loading.value = false
   }
 }
 
-async function fetchData() {
-  if (isRealtime.value) {
-    await fetchRecentData()
+async function fetchData(silent = false) {
+  if (fetchInFlight) {
+    if (!silent)
+      pendingVisibleFetch = true
+    return
   }
-  else {
-    await fetchHistoryData()
+  fetchInFlight = true
+  try {
+    if (isRealtime.value) {
+      await fetchRecentData()
+    }
+    else {
+      await fetchHistoryData(silent)
+    }
+  }
+  finally {
+    fetchInFlight = false
+    if (pendingVisibleFetch) {
+      pendingVisibleFetch = false
+      void fetchData()
+    }
   }
 }
 
@@ -1580,7 +1599,7 @@ function ensureDefaultCustomRange() {
 
 // 使用 VueUse 的 useIntervalFn 自动管理定时器
 const { pause: pauseRealtimeUpdate, resume: resumeRealtimeUpdate } = useIntervalFn(
-  () => fetchData(),
+  () => fetchData(true),
   dataUpdateInterval,
   { immediate: false },
 )
