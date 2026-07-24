@@ -140,9 +140,6 @@ const trafficResetText = computed(() => {
               :aria-label="data.ipv4 ? `复制 IPv4 ${data.ipv4}` : '无 IPv4 地址'"
               @click="copyIp('ipv4', data.ipv4)"
             >
-              <span class="detail-meta-icon detail-meta-icon-v4">
-                <Icon icon="tabler:number-4" :width="16" :height="16" />
-              </span>
               <span class="min-w-0 flex-1 text-left">
                 <span class="detail-meta-label">IPv4</span>
                 <span class="detail-meta-value font-mono">{{ data.ipv4 || '--' }}</span>
@@ -156,9 +153,6 @@ const trafficResetText = computed(() => {
               :aria-label="data.ipv6 ? `复制 IPv6 ${data.ipv6}` : '无 IPv6 地址'"
               @click="copyIp('ipv6', data.ipv6)"
             >
-              <span class="detail-meta-icon detail-meta-icon-v6">
-                <Icon icon="tabler:number-6" :width="16" :height="16" />
-              </span>
               <span class="min-w-0 flex-1 text-left">
                 <span class="detail-meta-label">IPv6</span>
                 <span class="detail-meta-value break-all font-mono">{{ data.ipv6 || '--' }}</span>
@@ -338,16 +332,6 @@ const trafficResetText = computed(() => {
 .detail-meta-icon-clock {
   color: rgb(56 189 248);
   background: rgb(14 165 233 / 0.12);
-}
-
-.detail-meta-icon-v4 {
-  color: rgb(52 211 153);
-  background: rgb(16 185 129 / 0.12);
-}
-
-.detail-meta-icon-v6 {
-  color: rgb(167 139 250);
-  background: rgb(139 92 246 / 0.12);
 }
 
 .detail-meta-label,
