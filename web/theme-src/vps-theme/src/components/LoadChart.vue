@@ -1735,8 +1735,8 @@ onMounted(() => {
         <CardX v-if="isChartCardEnabled('cpu')" size="small" class="cursor-pointer bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('cpu')" role="button" tabindex="0" @click="openExpandedChart('cpu')" @keydown.enter="openExpandedChart('cpu')">
           <template #header>
             <MetricChartHeader title="CPU 与负载" icon="tabler:cpu" tone="rose">
-              <div v-if="latestStatus?.cpu != null" class="text-xs flex gap-0.5 items-baseline">
-                <span>{{ latestStatus.cpu.toFixed(1) }}</span>
+              <div v-if="nodeInfo?.cpu != null" class="text-xs flex gap-0.5 items-baseline">
+                <span>{{ nodeInfo.cpu.toFixed(1) }}</span>
                 <span>%</span>
               </div>
               <span v-else>-</span>
@@ -1803,17 +1803,17 @@ onMounted(() => {
               <div class="text-xs flex gap-2 items-baseline">
                 <span class="flex flex-row items-center justify-center gap-0.5">
                   <Icon icon="tabler:chevron-up" width="12" height="12" />
-                  <template v-if="latestStatus?.net_out != null">
-                    {{ formatBytesSplit(latestStatus.net_out).value }}
-                    {{ formatBytesSplit(latestStatus.net_out).unit }}/s
+                  <template v-if="nodeInfo?.net_out != null">
+                    {{ formatBytesSplit(nodeInfo.net_out).value }}
+                    {{ formatBytesSplit(nodeInfo.net_out).unit }}/s
                   </template>
                   <template v-else>-</template>
                 </span>
                 <span class="flex flex-row items-center justify-center gap-0.5">
                   <Icon icon="tabler:chevron-down" width="12" height="12" />
-                  <template v-if="latestStatus?.net_in != null">
-                    {{ formatBytesSplit(latestStatus.net_in).value }}
-                    {{ formatBytesSplit(latestStatus.net_in).unit }}/s
+                  <template v-if="nodeInfo?.net_in != null">
+                    {{ formatBytesSplit(nodeInfo.net_in).value }}
+                    {{ formatBytesSplit(nodeInfo.net_in).unit }}/s
                   </template>
                   <template v-else>-</template>
                 </span>
