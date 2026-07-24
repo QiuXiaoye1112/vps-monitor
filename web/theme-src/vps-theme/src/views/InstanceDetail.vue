@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { ProgressThin } from '@/components/ui/progress-thin'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { message } from '@/utils/message'
 import { getDiskPercentage, getMemoryPercentage, getTrafficUsed, getTrafficUsedPercentage, hasTrafficLimit } from '@/utils/nodeMetricsHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 
@@ -28,6 +29,44 @@ const getRegionAltText = (region: string) => getRegionDisplayName(region) || get
 const lastReportTime = computed(() => {
   const timestamp = data.value?.status_updated_at || data.value?.time
   return timestamp ? formatDateTime(timestamp) : '--'
+})
+const copiedIp = ref<'ipv4' | 'ipv6' | null>(null)
+let copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+async function copyIp(kind: 'ipv4' | 'ipv6', value?: string) {
+  if (!value)
+    return
+  try {
+    await navigator.clipboard.writeText(value)
+  }
+  catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const copied = document.execCommand('copy')
+    textarea.remove()
+    if (!copied) {
+      message.error('复制失败，请手动复制')
+      return
+    }
+  }
+
+  copiedIp.value = kind
+  message.success(`${kind === 'ipv4' ? 'IPv4' : 'IPv6'} 已复制`)
+  if (copyFeedbackTimer)
+    clearTimeout(copyFeedbackTimer)
+  copyFeedbackTimer = setTimeout(() => {
+    copiedIp.value = null
+    copyFeedbackTimer = null
+  }, 1600)
+}
+
+onBeforeUnmount(() => {
+  if (copyFeedbackTimer)
+    clearTimeout(copyFeedbackTimer)
 })
 
 const memPercentage = computed(() => data.value ? getMemoryPercentage(data.value) : 0)
@@ -84,19 +123,48 @@ const trafficResetText = computed(() => {
               {{ data.online ? '在线' : '离线' }}
             </Badge>
           </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span class="detail-meta">
-              <Icon icon="tabler:clock" :width="14" :height="14" />
-              最后上报 {{ lastReportTime }}
-            </span>
-            <span class="detail-meta">
-              <Icon icon="tabler:number-4" :width="14" :height="14" />
-              IPv4 {{ data.ipv4 || '--' }}
-            </span>
-            <span class="detail-meta min-w-0">
-              <Icon icon="tabler:number-6" :width="14" :height="14" class="shrink-0" />
-              <span class="break-all">IPv6 {{ data.ipv6 || '--' }}</span>
-            </span>
+          <div class="detail-meta-grid">
+            <div class="detail-meta-card">
+              <span class="detail-meta-icon detail-meta-icon-clock">
+                <Icon icon="tabler:clock" :width="16" :height="16" />
+              </span>
+              <span class="min-w-0">
+                <span class="detail-meta-label">最后上报</span>
+                <span class="detail-meta-value">{{ lastReportTime }}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              class="detail-meta-card detail-meta-copy"
+              :disabled="!data.ipv4"
+              :aria-label="data.ipv4 ? `复制 IPv4 ${data.ipv4}` : '无 IPv4 地址'"
+              @click="copyIp('ipv4', data.ipv4)"
+            >
+              <span class="detail-meta-icon detail-meta-icon-v4">
+                <Icon icon="tabler:number-4" :width="16" :height="16" />
+              </span>
+              <span class="min-w-0 flex-1 text-left">
+                <span class="detail-meta-label">IPv4</span>
+                <span class="detail-meta-value font-mono">{{ data.ipv4 || '--' }}</span>
+              </span>
+              <Icon :icon="copiedIp === 'ipv4' ? 'tabler:check' : 'tabler:copy'" :width="15" :height="15" class="detail-copy-icon" />
+            </button>
+            <button
+              type="button"
+              class="detail-meta-card detail-meta-copy min-w-0"
+              :disabled="!data.ipv6"
+              :aria-label="data.ipv6 ? `复制 IPv6 ${data.ipv6}` : '无 IPv6 地址'"
+              @click="copyIp('ipv6', data.ipv6)"
+            >
+              <span class="detail-meta-icon detail-meta-icon-v6">
+                <Icon icon="tabler:number-6" :width="16" :height="16" />
+              </span>
+              <span class="min-w-0 flex-1 text-left">
+                <span class="detail-meta-label">IPv6</span>
+                <span class="detail-meta-value break-all font-mono">{{ data.ipv6 || '--' }}</span>
+              </span>
+              <Icon :icon="copiedIp === 'ipv6' ? 'tabler:check' : 'tabler:copy'" :width="15" :height="15" class="detail-copy-icon" />
+            </button>
           </div>
         </div>
       </div>
@@ -238,9 +306,102 @@ const trafficResetText = computed(() => {
   background: rgb(100 116 139 / 0.05);
 }
 
-.detail-meta {
+.detail-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.detail-meta-card {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgb(148 163 184 / 0.14);
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.08), rgb(148 163 184 / 0.035));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.detail-meta-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+}
+
+.detail-meta-icon-clock {
+  color: rgb(56 189 248);
+  background: rgb(14 165 233 / 0.12);
+}
+
+.detail-meta-icon-v4 {
+  color: rgb(52 211 153);
+  background: rgb(16 185 129 / 0.12);
+}
+
+.detail-meta-icon-v6 {
+  color: rgb(167 139 250);
+  background: rgb(139 92 246 / 0.12);
+}
+
+.detail-meta-label,
+.detail-meta-value {
+  display: block;
+}
+
+.detail-meta-label {
+  margin-bottom: 0.1rem;
+  color: rgb(148 163 184 / 0.85);
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.detail-meta-value {
+  color: rgb(226 232 240 / 0.9);
+  font-size: 0.75rem;
+  line-height: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-meta-copy {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.detail-meta-copy:hover {
+  border-color: rgb(34 197 94 / 0.28);
+  background: rgb(255 255 255 / 0.1);
+  transform: translateY(-1px);
+}
+
+.detail-meta-copy:focus-visible {
+  outline: 2px solid rgb(34 197 94 / 0.45);
+  outline-offset: 2px;
+}
+
+.detail-meta-copy:disabled {
+  cursor: default;
+  opacity: 0.55;
+  transform: none;
+}
+
+.detail-copy-icon {
+  flex: 0 0 auto;
+  color: rgb(148 163 184 / 0.75);
+}
+
+@media (max-width: 640px) {
+  .detail-meta-card {
+    width: 100%;
+  }
 }
 </style>

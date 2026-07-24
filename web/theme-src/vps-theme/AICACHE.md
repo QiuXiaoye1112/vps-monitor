@@ -515,3 +515,4 @@
 - Validation completed: theme type-check, ESLint, and production build passed; full `go test ./...` passed. Browser/live deployment verification remains pending.
 - Production follow-up fixed a blocking-spinner loop in the new one-hour cards: historical refreshes now run at most once per 60 seconds, are silent after initial load, reject overlapping requests, and queue a visible refresh when the user changes the selected range during a background request.
 - Generated Agent installation commands now use GitHub's `releases/latest/download/monitor-agent-linux-amd64` endpoint instead of pinning `v1.0.0`.
+- Node-detail last-report, IPv4, and IPv6 metadata now use matching glass info pills. IPv4/IPv6 pills are accessible buttons with clipboard copy, fallback copy support, success/error toasts, and temporary check-icon feedback.
