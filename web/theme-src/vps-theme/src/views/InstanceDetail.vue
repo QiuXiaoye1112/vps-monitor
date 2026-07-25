@@ -312,10 +312,10 @@ const trafficResetText = computed(() => {
   align-items: center;
   gap: 0.6rem;
   padding: 0.45rem 0.65rem;
-  border: 1px solid rgb(148 163 184 / 0.14);
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
   border-radius: 0.65rem;
-  background: linear-gradient(135deg, rgb(255 255 255 / 0.08), rgb(148 163 184 / 0.035));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  background: color-mix(in srgb, var(--card) 76%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -341,13 +341,13 @@ const trafficResetText = computed(() => {
 
 .detail-meta-label {
   margin-bottom: 0.1rem;
-  color: rgb(148 163 184 / 0.85);
+  color: var(--muted-foreground);
   font-size: 0.65rem;
   line-height: 1;
 }
 
 .detail-meta-value {
-  color: rgb(226 232 240 / 0.9);
+  color: var(--foreground);
   font-size: 0.75rem;
   line-height: 1.15rem;
   font-variant-numeric: tabular-nums;
@@ -363,7 +363,7 @@ const trafficResetText = computed(() => {
 
 .detail-meta-copy:hover {
   border-color: rgb(34 197 94 / 0.28);
-  background: rgb(255 255 255 / 0.1);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
   transform: translateY(-1px);
 }
 
@@ -380,7 +380,7 @@ const trafficResetText = computed(() => {
 
 .detail-copy-icon {
   flex: 0 0 auto;
-  color: rgb(148 163 184 / 0.75);
+  color: var(--muted-foreground);
 }
 
 @media (max-width: 640px) {

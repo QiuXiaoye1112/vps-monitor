@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { CardX } from '@/components/ui/card-x'
 import { Empty } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { loadNodeLoadRecords, useNodeLoadStats } from '@/composables/useNodeLoadStats'
 import { LOAD_RECORD_MAX_COUNT } from '@/constants/load'
@@ -1721,7 +1720,7 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-4">
     <!-- 内容区域 -->
-    <Spinner :show="loading">
+    <div :aria-busy="loading">
       <div v-if="error" class="text-red-500 py-8 text-center">
         {{ error }}
       </div>
@@ -1919,7 +1918,7 @@ onMounted(() => {
           percent-scale
         />
       </div>
-    </Spinner>
+    </div>
 
     <AppDialog
       :open="expandedChart !== null"

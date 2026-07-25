@@ -7,7 +7,6 @@ import VChart from 'vue-echarts'
 import { Button } from '@/components/ui/button'
 import { Empty } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { PING_RECORD_MAX_COUNT } from '@/constants/load'
@@ -823,7 +822,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 内容区域 -->
-    <Spinner :show="loading" content-class="flex flex-col gap-4">
+    <div :aria-busy="loading" class="flex flex-col gap-4">
       <div v-if="error" class="text-red-500 py-8 text-center">
         {{ error }}
       </div>
@@ -962,6 +961,6 @@ onBeforeUnmount(() => {
           <VChart :option="pingChartOption" autoresize />
         </div>
       </template>
-    </Spinner>
+    </div>
   </div>
 </template>
