@@ -13,23 +13,10 @@ const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(fal
 const avatarUrl = '/images/ethan-avatar.png'
 
 const actionButtons = computed(() => {
-  const themeTitleMap = {
-    auto: appStore.managedThemeMode === 'beijing'
-      ? appStore.isBeijingDaytime ? '自动主题：北京时间日间' : '自动主题：北京时间夜间'
-      : appStore.managedThemeMode === 'light' ? '自动主题：后台浅色' : '自动主题：后台深色',
-    light: '浅色主题',
-    dark: '深色主题',
-  } as const
-  const themeIconMap = {
-    auto: appStore.isDark ? 'icon-park-outline:moon' : 'icon-park-outline:sun-one',
-    light: 'icon-park-outline:sun-one',
-    dark: 'icon-park-outline:moon',
-  } as const
-
   return [
     {
-      title: `${themeTitleMap[appStore.themeMode]}（点击切换）`,
-      icon: themeIconMap[appStore.themeMode],
+      title: appStore.isDark ? '深色主题（点击切换为亮色）' : '亮色主题（点击切换为暗色）',
+      icon: appStore.isDark ? 'icon-park-outline:moon' : 'icon-park-outline:sun-one',
       action: 'toggleTheme',
     },
     { title: '后台管理', icon: 'icon-park-outline:setting', action: 'jumpToSetting' },

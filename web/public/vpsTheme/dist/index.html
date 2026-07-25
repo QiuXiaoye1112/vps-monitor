@@ -50,26 +50,14 @@
             ? publicInfo.theme_settings
             : {}
         const enabled = settings.backgroundEnabled === true
-        let preference = 'auto'
+        let preference = 'dark'
         try {
-          preference = localStorage.getItem('themeMode') || 'auto'
+          preference = localStorage.getItem('themeMode') || 'dark'
           const parsed = JSON.parse(preference)
           if (typeof parsed === 'string') preference = parsed
         } catch (_) {}
-        if (!['auto', 'light', 'dark'].includes(preference)) preference = 'auto'
-        const managedMode = ['beijing', 'light', 'dark'].includes(settings.themeMode) ? settings.themeMode : 'beijing'
-        const beijingHour =
-          Number(
-            new Intl.DateTimeFormat('en-US', {
-              hour: '2-digit',
-              hour12: false,
-              timeZone: 'Asia/Shanghai',
-            }).format(new Date()),
-          ) % 24
-        const beijingDaytime = beijingHour >= 7 && beijingHour < 19
-        const dark =
-          preference === 'dark' ||
-          (preference !== 'light' && (managedMode === 'dark' || (managedMode === 'beijing' && !beijingDaytime)))
+        if (!['light', 'dark'].includes(preference)) preference = 'dark'
+        const dark = preference === 'dark'
         document.documentElement.classList.toggle('dark', dark)
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
 
@@ -163,19 +151,11 @@
           if (!('noModule' in document.createElement('script'))) root.classList.add('no-esm')
 
           var mode = localStorage.getItem('themeMode')
-          var isDark = mode === 'dark'
-
-          if (mode !== 'dark' && mode !== 'light') {
-            var hour = Number(
-              new Intl.DateTimeFormat('en-US', {
-                hour: '2-digit',
-                hour12: false,
-                timeZone: 'Asia/Shanghai',
-              }).format(new Date()),
-            )
-            if (hour === 24) hour = 0
-            isDark = Number.isFinite(hour) ? hour < 7 || hour >= 19 : true
-          }
+          try {
+            var parsedMode = JSON.parse(mode)
+            if (typeof parsedMode === 'string') mode = parsedMode
+          } catch (_) {}
+          var isDark = mode !== 'light'
 
           root.classList.toggle('dark', isDark)
           root.style.colorScheme = isDark ? 'dark' : 'light'
@@ -186,11 +166,11 @@
         }
       })()
     </script>
-    <script type="module" crossorigin src="/assets/index-C691LPMG.js"></script>
+    <script type="module" crossorigin src="/assets/index-C1NzgWps.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vue-vendor-BznJVgF8.js">
     <link rel="modulepreload" crossorigin href="/assets/vueuse-BDSlBwtv.js">
     <link rel="modulepreload" crossorigin href="/assets/globe-Bn-aNof8.js">
-    <link rel="modulepreload" crossorigin href="/assets/v3-services-B4Kudvd7.js">
+    <link rel="modulepreload" crossorigin href="/assets/v3-services-DH6SEoIO.js">
     <link rel="modulepreload" crossorigin href="/assets/reka-ui-Ro5nB980.js">
     <link rel="stylesheet" crossorigin href="/assets/index-DAuABzih.css">
   </head>

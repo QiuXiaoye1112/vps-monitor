@@ -6,8 +6,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { getAuthSession, requirePermission, setAuthSessionFromLogin, verifyLogin } from '@/services/auth.service'
 
-export type ThemeMode = 'auto' | 'light' | 'dark'
-export type ManagedThemeMode = 'beijing' | 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark'
 export type GeneralCardKey
   = | 'currentTime'
     | 'memory'
@@ -570,25 +569,7 @@ const KEY_LIST_SEPARATOR_REGEX = /[\s,，;；]+/u
 const EMPTY_THEME_SETTINGS: ThemeSettings = {}
 
 function isValidThemeMode(value: unknown): value is ThemeMode {
-  return value === 'auto' || value === 'light' || value === 'dark'
-}
-
-function isValidManagedThemeMode(value: unknown): value is ManagedThemeMode {
-  return value === 'beijing' || value === 'light' || value === 'dark'
-}
-
-function getBeijingHour(timestamp: number): number {
-  const hour = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Shanghai',
-  }).format(new Date(timestamp))
-
-  const parsed = Number.parseInt(hour, 10)
-  if (!Number.isFinite(parsed))
-    return new Date(timestamp).getHours()
-
-  return parsed === 24 ? 0 : parsed
+  return value === 'light' || value === 'dark'
 }
 
 function isGeneralCardKey(value: string): value is GeneralCardKey {
@@ -883,7 +864,7 @@ const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(true)
 
   // 使用 VueUse 的 useStorageAsync 实现自动持久化
-  const themeMode = useStorageAsync<ThemeMode>('themeMode', 'auto', localStorage)
+  const themeMode = useStorageAsync<ThemeMode>('themeMode', 'dark', localStorage)
   const lang = ref<Lang>('zh-CN')
   const publicSettings = ref<PublicSettings>()
   const nodeSelectedGroup = useStorageAsync<string>('nodeSelectedGroup', 'all', localStorage)
@@ -902,13 +883,6 @@ const useAppStore = defineStore('app', () => {
 
   // 使用 null 表示未设置，等待主题配置加载后决定
   const storedViewMode = useStorageAsync<NodeViewMode | null>('nodeViewMode', null, localStorage)
-
-  const beijingTimeTick = ref(Date.now())
-  if (typeof window !== 'undefined') {
-    window.setInterval(() => {
-      beijingTimeTick.value = Date.now()
-    }, 60 * 1000)
-  }
 
   // 计算属性：从主题配置获取默认视图模式
   const defaultViewMode = computed<NodeViewMode>(() => {
@@ -1191,33 +1165,13 @@ const useAppStore = defineStore('app', () => {
   }, { immediate: true })
 
   watch(themeMode, (mode) => {
-    if (!isValidThemeMode(mode)) {
-      themeMode.value = 'auto'
-    }
+    if (!isValidThemeMode(mode))
+      themeMode.value = 'dark'
   }, { immediate: true })
 
-  const managedThemeMode = computed<ManagedThemeMode>(() => {
-    const value = themeSettings.value.themeMode
-    return isValidManagedThemeMode(value) ? value : 'beijing'
-  })
-
-  const isBeijingDaytime = computed<boolean>(() => {
-    const hour = getBeijingHour(beijingTimeTick.value)
-    return hour >= 7 && hour < 19
-  })
-
-  // 计算当前是否为暗色模式。本机按钮选择 auto 时跟随后台托管设置；手动选择浅色/深色时仅覆盖当前浏览器。
+  // 主题仅由当前浏览器右上角按钮控制，非法或旧版自动模式统一回退到暗色。
   const isDark = computed(() => {
-    const localMode = isValidThemeMode(themeMode.value) ? themeMode.value : 'auto'
-    if (localMode === 'light')
-      return false
-    if (localMode === 'dark')
-      return true
-
-    if (managedThemeMode.value === 'beijing')
-      return !isBeijingDaytime.value
-
-    return managedThemeMode.value === 'dark'
+    return !isValidThemeMode(themeMode.value) || themeMode.value === 'dark'
   })
 
   const resolvedThemeMode = computed<'light' | 'dark'>(() => isDark.value ? 'dark' : 'light')
@@ -1232,18 +1186,10 @@ const useAppStore = defineStore('app', () => {
 
   function updateThemeMode(mode?: ThemeMode) {
     if (mode) {
-      themeMode.value = isValidThemeMode(mode) ? mode : 'auto'
+      themeMode.value = isValidThemeMode(mode) ? mode : 'dark'
       return
     }
-
-    const nextMode: Record<ThemeMode, ThemeMode> = {
-      auto: 'light',
-      light: 'dark',
-      dark: 'auto',
-    }
-
-    const currentMode = isValidThemeMode(themeMode.value) ? themeMode.value : 'auto'
-    themeMode.value = nextMode[currentMode]
+    themeMode.value = isDark.value ? 'light' : 'dark'
   }
 
   function syncAuthState() {
@@ -1272,8 +1218,6 @@ const useAppStore = defineStore('app', () => {
   return {
     loading,
     themeMode,
-    managedThemeMode,
-    isBeijingDaytime,
     isDark,
     resolvedThemeMode,
     lang,

@@ -10,7 +10,6 @@
     "name": "主题自定义",
     "data": [
       { "name": "基础设置", "type": "title" },
-      { "key": "themeMode", "name": "默认主题模式", "type": "select", "default": "beijing", "options": "beijing,light,dark", "help": "全站默认主题模式：beijing=按北京时间自动切换，light=默认浅色，dark=默认深色。" },
       { "key": "dataUpdateInterval", "name": "数据更新间隔", "type": "number", "default": 1, "help": "实时数据刷新间隔，单位：秒。" },
       { "key": "nodeCardSize", "name": "节点卡片尺寸", "type": "select", "default": "compact", "options": "compact,comfortable,large", "help": "首页节点卡片尺寸。" },
 

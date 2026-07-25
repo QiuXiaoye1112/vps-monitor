@@ -1065,7 +1065,6 @@
         });
         var s = r.ok ? await r.json() : {};
         var defaults = {
-          themeMode: "beijing",
           dataUpdateInterval: 1,
           nodeCardSize: "compact",
           stopEarth:false,
@@ -1082,13 +1081,6 @@
           {
             title: "通用",
             fields: [
-              {
-                k: "themeMode",
-                l: "默认主题模式",
-                t: "select",
-                o: ["beijing", "light", "dark"],
-                h: "beijing=按北京时间自动切换",
-              },
               { k: "dataUpdateInterval", l: "数据更新间隔(秒)", t: "num" },
               {
                 k: "nodeCardSize",
