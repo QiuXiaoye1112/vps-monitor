@@ -13,14 +13,23 @@ const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(fal
 const avatarUrl = '/images/ethan-avatar.png'
 
 const actionButtons = computed(() => {
-  return [
+  const buttons = [
     {
       title: appStore.isDark ? '深色主题（点击切换为亮色）' : '亮色主题（点击切换为暗色）',
       icon: appStore.isDark ? 'icon-park-outline:moon' : 'icon-park-outline:sun-one',
       action: 'toggleTheme',
     },
-    { title: '后台管理', icon: 'icon-park-outline:setting', action: 'jumpToSetting' },
   ]
+
+  if (appStore.isLoggedIn) {
+    buttons.push({
+      title: '后台管理',
+      icon: 'icon-park-outline:setting',
+      action: 'jumpToSetting',
+    })
+  }
+
+  return buttons
 })
 
 const sitename = computed(() => appStore.publicSettings?.sitename || 'VPS Monitor')

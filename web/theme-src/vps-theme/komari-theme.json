@@ -19,7 +19,6 @@
       { "key": "hideEarth", "name": "隐藏地球", "type": "switch", "default": false, "help": "隐藏首页地球区域。" },
       { "key": "hideGeneralCard", "name": "隐藏头部", "type": "switch", "default": false, "help": "隐藏地球和总览卡片。" },
       { "key": "generalCardKeys", "name": "自定义头部卡片", "type": "string", "default": "onlineNodes,totalTraffic,uploadSpeed,downloadSpeed", "help": "用英文逗号分隔 key，例如 onlineNodes,totalTraffic,uploadSpeed,downloadSpeed。" },
-      { "key": "hideAdminEntryWhenLoggedOut", "name": "隐藏后台入口", "type": "switch", "default": false, "help": "未登录时隐藏顶部后台管理入口。" },
       { "name": "自定义背景", "type": "title" },
       { "key": "backgroundEnabled", "name": "启用自定义背景", "type": "switch", "default": false, "help": "使用后台手动上传到本机的图片作为页面背景。" },
       { "key": "backgroundBlur", "name": "背景模糊半径", "type": "number", "default": 0, "help": "背景的高斯模糊半径，单位 px。" },
