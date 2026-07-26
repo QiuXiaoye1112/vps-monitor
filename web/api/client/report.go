@@ -239,6 +239,17 @@ func processMessage(conn *connection.SafeConn, message []byte, uuid string) {
 			conn.WriteJSON(gin.H{"status": "error", "error": fmt.Sprintf("%v", err)})
 			return
 		}
+	case "history_report":
+		report := v1.Report{}
+		err = json.Unmarshal(message, &report)
+		if err != nil {
+			conn.WriteJSON(gin.H{"status": "error", "error": "Invalid history report format"})
+			return
+		}
+		if err := ingestHistoryReport(uuid, report); err != nil {
+			conn.WriteJSON(gin.H{"status": "error", "error": fmt.Sprintf("%v", err)})
+			return
+		}
 	case "ping_result":
 		var reqBody struct {
 			PingTaskID uint      `json:"task_id"`

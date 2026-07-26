@@ -16,6 +16,7 @@ type MonthlyTraffic struct {
 	Up           int64     `json:"up"`
 	Down         int64     `json:"down"`
 	RawTotal     int64     `json:"raw_total"`
+	Carry        int64     `json:"-"`
 	Compensation int64     `json:"compensation"`
 	Total        int64     `json:"total"`
 }
@@ -27,7 +28,7 @@ func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic,
 		return MonthlyTraffic{}, err
 	}
 
-	raw := up + down
+	raw := up + down + client.TrafficCarry
 	total := raw + client.TrafficComp
 	if total < 0 {
 		total = 0
@@ -39,6 +40,7 @@ func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic,
 		Up:           up,
 		Down:         down,
 		RawTotal:     raw,
+		Carry:        client.TrafficCarry,
 		Compensation: client.TrafficComp,
 		Total:        total,
 	}, nil

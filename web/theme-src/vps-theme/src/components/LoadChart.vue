@@ -16,15 +16,15 @@ import { CardX } from '@/components/ui/card-x'
 import { Empty } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { loadNodeLoadRecords, useNodeLoadStats } from '@/composables/useNodeLoadStats'
+import { useNodeLoadStats } from '@/composables/useNodeLoadStats'
 import { LOAD_RECORD_MAX_COUNT } from '@/constants/load'
+import { normalizeStatusRecordsPayload } from '@/services/history.service'
 import { loadMetricDefinitions, loadPublicPingTasks, queryMetrics } from '@/services/metrics.service'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { getChartSeriesPalette, getLoadChartPalette } from '@/utils/chartPalette'
 import { formatBytes, formatBytesSplit } from '@/utils/helper'
 import { metricTags, normalizeMetricSeriesList } from '@/utils/metricSeries'
-import { fillMissingTimePoints } from '@/utils/recordHelper'
 import { getSharedRpc } from '@/utils/rpc'
 import '@/utils/echarts' // 共享 ECharts 配置
 
@@ -85,7 +85,6 @@ const CUSTOM_VIEW_LABEL = '自定义'
 const PING_METRIC_KEYS = ['ping.latency_ms', 'ping.loss'] as const
 const METRIC_HISTORY_MAX_POINTS = 700
 const REALTIME_METRIC_REFRESH_MS = 30_000
-const FULL_HISTORY_REFRESH_MS = 60_000
 
 interface MetricChartSeriesData {
   name: string
@@ -238,7 +237,6 @@ const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
 let lastRealtimeMetricFetchAt = 0
-let lastFullHistoryFetchAt = 0
 let fetchInFlight = false
 let pendingVisibleFetch = false
 
@@ -351,40 +349,6 @@ function updateObservedReportInterval(records: StatusRecord[]): void {
     return
   gaps.sort((a, b) => a - b)
   observedReportIntervalSeconds.value = Math.min(60, Math.max(1, Math.round(gaps[Math.floor(gaps.length / 2)]!)))
-}
-
-function mergeStatusRecords(base: StatusRecord[], recent: StatusRecord[]): StatusRecord[] {
-  const records = new Map<number, StatusRecord>()
-  for (const record of [...base, ...recent]) {
-    const timestamp = dayjs(record.time).valueOf()
-    if (Number.isFinite(timestamp))
-      records.set(timestamp, record)
-  }
-  return [...records.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([, record]) => record)
-}
-
-function mergeMetricRecords(base: RecordFormat[], recent: StatusRecord[]): RecordFormat[] {
-  const records = new Map<number, RecordFormat>()
-  for (const record of [...base, ...statusToRecordFormat(recent)]) {
-    const timestamp = dayjs(record.time).valueOf()
-    if (Number.isFinite(timestamp))
-      records.set(timestamp, record)
-  }
-  return [...records.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([, record]) => record)
-}
-
-async function refreshRecentHistoryData(): Promise<void> {
-  const result = await rpc.getNodeRecentStatus(props.uuid)
-  const records = result?.records ?? []
-  updateObservedReportInterval(records)
-  if (metricData.value)
-    metricData.value = mergeMetricRecords(metricData.value, records)
-  else
-    remoteData.value = mergeStatusRecords(remoteData.value, records)
 }
 
 function metricValue(value: number | null | undefined): number | null {
@@ -721,17 +685,6 @@ async function fetchHistoryData(silent = false) {
     return
   }
 
-  if (silent && selectedView.value === '1 小时' && Date.now() - lastFullHistoryFetchAt < FULL_HISTORY_REFRESH_MS) {
-    try {
-      await refreshRecentHistoryData()
-      error.value = null
-    }
-    catch {
-      // 短时实时请求失败时保留已有图表，下一次轮询自动重试。
-    }
-    return
-  }
-
   const range = customRange.value
   const hours = effectiveHistoryHours.value
   const metricParams: Pick<MetricQueryParams, 'hours' | 'start' | 'end'> = isCustomRange.value && range
@@ -743,20 +696,22 @@ async function fetchHistoryData(silent = false) {
   error.value = null
 
   try {
-    const metricHistory = await loadMetricHistoryRecords(metricParams).catch(() => null)
-    if (metricHistory) {
-      metricData.value = metricHistory.records
-      rawMetricSeries.value = metricHistory.series
-      remoteData.value = []
-    }
-    else {
-      metricData.value = null
-      rawMetricSeries.value = []
-      remoteData.value = await loadNodeLoadRecords(props.uuid, hours, LOAD_RECORD_MAX_COUNT)
-    }
-    lastFullHistoryFetchAt = Date.now()
-    if (selectedView.value === '1 小时')
-      await refreshRecentHistoryData().catch(() => undefined)
+    const loadParams = isCustomRange.value && range
+      ? {
+          uuid: props.uuid,
+          start: range.start.toDate().toISOString(),
+          end: range.end.toDate().toISOString(),
+          maxCount: LOAD_RECORD_MAX_COUNT,
+        }
+      : { uuid: props.uuid, hours, maxCount: LOAD_RECORD_MAX_COUNT }
+    const [historyResult, metricHistory] = await Promise.all([
+      rpc.getLoadRecordsRange(loadParams),
+      loadMetricHistoryRecords(metricParams).catch(() => null),
+    ])
+    metricData.value = null
+    remoteData.value = normalizeStatusRecordsPayload(historyResult.records)
+    updateObservedReportInterval(remoteData.value)
+    rawMetricSeries.value = metricHistory?.series ?? []
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
@@ -798,33 +753,7 @@ async function fetchData(silent = false) {
 
 const chartData = computed(() => {
   const data = metricData.value ?? statusToRecordFormat(remoteData.value)
-  if (!data.length)
-    return []
-
-  if (isRealtime.value) {
-    return data
-  }
-
-  const hours = effectiveHistoryHours.value
-  const minute = 60
-  const hour = minute * 60
-  let intervalSec: number
-  let maxGap: number
-
-  if (hours <= 4) {
-    intervalSec = Math.max(1, observedReportIntervalSeconds.value ?? minute)
-    maxGap = minute * 2
-  }
-  else if (hours > 120) {
-    intervalSec = hour
-    maxGap = hour * 2
-  }
-  else {
-    intervalSec = minute * 15
-    maxGap = minute * 30
-  }
-
-  return fillMissingTimePoints(data, intervalSec, hours * 3600, maxGap)
+  return data
 })
 
 const latestStatus = computed(() => {
@@ -1699,7 +1628,6 @@ watch(() => props.uuid, () => {
   rawMetricSeries.value = []
   observedReportIntervalSeconds.value = null
   lastRealtimeMetricFetchAt = 0
-  lastFullHistoryFetchAt = 0
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
 })
@@ -1874,9 +1802,9 @@ onMounted(() => {
           <template #header>
             <MetricChartHeader title="网络连接" icon="tabler:binary-tree" tone="amber">
               <div class="text-xs flex gap-1 items-baseline">
-                <span>TCP: {{ latestStatus?.connections ?? '-' }}</span>
+                <span>TCP: {{ nodeInfo?.connections ?? '-' }}</span>
                 <span>·</span>
-                <span>UDP: {{ latestStatus?.connections_udp ?? '-' }}</span>
+                <span>UDP: {{ nodeInfo?.connections_udp ?? '-' }}</span>
               </div>
             </MetricChartHeader>
           </template>
@@ -1890,7 +1818,7 @@ onMounted(() => {
           <template #header>
             <MetricChartHeader title="进程" icon="tabler:activity" tone="slate">
               <span class="text-xs">
-                {{ latestStatus?.process ?? '-' }}
+                {{ nodeInfo?.process ?? '-' }}
               </span>
             </MetricChartHeader>
           </template>

@@ -86,7 +86,7 @@ func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	require.NoError(t, db.Create(&client).Error)
 
 	// The current Shanghai billing period started on July 21. The old history
-	// row is deleted, but its traffic is folded into compensation.
+	// row is deleted, but its traffic is folded into the hidden carry.
 	recordTime := time.Date(2026, 7, 21, 5, 0, 0, 0, time.UTC)
 	require.True(t, recordTime.Before(historyCutoff))
 	require.NoError(t, db.Table("records_long_term").Create(&models.Record{
@@ -99,7 +99,8 @@ func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	require.Zero(t, count)
 	var updated models.Client
 	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
-	require.Equal(t, int64(123), updated.TrafficComp)
+	require.Equal(t, int64(0), updated.TrafficComp)
+	require.Equal(t, int64(123), updated.TrafficCarry)
 }
 
 func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *testing.T) {
@@ -120,5 +121,6 @@ func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *test
 	require.Zero(t, count)
 	var updated models.Client
 	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
-	require.Equal(t, int64(456), updated.TrafficComp)
+	require.Equal(t, int64(0), updated.TrafficComp)
+	require.Equal(t, int64(456), updated.TrafficCarry)
 }

@@ -5,6 +5,7 @@ import v1 "github.com/monitor-monitor/monitor/protocol/v1"
 const (
 	Version               = "2.0"
 	MethodAgentReport     = "agent.report"
+	MethodAgentHistory    = "agent.historyReport"
 	MethodAgentBasicInfo  = "agent.basicInfo"
 	MethodAgentPingResult = "agent.pingResult"
 	MethodAgentTaskResult = "agent.taskResult"

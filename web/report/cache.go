@@ -32,6 +32,7 @@ func DeleteClientReports(uuid string) {
 	reportCacheMu.Lock()
 	defer reportCacheMu.Unlock()
 	Records.Delete(uuid)
+	DeleteClientHistoryReports(uuid)
 }
 
 func AppendClientReport(uuid string, report v1.Report) (v1.Report, error) {

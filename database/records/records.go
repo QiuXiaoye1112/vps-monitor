@@ -21,13 +21,19 @@ const longTermRecordInterval = 15 * time.Minute
 
 func DeleteAll() error {
 	if metricstore.IsEnabled() {
-		return metricstore.DeleteAllRecords(context.Background())
+		if err := metricstore.DeleteAllRecords(context.Background()); err != nil {
+			return err
+		}
+		return DeleteAllHistory()
 	}
 	db := dbcore.GetDBInstance()
 	if err := db.Exec("DELETE FROM records_long_term").Error; err != nil {
 		return err
 	}
-	return db.Exec("DELETE FROM records").Error
+	if err := db.Exec("DELETE FROM records").Error; err != nil {
+		return err
+	}
+	return DeleteAllHistory()
 }
 
 // GetGPURecordsByClientAndTime 获取GPU记录数据（仅 metric store 启用时有数据）
@@ -64,9 +70,10 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 			clientUUIDs = append(clientUUIDs, client.UUID)
 
 			// Fold traffic deltas that still belong to the active billing window
-			// into the client's compensation before deleting old chart history.
+			// into the internal carry before deleting old chart history.
 			// This keeps cumulative traffic stable while allowing every historical
-			// record row (CPU/RAM/etc.) older than seven days to be removed.
+			// record row (CPU/RAM/etc.) older than seven days to be removed without
+			// changing the user-managed traffic compensation field.
 			foldStart := time.Time{}
 			if client.TrafficResetEnabled {
 				foldStart, _ = TrafficWindow(client, now)
@@ -86,7 +93,7 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 			}
 			if total := folded.Up + folded.Down; total > 0 {
 				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Updates(map[string]interface{}{
-					"traffic_compensation":          gorm.Expr("traffic_compensation + ?", total),
+					"traffic_carry":                 gorm.Expr("traffic_carry + ?", total),
 					"traffic_compensation_reset_at": now,
 				}).Error; err != nil {
 					return err

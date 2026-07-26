@@ -7,6 +7,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/tasks"
 	v1 "github.com/monitor-monitor/monitor/protocol/v1"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
+	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
 
 // ingest.go
@@ -28,6 +29,13 @@ func ingestReport(uuid string, report v1.Report, protocolVersion int, markPresen
 		refreshPostPresence(uuid)
 	}
 	return nil
+}
+
+// ingestHistoryReport stores a chart sample without changing the live status,
+// presence, or traffic-accounting report cache.
+func ingestHistoryReport(uuid string, report v1.Report) error {
+	report.UUID = uuid
+	return report_cache.AppendHistoryReport(uuid, report)
 }
 
 // ingestBasicInfo 保存客户端基础信息。fallbackIP 在上报未携带 IP 时用作兜底。

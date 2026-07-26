@@ -1364,11 +1364,15 @@
           id,
           "生成安装命令",
           "" +
-            '<div class="modal-grid"><div class="form-group"><label>安装路径</label><input id="path' +
+            '<div class="form-group"><label>安装路径</label><input id="path' +
             id +
-            '" value="/usr/local/bin/monitor-agent"></div><div class="form-group"><label>上报间隔(秒)</label><input id="interval' +
+            '" value="/usr/local/bin/monitor-agent"></div>' +
+            '<div class="modal-grid"><div class="form-group"><label>实时状态间隔(秒)</label><input id="interval' +
             id +
-            '" type="number" value="1"></div></div>' +
+            '" type="number" min="0.1" step="0.1" value="1"></div><div class="form-group"><label>历史图间隔(秒)</label><input id="historyInterval' +
+            id +
+            '" type="number" min="1" max="60" step="1" value="5"></div></div>' +
+            '<p class="text-xs text-muted mb-3">实时状态控制卡片右上角数值；历史图间隔只控制六个历史图的数据精度。</p>' +
             '<div class="sec-title">可选配置</div>' +
             '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns' +
             id +
@@ -1394,6 +1398,8 @@
             document.getElementById("path" + id).value.trim() ||
             "/usr/local/bin/monitor-agent";
           var interval = document.getElementById("interval" + id).value || "1";
+          var historyInterval =
+            document.getElementById("historyInterval" + id).value || "5";
           var dns = document.getElementById("dns" + id).value.trim();
           var inNic = document.getElementById("includeNic" + id).value.trim();
           var exNic = document.getElementById("excludeNic" + id).value.trim();
@@ -1405,7 +1411,20 @@
           }
           var intervalNumber = Number(interval);
           if (!Number.isFinite(intervalNumber) || intervalNumber <= 0) {
-            toast("上报间隔必须大于 0");
+            toast("实时状态间隔必须大于 0");
+            return;
+          }
+          var historyIntervalNumber = Number(historyInterval);
+          if (
+            !Number.isFinite(historyIntervalNumber) ||
+            historyIntervalNumber < 1 ||
+            historyIntervalNumber > 60
+          ) {
+            toast("历史图间隔必须是 1 到 60 秒");
+            return;
+          }
+          if (historyIntervalNumber < intervalNumber) {
+            toast("历史图间隔不能小于实时状态间隔");
             return;
           }
 
@@ -1437,6 +1456,8 @@
             token,
             "-i",
             String(intervalNumber),
+            "--history-interval",
+            String(historyIntervalNumber),
           ];
           if (dns) args.push("--custom-dns", dns);
           if (inNic) args.push("--include-nics", inNic);
@@ -1576,7 +1597,6 @@
             traffic_reset_day: parseInt(f.get("traffic_reset_day")) || 1,
             traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
             traffic_compensation: Math.round(compGB * 1073741824),
-            traffic_compensation_base: Math.round(visibleBase),
             traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
             ping_task_order: collectNodePingOrder(e.target),
           };

@@ -909,6 +909,8 @@ export class KomariRpc {
     type: 'load' | 'ping'
     uuid?: string
     hours?: number
+    start?: string
+    end?: string
     task_id?: number
     load_type?: string
     maxCount?: number
@@ -928,6 +930,20 @@ export class KomariRpc {
       load_type: loadType,
       maxCount,
       max_count: maxCount,
+    }, signal)
+  }
+
+  async getLoadRecordsRange(params: {
+    uuid: string
+    hours?: number
+    start?: string
+    end?: string
+    maxCount?: number
+  }, signal?: AbortSignal): Promise<{ records: StatusRecord[] | Record<string, StatusRecord[]> }> {
+    return this.client.call<{ records: StatusRecord[] | Record<string, StatusRecord[]> }>('common:getRecords', {
+      type: 'load',
+      ...params,
+      max_count: params.maxCount,
     }, signal)
   }
 

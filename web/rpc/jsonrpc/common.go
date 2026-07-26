@@ -422,11 +422,11 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
 				monthly = mt
 				monthlyTrafficCache.Set(uuid, mt, cache.NoExpiration)
-				monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Compensation)
+				monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Carry+mt.Compensation)
 			} else if cached, found := monthlyTrafficCache.Get(uuid); found {
 				if mt, valid := cached.(records.MonthlyTraffic); valid {
 					monthly = mt
-					monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Compensation)
+					monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Carry+mt.Compensation)
 				}
 				log.Printf("failed to calculate monthly traffic for %s, using last known value: %v", uuid, err)
 			} else {
@@ -465,7 +465,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			TrafficResetHour:    clientByUUID[uuid].TrafficResetHour,
 			TrafficResetEnabled: clientByUUID[uuid].TrafficResetEnabled,
 			Process:             rep.Process,
-			Connections:         rep.Connections.TCP + rep.Connections.UDP,
+			Connections:         rep.Connections.TCP,
 			ConnectionsUdp:      rep.Connections.UDP,
 			Online:              onlineSet[uuid],
 			Uptime:              rep.Uptime,
@@ -647,7 +647,7 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 			NetTotalUp:     r.Network.TotalUp,
 			NetTotalDown:   r.Network.TotalDown,
 			Process:        r.Process,
-			Connections:    r.Connections.TCP + r.Connections.UDP,
+			Connections:    r.Connections.TCP,
 			ConnectionsUdp: r.Connections.UDP,
 		}
 		resp.Records = append(resp.Records, fr)

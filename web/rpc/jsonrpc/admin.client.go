@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/monitor-monitor/monitor/database/clients"
-	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/records"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
@@ -141,7 +139,6 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 		"traffic_reset_day",
 		"traffic_reset_hour",
 		"traffic_compensation",
-		"traffic_compensation_base",
 		"traffic_reset_enabled",
 	} {
 		value, ok := raw[key]
@@ -159,7 +156,7 @@ func normalizeClientCreateValue(key string, value interface{}) interface{} {
 		if n, ok := asInt64(value); ok {
 			return int(n)
 		}
-	case "traffic_limit", "traffic_compensation", "traffic_compensation_base":
+	case "traffic_limit", "traffic_compensation":
 		if n, ok := asInt64(value); ok {
 			return n
 		}
@@ -239,9 +236,7 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
 	}
-	if err := normalizeVisibleTrafficCompensation(update); err != nil {
-		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
-	}
+	delete(update, "traffic_compensation_base")
 	if err := clients.SaveClient(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
 	}
@@ -271,59 +266,6 @@ func popPingTaskOrder(update map[string]interface{}) ([]uint, bool, error) {
 		return nil, true, fmt.Errorf("invalid ping_task_order")
 	}
 	return order, true, nil
-}
-
-func normalizeVisibleTrafficCompensation(update map[string]interface{}) error {
-	baseRaw, hasBase := update["traffic_compensation_base"]
-	delete(update, "traffic_compensation_base")
-	if !hasBase {
-		return nil
-	}
-	userCompRaw, hasComp := update["traffic_compensation"]
-	if !hasComp {
-		return nil
-	}
-	uuid, _ := update["uuid"].(string)
-	if uuid == "" {
-		return nil
-	}
-	base, ok := asInt64(baseRaw)
-	if !ok {
-		return nil
-	}
-	userComp, ok := asInt64(userCompRaw)
-	if !ok {
-		return nil
-	}
-	current, err := clients.GetClientByUUID(uuid)
-	if err != nil {
-		return err
-	}
-	proposed := clientWithTrafficUpdate(current, update)
-	proposed.TrafficComp = 0
-	rawAfterSave, err := records.CurrentMonthlyTraffic(proposed, time.Now())
-	if err != nil {
-		return err
-	}
-	update["traffic_compensation"] = compensationForVisibleBase(base, userComp, rawAfterSave.RawTotal)
-	return nil
-}
-
-func clientWithTrafficUpdate(client models.Client, update map[string]interface{}) models.Client {
-	if v, ok := update["traffic_reset_enabled"].(bool); ok {
-		client.TrafficResetEnabled = v
-	}
-	if v, ok := asInt64(update["traffic_reset_day"]); ok {
-		client.TrafficResetDay = int(v)
-	}
-	if v, ok := asInt64(update["traffic_reset_hour"]); ok {
-		client.TrafficResetHour = int(v)
-	}
-	return client
-}
-
-func compensationForVisibleBase(visibleBase, userCompensation, rawAfterSave int64) int64 {
-	return visibleBase + userCompensation - rawAfterSave
 }
 
 func adminRemoveClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {

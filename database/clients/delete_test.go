@@ -22,6 +22,7 @@ func TestDeleteClientDataRemovesAllNodeDataAndTaskMemberships(t *testing.T) {
 		&models.TaskResult{},
 	))
 	require.NoError(t, db.Table("records_long_term").AutoMigrate(&models.Record{}))
+	require.NoError(t, db.Table("history_records").AutoMigrate(&models.Record{}))
 
 	deleted := models.Client{UUID: "delete-me", Token: "delete-token"}
 	kept := models.Client{UUID: "keep-me", Token: "keep-token"}
@@ -31,6 +32,7 @@ func TestDeleteClientDataRemovesAllNodeDataAndTaskMemberships(t *testing.T) {
 	now := models.FromTime(time.Now())
 	require.NoError(t, db.Create(&models.Record{Client: deleted.UUID, Time: now}).Error)
 	require.NoError(t, db.Table("records_long_term").Create(&models.Record{Client: deleted.UUID, Time: now}).Error)
+	require.NoError(t, db.Table("history_records").Create(&models.Record{Client: deleted.UUID, Time: now}).Error)
 
 	pingTask := models.PingTask{Name: "shared-ping", Clients: models.StringArray{deleted.UUID, kept.UUID}, Target: "127.0.0.1", Interval: 60}
 	require.NoError(t, db.Create(&pingTask).Error)
@@ -50,7 +52,7 @@ func TestDeleteClientDataRemovesAllNodeDataAndTaskMemberships(t *testing.T) {
 		return deleteClientData(tx, deleted.UUID)
 	}))
 
-	for _, table := range []string{"records", "records_long_term", "ping_records"} {
+	for _, table := range []string{"records", "records_long_term", "history_records", "ping_records"} {
 		var count int64
 		require.NoError(t, db.Table(table).Where("client = ?", deleted.UUID).Count(&count).Error)
 		require.Zero(t, count, table)

@@ -80,6 +80,44 @@ func TestRunSkipsLegacyConfigMigrationForCurrentConfigItemTable(t *testing.T) {
 	}
 }
 
+func TestBackfillTrafficCarrySeparatesAutomaticPositiveValues(t *testing.T) {
+	db := openTestDB(t, "migrations_traffic_carry")
+	if err := db.AutoMigrate(&appconfig.ConfigItem{}, &models.Client{}); err != nil {
+		t.Fatalf("migrate traffic carry models: %v", err)
+	}
+	now := models.FromTime(time.Now())
+	clients := []models.Client{
+		{UUID: "positive", Token: "token-positive", TrafficComp: 1234, CreatedAt: now, UpdatedAt: now},
+		{UUID: "negative", Token: "token-negative", TrafficComp: -55, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := db.Create(&clients).Error; err != nil {
+		t.Fatalf("seed clients: %v", err)
+	}
+
+	if err := BackfillTrafficCarry(db); err != nil {
+		t.Fatalf("backfill traffic carry: %v", err)
+	}
+	if err := BackfillTrafficCarry(db); err != nil {
+		t.Fatalf("second traffic carry migration must be idempotent: %v", err)
+	}
+
+	var positive models.Client
+	if err := db.First(&positive, "uuid = ?", "positive").Error; err != nil {
+		t.Fatalf("load positive client: %v", err)
+	}
+	if positive.TrafficComp != 0 || positive.TrafficCarry != 1234 {
+		t.Fatalf("positive legacy value = comp %d carry %d, want comp 0 carry 1234", positive.TrafficComp, positive.TrafficCarry)
+	}
+
+	var negative models.Client
+	if err := db.First(&negative, "uuid = ?", "negative").Error; err != nil {
+		t.Fatalf("load negative client: %v", err)
+	}
+	if negative.TrafficComp != -55 || negative.TrafficCarry != 0 {
+		t.Fatalf("negative legacy value = comp %d carry %d, want comp -55 carry 0", negative.TrafficComp, negative.TrafficCarry)
+	}
+}
+
 func TestRunPreservesVersion120RuntimeShape(t *testing.T) {
 	db := openTestDB(t, "migrations_v120_runtime_shape")
 	if err := db.AutoMigrate(

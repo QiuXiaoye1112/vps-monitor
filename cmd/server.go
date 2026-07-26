@@ -168,12 +168,16 @@ func DoScheduledWork() {
 	if err := corn.AddFunc("records:minute", "@every 1m", minuteScheduledWork); err != nil {
 		log.Println("Failed to add minute scheduled task:", err)
 	}
+	if err := corn.AddFunc("records:history", "@every 2s", historyScheduledWork); err != nil {
+		log.Println("Failed to add history persistence task:", err)
+	}
 }
 
 func cleanupScheduledData() {
 	clients.ResetTrafficCompensationForDueClients()
 	records.CompactRecord()
 	records.DeleteRecordBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultRecordPreserveTime)))
+	records.DeleteHistoryBefore(time.Now().Add(-7 * 24 * time.Hour))
 	tasks.ClearTaskResultsByTimeBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultRecordPreserveTime)))
 	tasks.DeletePingRecordsBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultPingRecordPreserveTime)))
 	auditlog.RemoveOldLogs()
@@ -190,9 +194,18 @@ func minuteScheduledWork() {
 	clients.ResetTrafficCompensationForDueClients()
 }
 
+func historyScheduledWork() {
+	if err := report_cache.SaveHistoryReportsToDB(); err != nil {
+		log.Printf("Failed to persist history reports: %v", err)
+	}
+}
+
 func OnShutdown() {
 	auditlog.Log("", "", "server is shutting down", "info")
 	corn.StopAll()
+	if err := report_cache.SaveHistoryReportsToDB(); err != nil {
+		log.Printf("Failed to flush history reports on shutdown: %v", err)
+	}
 	cloudflared.Shutdown()
 	if err := metricstore.CloseStore(); err != nil {
 		log.Printf("Failed to close metric store: %v", err)

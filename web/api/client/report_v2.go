@@ -81,6 +81,15 @@ func handleV2RPC(uuid string, req v2.Request, allowWait bool) v2.Response {
 			"status": "success",
 			"events": agent_runtime.TakeV2Events(uuid, params.AckEventIDs, 8),
 		})
+	case v2.MethodAgentHistory:
+		var params v2.ReportParams
+		if err := bindV2Params(req.Params, &params); err != nil {
+			return v2.Error(req.ID, -32602, "invalid history report params", err.Error())
+		}
+		if err := ingestHistoryReport(uuid, params.Report); err != nil {
+			return v2.Error(req.ID, -32000, "failed to save history report", err.Error())
+		}
+		return v2.Success(req.ID, gin.H{"status": "success"})
 	case v2.MethodAgentBasicInfo:
 		var params v2.BasicInfoParams
 		if err := bindV2Params(req.Params, &params); err != nil {

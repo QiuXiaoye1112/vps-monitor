@@ -56,6 +56,9 @@ func deleteClientData(tx *gorm.DB, clientUUID string) error {
 	if err := tx.Table("records_long_term").Where("client = ?", clientUUID).Delete(&models.Record{}).Error; err != nil {
 		return fmt.Errorf("delete records_long_term: %w", err)
 	}
+	if err := tx.Table("history_records").Where("client = ?", clientUUID).Delete(&models.Record{}).Error; err != nil {
+		return fmt.Errorf("delete history_records: %w", err)
+	}
 	if err := tx.Where("client = ?", clientUUID).Delete(&models.PingRecord{}).Error; err != nil {
 		return fmt.Errorf("delete ping_records: %w", err)
 	}
@@ -311,9 +314,10 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	return clients, nil
 }
 
-// ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将 traffic_compensation 清零。
+// ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将
+// 用户补偿 traffic_compensation 与内部结转 traffic_carry 一并清零。
 // 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 traffic_compensation_reset_at
-// 早于该起始时间且 traffic_compensation != 0，则视为上一周期的补偿值，直接清零。
+// 早于该起始时间，且补偿或内部结转不为 0，则视为上一周期的值并清零。
 func ResetTrafficCompensationForDueClients() {
 	db := dbcore.GetDBInstance()
 	allClients, err := GetAllClientBasicInfo()
@@ -329,18 +333,19 @@ func ResetTrafficCompensationForDueClients() {
 		if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
 			Updates(map[string]interface{}{
 				"traffic_compensation":          int64(0),
+				"traffic_carry":                 int64(0),
 				"traffic_compensation_reset_at": now,
 				"updated_at":                    now,
 			}).Error; err != nil {
 			log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
 		} else {
-			log.Printf("[traffic_comp_reset] reset compensation for %s (was %d)", c.UUID, c.TrafficComp)
+			log.Printf("[traffic_comp_reset] reset traffic accounting for %s (compensation=%d, carry=%d)", c.UUID, c.TrafficComp, c.TrafficCarry)
 		}
 	}
 }
 
 func shouldResetTrafficCompensation(client models.Client, now time.Time) bool {
-	if client.TrafficComp == 0 || !client.TrafficResetEnabled {
+	if (client.TrafficComp == 0 && client.TrafficCarry == 0) || !client.TrafficResetEnabled {
 		return false
 	}
 	start := trafficResetStart(client, now)

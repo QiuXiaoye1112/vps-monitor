@@ -119,8 +119,23 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 	switch params.Type {
 	case "load":
 		startTime, endTime = clampLoadRecordRange(startTime, endTime)
-		// fetch load records
-		recs, err := getLoadRecordsCombined(params.UUID, startTime, endTime)
+		maxCount := params.MaxCount
+		if maxCount == 0 {
+			maxCount = 4000
+		}
+
+		// Node detail charts prefer the dedicated Agent history stream. Older
+		// agents continue to work through the legacy minute-record fallback.
+		var recs []models.Record
+		var err error
+		if params.UUID != "" {
+			recs, err = recordsdb.GetHistoryRecordsByClientAndTime(params.UUID, startTime, endTime, maxCount)
+			if err == nil && len(recs) == 0 {
+				recs, err = getLoadRecordsCombined(params.UUID, startTime, endTime)
+			}
+		} else {
+			recs, err = getLoadRecordsCombined(params.UUID, startTime, endTime)
+		}
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch records", err.Error())
 		}
@@ -134,12 +149,6 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 				filtered = append(filtered, r)
 			}
 			recs = filtered
-		}
-
-		// resolve maxCount default for load
-		maxCount := params.MaxCount
-		if maxCount == 0 {
-			maxCount = 4000
 		}
 
 		// optional load_type filtering -> group by client
