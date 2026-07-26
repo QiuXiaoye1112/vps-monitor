@@ -422,11 +422,19 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
 				monthly = mt
 				monthlyTrafficCache.Set(uuid, mt, cache.NoExpiration)
-				monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Carry+mt.Compensation)
+				monthlyUp, monthlyDown = adjustedTrafficTotals(
+					mt.Up+mt.CarryUp,
+					mt.Down+mt.CarryDown,
+					mt.Compensation,
+				)
 			} else if cached, found := monthlyTrafficCache.Get(uuid); found {
 				if mt, valid := cached.(records.MonthlyTraffic); valid {
 					monthly = mt
-					monthlyUp, monthlyDown = adjustedTrafficTotals(mt.Up, mt.Down, mt.Carry+mt.Compensation)
+					monthlyUp, monthlyDown = adjustedTrafficTotals(
+						mt.Up+mt.CarryUp,
+						mt.Down+mt.CarryDown,
+						mt.Compensation,
+					)
 				}
 				log.Printf("failed to calculate monthly traffic for %s, using last known value: %v", uuid, err)
 			} else {

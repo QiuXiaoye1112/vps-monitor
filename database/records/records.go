@@ -91,9 +91,10 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 			if err := foldQuery.Scan(&folded).Error; err != nil {
 				return err
 			}
-			if total := folded.Up + folded.Down; total > 0 {
+			if folded.Up > 0 || folded.Down > 0 {
 				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Updates(map[string]interface{}{
-					"traffic_carry":                 gorm.Expr("traffic_carry + ?", total),
+					"traffic_carry_up":              gorm.Expr("traffic_carry_up + ?", folded.Up),
+					"traffic_carry_down":            gorm.Expr("traffic_carry_down + ?", folded.Down),
 					"traffic_compensation_reset_at": now,
 				}).Error; err != nil {
 					return err

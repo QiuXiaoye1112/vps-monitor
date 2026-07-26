@@ -87,8 +87,13 @@ func TestBackfillTrafficCarrySeparatesAutomaticPositiveValues(t *testing.T) {
 	}
 	now := models.FromTime(time.Now())
 	clients := []models.Client{
-		{UUID: "positive", Token: "token-positive", TrafficComp: 1234, CreatedAt: now, UpdatedAt: now},
+		{UUID: "positive", Token: "token-positive", TrafficComp: 1235, CreatedAt: now, UpdatedAt: now},
 		{UUID: "negative", Token: "token-negative", TrafficComp: -55, CreatedAt: now, UpdatedAt: now},
+		{
+			UUID: "aggregate", Token: "token-aggregate",
+			TrafficCarry: 5, TrafficCarryUp: 10, TrafficCarryDown: 20,
+			CreatedAt: now, UpdatedAt: now,
+		},
 	}
 	if err := db.Create(&clients).Error; err != nil {
 		t.Fatalf("seed clients: %v", err)
@@ -105,16 +110,92 @@ func TestBackfillTrafficCarrySeparatesAutomaticPositiveValues(t *testing.T) {
 	if err := db.First(&positive, "uuid = ?", "positive").Error; err != nil {
 		t.Fatalf("load positive client: %v", err)
 	}
-	if positive.TrafficComp != 0 || positive.TrafficCarry != 1234 {
-		t.Fatalf("positive legacy value = comp %d carry %d, want comp 0 carry 1234", positive.TrafficComp, positive.TrafficCarry)
+	if positive.TrafficComp != 0 ||
+		positive.TrafficCarry != 0 ||
+		positive.TrafficCarryUp != 618 ||
+		positive.TrafficCarryDown != 617 {
+		t.Fatalf(
+			"positive legacy value = comp %d aggregate %d up %d down %d, want 0/0/618/617",
+			positive.TrafficComp,
+			positive.TrafficCarry,
+			positive.TrafficCarryUp,
+			positive.TrafficCarryDown,
+		)
 	}
 
 	var negative models.Client
 	if err := db.First(&negative, "uuid = ?", "negative").Error; err != nil {
 		t.Fatalf("load negative client: %v", err)
 	}
-	if negative.TrafficComp != -55 || negative.TrafficCarry != 0 {
-		t.Fatalf("negative legacy value = comp %d carry %d, want comp -55 carry 0", negative.TrafficComp, negative.TrafficCarry)
+	if negative.TrafficComp != -55 ||
+		negative.TrafficCarry != 0 ||
+		negative.TrafficCarryUp != 0 ||
+		negative.TrafficCarryDown != 0 {
+		t.Fatalf(
+			"negative legacy value = comp %d aggregate %d up %d down %d, want -55/0/0/0",
+			negative.TrafficComp,
+			negative.TrafficCarry,
+			negative.TrafficCarryUp,
+			negative.TrafficCarryDown,
+		)
+	}
+
+	var aggregate models.Client
+	if err := db.First(&aggregate, "uuid = ?", "aggregate").Error; err != nil {
+		t.Fatalf("load aggregate client: %v", err)
+	}
+	if aggregate.TrafficCarry != 0 ||
+		aggregate.TrafficCarryUp != 13 ||
+		aggregate.TrafficCarryDown != 22 {
+		t.Fatalf(
+			"aggregate legacy carry = aggregate %d up %d down %d, want 0/13/22",
+			aggregate.TrafficCarry,
+			aggregate.TrafficCarryUp,
+			aggregate.TrafficCarryDown,
+		)
+	}
+}
+
+func TestBackfillDirectionalTrafficCarryFromVersionTwo(t *testing.T) {
+	db := openTestDB(t, "migrations_directional_traffic_carry")
+	if err := db.AutoMigrate(&appconfig.ConfigItem{}, &models.Client{}); err != nil {
+		t.Fatalf("migrate directional traffic carry models: %v", err)
+	}
+	now := models.FromTime(time.Now())
+	client := models.Client{
+		UUID: "v2-client", Token: "token-v2-client",
+		TrafficCarry: 9, TrafficCarryUp: 100, TrafficCarryDown: 200,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&client).Error; err != nil {
+		t.Fatalf("seed v2 client: %v", err)
+	}
+	if err := db.Create(&appconfig.ConfigItem{
+		Key: trafficCarryMigrationKey, Value: "true",
+	}).Error; err != nil {
+		t.Fatalf("seed v2 migration marker: %v", err)
+	}
+
+	if err := BackfillTrafficCarry(db); err != nil {
+		t.Fatalf("backfill directional traffic carry: %v", err)
+	}
+	if err := BackfillTrafficCarry(db); err != nil {
+		t.Fatalf("second directional migration must be idempotent: %v", err)
+	}
+
+	var updated models.Client
+	if err := db.First(&updated, "uuid = ?", client.UUID).Error; err != nil {
+		t.Fatalf("load migrated v2 client: %v", err)
+	}
+	if updated.TrafficCarry != 0 ||
+		updated.TrafficCarryUp != 105 ||
+		updated.TrafficCarryDown != 204 {
+		t.Fatalf(
+			"migrated v2 carry = aggregate %d up %d down %d, want 0/105/204",
+			updated.TrafficCarry,
+			updated.TrafficCarryUp,
+			updated.TrafficCarryDown,
+		)
 	}
 }
 

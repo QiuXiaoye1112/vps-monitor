@@ -90,7 +90,8 @@ func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	recordTime := time.Date(2026, 7, 21, 5, 0, 0, 0, time.UTC)
 	require.True(t, recordTime.Before(historyCutoff))
 	require.NoError(t, db.Table("records_long_term").Create(&models.Record{
-		Client: client.UUID, Time: models.FromTime(recordTime), TrafficUp: 123,
+		Client: client.UUID, Time: models.FromTime(recordTime),
+		TrafficUp: 123, TrafficDown: 456,
 	}).Error)
 
 	require.NoError(t, deleteLegacyRecordsBefore(db, historyCutoff, now))
@@ -100,7 +101,9 @@ func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	var updated models.Client
 	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
 	require.Equal(t, int64(0), updated.TrafficComp)
-	require.Equal(t, int64(123), updated.TrafficCarry)
+	require.Equal(t, int64(0), updated.TrafficCarry)
+	require.Equal(t, int64(123), updated.TrafficCarryUp)
+	require.Equal(t, int64(456), updated.TrafficCarryDown)
 }
 
 func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *testing.T) {
@@ -122,5 +125,7 @@ func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *test
 	var updated models.Client
 	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
 	require.Equal(t, int64(0), updated.TrafficComp)
-	require.Equal(t, int64(456), updated.TrafficCarry)
+	require.Equal(t, int64(0), updated.TrafficCarry)
+	require.Equal(t, int64(0), updated.TrafficCarryUp)
+	require.Equal(t, int64(456), updated.TrafficCarryDown)
 }

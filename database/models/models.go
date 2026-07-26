@@ -42,7 +42,9 @@ type Client struct {
 	TrafficResetHour    int       `json:"traffic_reset_hour" gorm:"type:int;default:0"`
 	TrafficResetEnabled bool      `json:"traffic_reset_enabled" gorm:"type:boolean;default:true"`
 	TrafficComp         int64     `json:"traffic_compensation" gorm:"column:traffic_compensation;type:bigint;default:0"`
-	TrafficCarry        int64     `json:"-" gorm:"column:traffic_carry;type:bigint;default:0"`
+	TrafficCarry        int64     `json:"-" gorm:"column:traffic_carry;type:bigint;default:0"` // Legacy aggregate; migrated into the directional fields below.
+	TrafficCarryUp      int64     `json:"-" gorm:"column:traffic_carry_up;type:bigint;default:0"`
+	TrafficCarryDown    int64     `json:"-" gorm:"column:traffic_carry_down;type:bigint;default:0"`
 	TrafficCompResetAt  LocalTime `json:"traffic_compensation_reset_at" gorm:"column:traffic_compensation_reset_at"`
 	PingTaskOrder       UintArray `json:"ping_task_order" gorm:"type:longtext"`
 	CreatedAt           LocalTime `json:"created_at"`

@@ -44,8 +44,9 @@ func TestShouldResetTrafficCompensation(t *testing.T) {
 	}
 
 	carryOnly := zero
-	carryOnly.TrafficCarry = 2048
+	carryOnly.TrafficCarryUp = 1024
+	carryOnly.TrafficCarryDown = 2048
 	if !shouldResetTrafficCompensation(carryOnly, now) {
-		t.Fatal("internal carry must reset at the same monthly boundary")
+		t.Fatal("directional internal carry must reset at the same monthly boundary")
 	}
 }

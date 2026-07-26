@@ -315,7 +315,7 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 }
 
 // ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将
-// 用户补偿 traffic_compensation 与内部结转 traffic_carry 一并清零。
+// 用户补偿 traffic_compensation 与上下行内部结转一并清零。
 // 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 traffic_compensation_reset_at
 // 早于该起始时间，且补偿或内部结转不为 0，则视为上一周期的值并清零。
 func ResetTrafficCompensationForDueClients() {
@@ -333,19 +333,31 @@ func ResetTrafficCompensationForDueClients() {
 		if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
 			Updates(map[string]interface{}{
 				"traffic_compensation":          int64(0),
-				"traffic_carry":                 int64(0),
+				"traffic_carry":                 int64(0), // Clear any pre-v3 residue as well.
+				"traffic_carry_up":              int64(0),
+				"traffic_carry_down":            int64(0),
 				"traffic_compensation_reset_at": now,
 				"updated_at":                    now,
 			}).Error; err != nil {
 			log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
 		} else {
-			log.Printf("[traffic_comp_reset] reset traffic accounting for %s (compensation=%d, carry=%d)", c.UUID, c.TrafficComp, c.TrafficCarry)
+			log.Printf(
+				"[traffic_comp_reset] reset traffic accounting for %s (compensation=%d, carry_up=%d, carry_down=%d)",
+				c.UUID,
+				c.TrafficComp,
+				c.TrafficCarryUp,
+				c.TrafficCarryDown,
+			)
 		}
 	}
 }
 
 func shouldResetTrafficCompensation(client models.Client, now time.Time) bool {
-	if (client.TrafficComp == 0 && client.TrafficCarry == 0) || !client.TrafficResetEnabled {
+	if (client.TrafficComp == 0 &&
+		client.TrafficCarry == 0 &&
+		client.TrafficCarryUp == 0 &&
+		client.TrafficCarryDown == 0) ||
+		!client.TrafficResetEnabled {
 		return false
 	}
 	start := trafficResetStart(client, now)
