@@ -12,7 +12,7 @@
 
 ## 当前任务
 
-- 状态：validation complete，等待发布与 `ded` 部署。
+- 状态：completed。
 - 目标：彻底删除未启用的 Metric Store 运行时代码与前端探测路径，并修复自动流量清零边界/并发覆盖和后台保存失败却提示成功的问题。
 - 范围：中心服务 Metric Store 包、启动/记录/Ping/GPU/历史查询分支、主题 metric 优先路径、Go 依赖；自动清零的读时边界与乐观并发保护；后台节点编辑严格 RPC 错误处理；生成主题同步、测试、发布与 `ded` 部署。
 - 数据边界：不迁移也不删除现有 SQLite 主库历史记录；旧 Metric Store 配置键只停止读取和返回，避免无关数据破坏。
@@ -29,6 +29,8 @@
 - 节点保存仅在流量补偿数值真实变化时刷新补偿周期时间戳；普通编辑不再把上周期旧补偿重新标记为当前周期。
 - 后台编辑/新增节点改用严格 RPC；失败时保留弹窗、显示错误并恢复按钮，不再关闭弹窗后提示成功。
 - 验证：`go test ./...`、关键包 `go test -race`、`go vet ./...`、主题 type-check/lint/build、后台脚本语法、生成产物同步、`git diff --check` 和 Linux amd64 静态交叉编译均通过。
+- 发布：运行代码提交 `c85d24ade533b6b125dec7f6e7ff4f703ea49721` 已推送 `main`；Release `v1.3.1` 与 tag 指向该提交，Linux AMD64 资产 SHA-256 为 `22be6ba687c220d593bfa3669c5a62661772687cd4eb45add9e757998e5096e4`。
+- 部署：`ded` 中心服务已更新到 `v1.3.1 (c85d24a)`；二进制摘要与 Release 一致，首页、后台、公开 API 和版本 RPC 均返回 200/正确版本，中心与 Agent 服务均 active。回滚备份位于 `/opt/monitor/backups/center-release-v1.3.1-W96tMxg0`。
 
 ### 2026-07-25 authenticated node detail (M4)
 
@@ -301,6 +303,7 @@
 
 ## 验证记录
 
+- 2026-07-29 v1.3.1：`go test ./...` 全包通过；`go test -race ./database/clients ./database/records ./web/report ./web/rpc/jsonrpc` 通过；`go vet ./...` 通过；`web/theme-src/build-vps-theme.sh` 完成 type-check、lint、生产构建和嵌入式产物同步；后台内联脚本可解析且源文件与生成文件一致；Linux amd64 musl 静态构建通过。`ded` 部署后 RPC 返回 `{"version":"v1.3.1","hash":"c85d24a"}`，运行二进制 SHA-256 为 `22be6ba687c220d593bfa3669c5a62661772687cd4eb45add9e757998e5096e4`。
 - 2026-07-14 v3.1.4 Issue #18 release：`bun run lint`、`bun run build`、`git diff --check` 通过；发布提交 `91c9b06` 已推送 `main`，Actions run `#29312369165`（#49）成功，tag / Release target 均为完整提交 `91c9b06fc5c4b5ee2636dc18779861186806abd7`，Issue #18 已关闭。线上 zip `komari-theme-Glassmorphism-build-91c9b06.zip` 大小 5,114,852 bytes，SHA-256 `f8b4c9b6f61cc66d755d7a612357d16d1d2774f9494b9b0c3ce87e572ee5da9b`，下载复核顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.4`。构建仍只有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
 - 2026-07-14 v3.1.3 release：发布提交 `4f37416` 已推送 `main`；GitHub Actions run `#29311122789` 成功。Release `v3.1.3` 为正式发布（非 draft / prerelease），target 为完整提交 `4f3741692bd81141ed542614d5b31a01ff0dc0fc`，zip 资产 `komari-theme-Glassmorphism-build-4f37416.zip` 上传状态为 `uploaded`。下载复核：大小 5,120,783 bytes，SHA-256 `f4d5f1be0c769ffc5372ab6a9b780042768f82529827b7222a843ef642605bee`，顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.3`。
 - 2026-07-14 v3.1.0 release：发布提交 `14dac71` 已推送 `main`；GitHub Actions run `#42` 成功。Release `v3.1.0` 为正式发布（非 draft / prerelease），target 为完整提交 `14dac711d3e1ad1e7963c6dc2609ab6d1921f82d`，zip 资产上传状态为 `uploaded`。
@@ -326,10 +329,11 @@
 ## 风险点
 
 - `bun run lint` 当前脚本包含 `--fix`，会自动修改文件；如需运行，应在运行后检查 diff。
-- PingChart、首页 Ping 摘要、LoadChart 历史模式已优先尝试 public metric store，并保留 legacy fallback；HealthSummaryPanel 尚未迁移到 metric store。
-- PingChart 自定义范围在 metric API 可用时精确传 `start/end`；legacy fallback 会按保留时间扩大回溯后再裁剪，但仍受旧接口最大保留时长与 6000 点上限约束。
+- PingChart 自定义范围会按保留时间扩大回溯后再裁剪，仍受中心历史接口最大保留时长与 6000 点上限约束。
+- 独立 GPU 历史持久化已随 Metric Store 删除；GPU 实时卡片仍读取 Agent 最新上报，历史图没有设备级 GPU 数据时会自动隐藏。
+- 数据库中可能仍保留旧 Metric Store 配置键，但运行时不读取、不返回也不写入；没有自动删除这些无害旧键，以避免发布过程改动用户数据库内容。
 - AuditLogPanel 已按 `admin:getLogs` 接入但尚未在真实登录后端手动验证返回形态；若后端字段或分页语义变化，需按真实响应微调。
-- 自定义 LoadChart 时间范围在 metric API 可用时精确传 `start` / `end`；旧后端 fallback 仍只能近似为“最近 N 小时”。
+- 自定义 LoadChart 时间范围通过现有历史接口读取，仍只能近似为“最近 N 小时”。
 - `traffic_up` / `traffic_down` 当前只做字段接收与历史 normalize，不替换现有流量 UI 语义。
 - `message` 已在 NodeCard / NodeList 以纯文本 tooltip 展示，禁止 `v-html` 的约束仍需保持。
 - JSON 导出已经分片构建节点字符串，但最终字符串拼接和 Blob 创建仍是浏览器同步边界；相比原先整棵大对象 `JSON.stringify` 已降低主线程尖峰。
@@ -339,6 +343,10 @@
 
 已完成：
 
+- Metric Store 后端包、数据库驱动依赖、写入/查询分支和主题探测路径已全部删除，主 SQLite `records` / `records_long_term` / `ping_records` 成为唯一历史数据源。
+- 自动清零在配置分钟边界立即隔离旧补偿与结转；定时持久化具备乐观并发保护，节点普通编辑不会刷新未变化补偿的周期时间戳。
+- 后台节点编辑和新增使用严格 RPC，失败保持弹窗并显示错误；生成后台已同步。
+- GitHub 运行代码提交为 `c85d24a`，Release 为 `v1.3.1`；`ded` 已部署同一构建，回滚备份为 `/opt/monitor/backups/center-release-v1.3.1-W96tMxg0`。
 - 首页强闪屏修复：首屏前预设暗色 class/color-scheme、文档初始背景 token 化、LoadingCover 去除 `bg-white/80`、密集节点卡片禁用首轮动画与在线状态扩散环。
 - 自定义背景图片 follow-up：`src/styles/main.css` 不再给 `#app` 设置不透明背景，避免遮住 `Background.vue` 的 fixed 背景层；仍保留 `html` / `body` token 背景来降低首屏白底闪现。`LoadingCover.vue` 在自定义背景启用且当前模式有背景 URL 时不再铺白雾遮罩/Loading 文案，仅保留轻量圆形指示器。
 - 本次未做真实浏览器夜间首屏录屏或真实 Komari 自定义背景验证；建议在真实 Komari 多节点环境中用暗色/auto 模式硬刷新首页，并打开自定义背景图片确认无白屏闪烁且背景可见。
