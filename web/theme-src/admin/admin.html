@@ -462,6 +462,9 @@
         z-index: 999;
         animation: fadeout 1.8s forwards;
       }
+      .toast-error {
+        background: var(--red);
+      }
       @keyframes fadeout {
         0%,
         60% {
@@ -488,6 +491,191 @@
         width: min(540px, 93vw);
         max-height: 90vh;
         overflow-y: auto;
+      }
+      .traffic-confirm-overlay {
+        z-index: 220;
+        background: rgba(2, 6, 23, 0.78);
+        backdrop-filter: blur(5px);
+      }
+      .traffic-confirm {
+        width: min(450px, calc(100vw - 32px));
+        overflow: hidden;
+        background: linear-gradient(180deg, #131d31 0%, #101827 100%);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 16px;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+      }
+      .traffic-confirm-header {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) 28px;
+        align-items: start;
+        gap: 12px;
+        padding: 20px 20px 16px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      }
+      .traffic-confirm-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.14);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 12px;
+        font-size: 23px;
+        font-weight: 800;
+      }
+      .traffic-confirm-title {
+        margin: 1px 0 4px;
+        font-size: 17px;
+      }
+      .traffic-confirm-node {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+      .traffic-confirm-close {
+        width: 28px;
+        height: 28px;
+        justify-content: center;
+        padding: 0;
+        font-size: 19px;
+      }
+      .traffic-confirm-body {
+        padding: 18px 20px 20px;
+      }
+      .traffic-confirm-lead {
+        margin: 0 0 14px;
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .traffic-confirm-summary {
+        overflow: hidden;
+        margin-bottom: 12px;
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 10px;
+      }
+      .traffic-confirm-row {
+        display: grid;
+        grid-template-columns: 100px minmax(0, 1fr);
+        gap: 12px;
+        padding: 11px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .traffic-confirm-row + .traffic-confirm-row {
+        border-top: 1px solid rgba(148, 163, 184, 0.1);
+      }
+      .traffic-confirm-label {
+        color: var(--muted);
+      }
+      .traffic-confirm-value {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .traffic-confirm-note {
+        display: flex;
+        gap: 9px;
+        padding: 10px 12px;
+        color: #fcd34d;
+        background: rgba(234, 179, 8, 0.08);
+        border: 1px solid rgba(234, 179, 8, 0.18);
+        border-radius: 9px;
+        font-size: 11px;
+        line-height: 1.55;
+      }
+      .traffic-confirm-error {
+        margin-top: 10px;
+        padding: 10px 12px;
+        color: #fecaca;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.22);
+        border-radius: 9px;
+        font-size: 11px;
+        line-height: 1.55;
+      }
+      .traffic-confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 18px;
+      }
+      .traffic-confirm-actions .btn {
+        min-width: 106px;
+        justify-content: center;
+      }
+      .traffic-plan-button {
+        width: 100%;
+        min-height: 35px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 11px;
+        text-align: left;
+        background: #0f172a;
+        border: 1px solid var(--border);
+      }
+      .traffic-plan-button:hover {
+        background: #131e33;
+        border-color: rgba(59, 130, 246, 0.55);
+      }
+      .traffic-plan-next {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        color: #93c5fd;
+        font-size: 13px;
+        font-weight: 500;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .traffic-plan-button.is-disabled .traffic-plan-next {
+        color: var(--muted);
+      }
+      .traffic-plan-chevron {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1;
+      }
+      .traffic-plan-preview {
+        margin-bottom: 14px;
+        padding: 12px 14px;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 10px;
+      }
+      .traffic-plan-preview-label {
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .traffic-plan-preview-time {
+        color: #bfdbfe;
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .traffic-plan-danger {
+        margin-top: 8px;
+        padding: 13px;
+        background: rgba(239, 68, 68, 0.06);
+        border: 1px solid rgba(239, 68, 68, 0.18);
+        border-radius: 10px;
+      }
+      .traffic-plan-danger-title {
+        margin-bottom: 4px;
+        color: #fecaca;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .traffic-plan-danger-copy {
+        margin-bottom: 11px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.55;
       }
       .sec-title {
         color: var(--accent);
@@ -547,6 +735,27 @@
           width: 96vw;
           padding: 14px;
           margin: 8px;
+        }
+        .traffic-confirm {
+          width: calc(100vw - 24px);
+        }
+        .traffic-confirm-header {
+          grid-template-columns: 40px minmax(0, 1fr) 28px;
+          padding: 16px;
+        }
+        .traffic-confirm-icon {
+          width: 40px;
+          height: 40px;
+        }
+        .traffic-confirm-body {
+          padding: 15px 16px 16px;
+        }
+        .traffic-confirm-row {
+          grid-template-columns: 82px minmax(0, 1fr);
+        }
+        .traffic-confirm-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
         }
         .card {
           padding: 12px;
@@ -703,8 +912,32 @@
         }
       }
 
-      function toast(msg) {
-        var t = H('<div class="toast">' + msg + "</div>");
+      async function RPCStrict(method, params) {
+        params = params || {};
+        var r = await fetch(A, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: method,
+            params: params,
+            id: Date.now(),
+          }),
+        });
+        if (r.status === 401) {
+          logout();
+          throw new Error("登录状态已失效");
+        }
+        var d = await r.json();
+        if (d.error) throw new Error(d.error.message || "请求失败");
+        if (!r.ok) throw new Error("请求失败（HTTP " + r.status + "）");
+        return d.result;
+      }
+
+      function toast(msg, type) {
+        var cls = type === "error" ? " toast-error" : "";
+        var t = H('<div class="toast' + cls + '">' + E(String(msg)) + "</div>");
         document.body.appendChild(t);
         setTimeout(function () {
           t.remove();
@@ -732,6 +965,250 @@
       function closeModal(id) {
         var m = document.getElementById(id);
         if (m) m.remove();
+      }
+
+      function openTrafficResetConfirm(nodeName, onConfirm) {
+        var confirmId = "trafficConfirm" + uid();
+        var titleId = confirmId + "Title";
+        var ov = H(
+          '<div class="modal-overlay traffic-confirm-overlay" id="' +
+            confirmId +
+            '"><div class="traffic-confirm" role="dialog" aria-modal="true" aria-labelledby="' +
+            titleId +
+            '"><div class="traffic-confirm-header"><div class="traffic-confirm-icon">!</div><div><h3 class="traffic-confirm-title" id="' +
+            titleId +
+            '">确认清零流量</h3><div class="traffic-confirm-node">节点：' +
+            E(nodeName || "未命名节点") +
+            '</div></div><button class="btn btn-ghost traffic-confirm-close" type="button" aria-label="关闭">×</button></div><div class="traffic-confirm-body"><p class="traffic-confirm-lead">将以 Agent 当前的即时流量快照建立新的统计起点。此操作无法撤销。</p><div class="traffic-confirm-summary"><div class="traffic-confirm-row"><span class="traffic-confirm-label">清零内容</span><span class="traffic-confirm-value">累计上行、累计下行、流量补偿</span></div><div class="traffic-confirm-row"><span class="traffic-confirm-label">自动清零计划</span><span class="traffic-confirm-value">保持不变，不移动周期起点</span></div></div><div class="traffic-confirm-note"><span>●</span><span>Agent 必须在线并支持严格快照。任何一步失败都不会修改当前流量。</span></div><div class="traffic-confirm-error" style="display:none"></div><div class="traffic-confirm-actions"><button class="btn btn-outline traffic-confirm-cancel" type="button">取消</button><button class="btn btn-danger traffic-confirm-submit" type="button">确认清零</button></div></div></div></div>',
+        );
+        var busy = false;
+        var cancelButton = ov.querySelector(".traffic-confirm-cancel");
+        var closeButton = ov.querySelector(".traffic-confirm-close");
+        var submitButton = ov.querySelector(".traffic-confirm-submit");
+        var errorBox = ov.querySelector(".traffic-confirm-error");
+        var close = function () {
+          if (!busy) ov.remove();
+        };
+        cancelButton.onclick = close;
+        closeButton.onclick = close;
+        ov.onclick = function (e) {
+          if (e.target === ov) close();
+        };
+        submitButton.onclick = async function () {
+          busy = true;
+          cancelButton.disabled = true;
+          closeButton.disabled = true;
+          submitButton.disabled = true;
+          submitButton.textContent = "正在清零…";
+          errorBox.style.display = "none";
+          try {
+            await onConfirm();
+            ov.remove();
+          } catch (e) {
+            errorBox.textContent = e && e.message ? e.message : "流量清零失败";
+            errorBox.style.display = "block";
+            busy = false;
+            cancelButton.disabled = false;
+            closeButton.disabled = false;
+            submitButton.disabled = false;
+            submitButton.textContent = "重新尝试";
+          }
+        };
+        document.getElementById("modals").appendChild(ov);
+        submitButton.focus();
+      }
+
+      function clampTrafficPlanValue(value, min, max, fallback) {
+        value = parseInt(value, 10);
+        if (!Number.isFinite(value)) value = fallback;
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function nextTrafficResetAt(enabled, day, hour, minute, now) {
+        if (!enabled) return null;
+        day = clampTrafficPlanValue(day, 1, 31, 1);
+        hour = clampTrafficPlanValue(hour, 0, 23, 0);
+        minute = clampTrafficPlanValue(minute, 0, 59, 0);
+        now = now || new Date();
+        var shanghaiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+        var year = shanghaiNow.getUTCFullYear();
+        var month = shanghaiNow.getUTCMonth();
+        var candidate = function (candidateYear, candidateMonth) {
+          var lastDay = new Date(
+            Date.UTC(candidateYear, candidateMonth + 1, 0),
+          ).getUTCDate();
+          return new Date(
+            Date.UTC(
+              candidateYear,
+              candidateMonth,
+              Math.min(day, lastDay),
+              hour - 8,
+              minute,
+              0,
+              0,
+            ),
+          );
+        };
+        var next = candidate(year, month);
+        if (next.getTime() <= now.getTime()) {
+          month++;
+          if (month > 11) {
+            month = 0;
+            year++;
+          }
+          next = candidate(year, month);
+        }
+        return next;
+      }
+
+      function formatShanghaiDateTime(date) {
+        if (!date) return "自动清零已关闭";
+        var local = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+        var pad = function (value) {
+          return String(value).padStart(2, "0");
+        };
+        return (
+          local.getUTCFullYear() +
+          "-" +
+          pad(local.getUTCMonth() + 1) +
+          "-" +
+          pad(local.getUTCDate()) +
+          " " +
+          pad(local.getUTCHours()) +
+          ":" +
+          pad(local.getUTCMinutes())
+        );
+      }
+
+      function trafficPlanSummary(enabled, day, hour, minute) {
+        return enabled
+          ? formatShanghaiDateTime(
+              nextTrafficResetAt(true, day, hour, minute),
+            )
+          : "自动清零已关闭";
+      }
+
+      function renderTrafficPlanControl(id, day, hour, minute) {
+        return (
+          '<input name="traffic_reset_day" type="hidden" value="' +
+          clampTrafficPlanValue(day, 1, 31, 1) +
+          '"><input name="traffic_reset_hour" type="hidden" value="' +
+          clampTrafficPlanValue(hour, 0, 23, 0) +
+          '"><input name="traffic_reset_minute" type="hidden" value="' +
+          clampTrafficPlanValue(minute, 0, 59, 0) +
+          '"><label>自动清零计划</label>' +
+          '<button class="btn traffic-plan-button" type="button" id="trafficPlan' +
+          id +
+          '"><span class="traffic-plan-next"></span><span class="traffic-plan-chevron">›</span></button>'
+        );
+      }
+
+      function updateTrafficPlanButton(form) {
+        if (!form) return;
+        var button = form.querySelector(".traffic-plan-button");
+        var enabledInput = form.querySelector(
+          '[name="traffic_reset_enabled"]',
+        );
+        var dayInput = form.querySelector('[name="traffic_reset_day"]');
+        var hourInput = form.querySelector('[name="traffic_reset_hour"]');
+        var minuteInput = form.querySelector('[name="traffic_reset_minute"]');
+        if (!button || !enabledInput || !dayInput || !hourInput || !minuteInput)
+          return;
+        var enabled = enabledInput.value === "true";
+        button.classList.toggle("is-disabled", !enabled);
+        button.querySelector(".traffic-plan-next").textContent =
+          trafficPlanSummary(
+            enabled,
+            dayInput.value,
+            hourInput.value,
+            minuteInput.value,
+          );
+      }
+
+      function bindTrafficPlan(form, nodeName, onManualClear) {
+        if (!form) return;
+        var button = form.querySelector(".traffic-plan-button");
+        var enabledInput = form.querySelector(
+          '[name="traffic_reset_enabled"]',
+        );
+        var dayInput = form.querySelector('[name="traffic_reset_day"]');
+        var hourInput = form.querySelector('[name="traffic_reset_hour"]');
+        var minuteInput = form.querySelector('[name="traffic_reset_minute"]');
+        if (!button || !enabledInput || !dayInput || !hourInput || !minuteInput)
+          return;
+
+        enabledInput.addEventListener("change", function () {
+          updateTrafficPlanButton(form);
+        });
+        updateTrafficPlanButton(form);
+
+        button.onclick = function () {
+          var planId = "trafficPlanEditor" + uid();
+          var canClearNow = typeof onManualClear === "function";
+          openModal(
+            planId,
+            "自动清零计划",
+            '<div class="traffic-plan-preview"><div class="traffic-plan-preview-label">下次清零时间</div><div class="traffic-plan-preview-time"></div></div>' +
+              '<div class="modal-grid"><div class="form-group"><label>清零日 (1-31)</label><input class="traffic-plan-day" type="number" min="1" max="31" value="' +
+              clampTrafficPlanValue(dayInput.value, 1, 31, 1) +
+              '"></div><div class="form-group"><label>清零时间</label><input class="traffic-plan-time" type="time" step="60" value="' +
+              String(
+                clampTrafficPlanValue(hourInput.value, 0, 23, 0),
+              ).padStart(2, "0") +
+              ":" +
+              String(
+                clampTrafficPlanValue(minuteInput.value, 0, 59, 0),
+              ).padStart(2, "0") +
+              '"></div></div><p class="text-xs text-muted mb-3">每月到达所设日期和时间时执行；当月没有所填日期时，使用该月最后一天。</p>' +
+              (canClearNow
+                ? '<div class="traffic-plan-danger"><div class="traffic-plan-danger-title">立即清零流量</div><div class="traffic-plan-danger-copy">立即建立新的流量统计起点并清空流量补偿，不会改变上面的自动清零计划。</div><button class="btn btn-danger w-full traffic-plan-clear-now" type="button">立即清零</button></div>'
+                : "") +
+              '<div class="flex gap-2 mt-4"><button class="btn btn-outline traffic-plan-cancel" style="flex:1" type="button">取消</button><button class="btn btn-primary traffic-plan-apply" style="flex:1" type="button">应用</button></div>',
+          );
+          var overlay = document.getElementById(planId);
+          var planDay = overlay.querySelector(".traffic-plan-day");
+          var planTime = overlay.querySelector(".traffic-plan-time");
+          var preview = overlay.querySelector(".traffic-plan-preview-time");
+          var refreshPreview = function () {
+            var timeParts = String(planTime.value || "00:00").split(":");
+            preview.textContent = trafficPlanSummary(
+              enabledInput.value === "true",
+              planDay.value,
+              timeParts[0],
+              timeParts[1],
+            );
+          };
+          planDay.addEventListener("input", refreshPreview);
+          planTime.addEventListener("input", refreshPreview);
+          refreshPreview();
+          overlay.querySelector(".traffic-plan-cancel").onclick = function () {
+            closeModal(planId);
+          };
+          overlay.querySelector(".traffic-plan-apply").onclick = function () {
+            var timeParts = String(planTime.value || "00:00").split(":");
+            dayInput.value = clampTrafficPlanValue(planDay.value, 1, 31, 1);
+            hourInput.value = clampTrafficPlanValue(
+              timeParts[0],
+              0,
+              23,
+              0,
+            );
+            minuteInput.value = clampTrafficPlanValue(
+              timeParts[1],
+              0,
+              59,
+              0,
+            );
+            updateTrafficPlanButton(form);
+            closeModal(planId);
+          };
+          if (canClearNow) {
+            overlay.querySelector(".traffic-plan-clear-now").onclick =
+              function () {
+                openTrafficResetConfirm(nodeName, onManualClear);
+              };
+          }
+        };
       }
 
       // ====== NAV ======
@@ -1502,23 +1979,6 @@
           return x.uuid === uuid;
         });
         if (!n) return;
-        var status = null;
-        try {
-          status = await RPC("common:getNodesLatestStatus", { uuid: uuid });
-        } catch (e) {
-          status = null;
-        }
-        var visibleBase = 0;
-        if (status && typeof status.monthly_traffic_raw === "number")
-          visibleBase = status.monthly_traffic_raw;
-        else if (status)
-          visibleBase = Math.max(
-            0,
-            (status.net_total_up || 0) +
-              (status.net_total_down || 0) -
-              (n.traffic_compensation || 0),
-          );
-        var visibleBaseGB = (visibleBase / 1073741824).toFixed(2);
         var id = uid();
         var nn = E(n.name || "");
         var ng = E(n.group || "");
@@ -1528,6 +1988,7 @@
         var ntt = n.traffic_limit_type || "sum";
         var nrd = n.traffic_reset_day || 1;
         var nrh = n.traffic_reset_hour || 0;
+        var nrm = n.traffic_reset_minute || 0;
         var ncomp = ((n.traffic_compensation || 0) / 1073741824).toFixed(2);
         var nre =
           n.traffic_reset_enabled !== undefined
@@ -1545,44 +2006,45 @@
             '" required></div><div class="form-group"><label>分组</label><input name="group" value="' +
             ng +
             '"></div></div>' +
-            '<div class="modal-grid"><div class="form-group"><label>权重</label><input name="weight" type="number" value="' +
+            '<input name="weight" type="hidden" value="' +
             nw +
-            '"></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" ' +
+            '"><div class="modal-grid"><div class="form-group"><label>自动清零</label><select name="traffic_reset_enabled"><option value="true" ' +
+            (nre ? "selected" : "") +
+            '>开启</option><option value="false" ' +
+            (nre ? "" : "selected") +
+            '>关闭</option></select></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" ' +
             (nh ? "" : "selected") +
             '>否</option><option value="true" ' +
             (nh ? "selected" : "") +
             ">是</option></select></div></div>" +
             '<h4 class="sec-title">流量</h4>' +
-            '<div class="modal-grid"><div class="form-group"><label>启用月度流量重置</label><select name="traffic_reset_enabled"><option value="true" ' +
-            (nre ? "selected" : "") +
-            '>开启</option><option value="false" ' +
-            (nre ? "" : "selected") +
-            '>关闭</option></select></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
-            ntl +
-            '"></div></div>' +
             '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" ' +
             (ntt === "sum" ? "selected" : "") +
             '>合计</option><option value="up" ' +
             (ntt === "up" ? "selected" : "") +
             '>上行</option><option value="down" ' +
             (ntt === "down" ? "selected" : "") +
-            '>下行</option></select></div><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="' +
+            '>下行</option></select></div><div class="form-group">' +
+            renderTrafficPlanControl(id, nrd, nrh, nrm) +
+            "</div></div>" +
+            '<div class="modal-grid"><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="' +
             ncomp +
+            '"></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
+            ntl +
             '"></div></div>' +
-            '<div class="modal-grid"><div class="form-group"><label>重置日(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="' +
-            nrd +
-            '"></div><div class="form-group"><label>重置小时(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="' +
-            nrh +
-            '"></div></div>' +
-            '<p class="text-xs text-muted mb-1">当前原始累计：' +
-            visibleBaseGB +
-            " GB。保存后前台显示 = 当前原始累计 + 流量补偿。</p>" +
-            '<p class="text-xs text-muted mb-2">流量补偿支持负数，每月重置日自动清零。</p>' +
             renderNodePingSelector(pingTasks, n.ping_task_order || []) +
             '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>',
         );
-        bindNodePingSelector(document.getElementById("ef" + id));
-        document.getElementById("ef" + id).onsubmit = async function (e) {
+        var editForm = document.getElementById("ef" + id);
+        bindNodePingSelector(editForm);
+        bindTrafficPlan(editForm, n.name, async function () {
+            await RPCStrict("admin:resetClientTraffic", { uuid: uuid });
+            document.querySelector(
+              "#ef" + id + ' [name="traffic_compensation"]',
+            ).value = "0.00";
+            toast("累计流量和流量补偿已清零");
+        });
+        editForm.onsubmit = async function (e) {
           e.preventDefault();
           var f = new FormData(e.target);
           var compGB = parseFloat(f.get("traffic_compensation")) || 0;
@@ -1596,6 +2058,8 @@
             traffic_limit_type: f.get("traffic_limit_type"),
             traffic_reset_day: parseInt(f.get("traffic_reset_day")) || 1,
             traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
+            traffic_reset_minute:
+              parseInt(f.get("traffic_reset_minute")) || 0,
             traffic_compensation: Math.round(compGB * 1073741824),
             traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
             ping_task_order: collectNodePingOrder(e.target),
@@ -2031,10 +2495,17 @@
             var pingTasks = (await RPC("admin:getAllPingTasks")) || [];
             openModal(
               id,
-              "\u6dfb\u52a0\u8282\u70b9",
+              "添加节点",
               '<form id="anf' +
                 id +
-                '"><div class="modal-grid"><div class="form-group"><label>\u540d\u79f0</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>\u5206\u7ec4</label><input name="group" placeholder="\u4f8b\u5982: \u65e5\u672c\u8282\u70b9"></div></div><div class="modal-grid"><div class="form-group"><label>\u6743\u91cd</label><input name="weight" type="number" value="0"></div><div class="form-group"><label>\u9690\u85cf</label><select name="hidden"><option value="false" selected>\u5426</option><option value="true">\u662f</option></select></div></div><h4 class="sec-title">\u6d41\u91cf</h4><div class="modal-grid"><div class="form-group"><label>\u542f\u7528\u6708\u5ea6\u6d41\u91cf\u91cd\u7f6e</label><select name="traffic_reset_enabled"><option value="true" selected>\u5f00\u542f</option><option value="false">\u5173\u95ed</option></select></div><div class="form-group"><label>\u6d41\u91cf\u9608\u503c (GB)</label><input name="traffic_limit" type="number" value="0"></div></div><div class="modal-grid"><div class="form-group"><label>\u9608\u503c\u7c7b\u578b</label><select name="traffic_limit_type"><option value="sum" selected>\u5408\u8ba1</option><option value="up">\u4e0a\u884c</option><option value="down">\u4e0b\u884c</option></select></div><div class="form-group"><label>\u6d41\u91cf\u8865\u507f (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="0.00"></div></div><div class="modal-grid"><div class="form-group"><label>\u91cd\u7f6e\u65e5(1-31)</label><input name="traffic_reset_day" type="number" min="1" max="31" value="1"></div><div class="form-group"><label>\u91cd\u7f6e\u5c0f\u65f6(0-23)</label><input name="traffic_reset_hour" type="number" min="0" max="23" value="0"></div></div><div class="text-xs text-muted mt-1">\u6d41\u91cf\u8865\u507f\u652f\u6301\u8d1f\u6570\uff0c\u6bcf\u6708\u91cd\u7f6e\u65e5\u81ea\u52a8\u6e05\u96f6\u3002</div><button class="btn btn-primary w-full mt-3" type="submit">\u521b\u5efa</button></form>',
+                '"><div class="modal-grid"><div class="form-group"><label>名称</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>分组</label><input name="group" placeholder="例如: 日本节点"></div></div>' +
+                '<input name="weight" type="hidden" value="0"><div class="modal-grid"><div class="form-group"><label>自动清零</label><select name="traffic_reset_enabled"><option value="true" selected>开启</option><option value="false">关闭</option></select></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" selected>否</option><option value="true">是</option></select></div></div>' +
+                '<h4 class="sec-title">流量</h4>' +
+                '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" selected>合计</option><option value="up">上行</option><option value="down">下行</option></select></div><div class="form-group">' +
+                renderTrafficPlanControl(id, 1, 0, 0) +
+                "</div></div>" +
+                '<div class="modal-grid"><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="0.00"></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="0"></div></div>' +
+                '<div class="text-xs text-muted mt-1">流量补偿支持负数，每月到达自动清零时间后清零。</div><button class="btn btn-primary w-full mt-3" type="submit">创建</button></form>',
             );
             var addForm = _d.getElementById("anf" + id);
             addForm
@@ -2044,6 +2515,7 @@
                 renderNodePingSelector(pingTasks, []),
               );
             bindNodePingSelector(addForm);
+            bindTrafficPlan(addForm, "", null);
             addForm.onsubmit = async function (e) {
               e.preventDefault();
               var f = new FormData(e.target);
@@ -2058,6 +2530,8 @@
                 traffic_limit_type: f.get("traffic_limit_type"),
                 traffic_reset_day: parseInt(f.get("traffic_reset_day")) || 1,
                 traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
+                traffic_reset_minute:
+                  parseInt(f.get("traffic_reset_minute")) || 0,
                 traffic_compensation: Math.round(compGB * 1073741824),
                 traffic_reset_enabled:
                   f.get("traffic_reset_enabled") === "true",

@@ -22,6 +22,59 @@ func openReportCacheTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+func TestFillTrafficDeltasUsesStrictClearSnapshotBaseline(t *testing.T) {
+	db := openReportCacheTestDB(t)
+	require.NoError(t, db.AutoMigrate(&models.Client{}))
+
+	clearedAt := time.Date(2026, 7, 28, 12, 0, 10, 0, time.UTC)
+	client := models.Client{
+		UUID:                "strict-clear-baseline",
+		TrafficClearedAt:    models.FromTime(clearedAt),
+		TrafficBaselineUp:   1_000,
+		TrafficBaselineDown: 2_000,
+	}
+	require.NoError(t, db.Create(&client).Error)
+	require.NoError(t, db.Create(&models.Record{
+		Client:       client.UUID,
+		Time:         models.FromTime(clearedAt.Add(-time.Minute)),
+		NetTotalUp:   900,
+		NetTotalDown: 1_900,
+	}).Error)
+
+	recordTime := clearedAt.Add(time.Minute)
+	pending := []models.Record{{
+		Client:       client.UUID,
+		Time:         models.FromTime(recordTime),
+		NetTotalUp:   1_025,
+		NetTotalDown: 2_040,
+	}}
+	summary := map[string]cachedTrafficSummary{
+		recordDedupKey(pending[0]): {
+			Points: []trafficTotalPoint{
+				{
+					Time:      clearedAt.Add(-10 * time.Second),
+					TotalUp:   990,
+					TotalDown: 1_990,
+				},
+				{
+					Time:      clearedAt.Add(30 * time.Second),
+					TotalUp:   1_010,
+					TotalDown: 2_015,
+				},
+				{
+					Time:      recordTime,
+					TotalUp:   1_025,
+					TotalDown: 2_040,
+				},
+			},
+		},
+	}
+
+	require.NoError(t, fillTrafficDeltas(db, pending, summary))
+	require.Equal(t, int64(25), pending[0].TrafficUp)
+	require.Equal(t, int64(40), pending[0].TrafficDown)
+}
+
 func resetReportCache(t *testing.T) {
 	t.Helper()
 	Records.Flush()

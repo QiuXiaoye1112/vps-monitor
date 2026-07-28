@@ -516,3 +516,12 @@
 - Production follow-up fixed a blocking-spinner loop in the new one-hour cards: historical refreshes now run at most once per 60 seconds, are silent after initial load, reject overlapping requests, and queue a visible refresh when the user changes the selected range during a background request.
 - Generated Agent installation commands now use GitHub's `releases/latest/download/monitor-agent-linux-amd64` endpoint instead of pinning `v1.0.0`.
 - Node-detail last-report, IPv4, and IPv6 metadata now use matching glass info pills. IPv4/IPv6 pills are accessible buttons with clipboard copy, fallback copy support, success/error toasts, and temporary check-icon feedback.
+
+## 2026-07-28 traffic reset minute compatibility (M4/M5)
+
+- 节点协议类型与响应式 store 新增 `traffic_reset_minute`，节点详情的重置说明从整点展示改为 `HH:MM`。
+- 后台把清零日、精确到分钟的清零时间和立即严格清零入口收进“自动清零计划”按钮；按钮显示按北京时间计算的下次清零时间，自动清零开关仍保留在外层。
+- 后端 Client 模型、创建/编辑 RPC、公开/实时节点响应、周期窗口、补偿重置边界和历史清理字段选择均已贯通分钟字段；旧数据默认分钟为 `0`。
+- 月末规则保持不变：目标月份缺少所填日期时取该月最后一天，下一月重新按原日期计算。
+- 验证：`bun run type-check`、`bun run lint`、生产构建和嵌入式主题同步通过；Go 全量测试与 `go vet ./...` 通过；后台内联脚本语法、4月31日回落到4月30日及下一月恢复31日的 JavaScript 日期测试通过。
+- 未执行浏览器视觉检查，按用户要求由用户自行刷新本地后台检查。

@@ -24,6 +24,7 @@ type MonthlyTraffic struct {
 
 func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic, error) {
 	start, end := TrafficWindow(client, now)
+	start = trafficAccountingStart(client, start)
 	up, down, err := sumTrafficDeltas(client.UUID, start, now)
 	if err != nil {
 		return MonthlyTraffic{}, err
@@ -48,6 +49,14 @@ func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic,
 	}, nil
 }
 
+func trafficAccountingStart(client models.Client, windowStart time.Time) time.Time {
+	clearedAt := client.TrafficClearedAt.ToTime()
+	if clearedAt.After(windowStart) {
+		return clearedAt
+	}
+	return windowStart
+}
+
 func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
 	if !client.TrafficResetEnabled {
 		return time.Time{}, now.AddDate(100, 0, 0)
@@ -62,8 +71,12 @@ func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
 	if hour < 0 || hour > 23 {
 		hour = 0
 	}
+	minute := client.TrafficResetMinute
+	if minute < 0 || minute > 59 {
+		minute = 0
+	}
 
-	this := monthlyBoundary(localNow.Year(), localNow.Month(), day, hour, loc)
+	this := monthlyBoundary(localNow.Year(), localNow.Month(), day, hour, minute, loc)
 	var start time.Time
 	var end time.Time
 	if localNow.Before(this) {
@@ -73,7 +86,7 @@ func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
 			prevMonth = 12
 			prevYear--
 		}
-		start = monthlyBoundary(prevYear, prevMonth, day, hour, loc)
+		start = monthlyBoundary(prevYear, prevMonth, day, hour, minute, loc)
 		end = this
 	} else {
 		start = this
@@ -83,17 +96,17 @@ func TrafficWindow(client models.Client, now time.Time) (time.Time, time.Time) {
 			nextMonth = 1
 			nextYear++
 		}
-		end = monthlyBoundary(nextYear, nextMonth, day, hour, loc)
+		end = monthlyBoundary(nextYear, nextMonth, day, hour, minute, loc)
 	}
 	return start, end
 }
 
-func monthlyBoundary(year int, month time.Month, day, hour int, loc *time.Location) time.Time {
-	lastDay := time.Date(year, month+1, 0, hour, 0, 0, 0, loc).Day()
+func monthlyBoundary(year int, month time.Month, day, hour, minute int, loc *time.Location) time.Time {
+	lastDay := time.Date(year, month+1, 0, hour, minute, 0, 0, loc).Day()
 	if day > lastDay {
 		day = lastDay
 	}
-	return time.Date(year, month, day, hour, 0, 0, 0, loc)
+	return time.Date(year, month, day, hour, minute, 0, 0, loc)
 }
 
 func trafficLocation() *time.Location {
@@ -160,7 +173,9 @@ func sumLegacyTrafficDeltas(db *gorm.DB, uuid string, start, end time.Time) (int
 			return result.Error
 		}
 		if result.Error == nil {
-			afterArchivedSlot := latestArchived.Time.ToTime().Add(longTermRecordInterval)
+			afterArchivedSlot := latestArchived.Time.ToTime().
+				Truncate(longTermRecordInterval).
+				Add(longTermRecordInterval)
 			if afterArchivedSlot.After(recentStart) {
 				recentStart = afterArchivedSlot
 			}

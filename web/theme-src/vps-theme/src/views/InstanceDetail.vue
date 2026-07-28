@@ -90,7 +90,8 @@ const trafficResetText = computed(() => {
     return '无'
   const day = data.value.traffic_reset_day || 1
   const hour = String(data.value.traffic_reset_hour ?? 0).padStart(2, '0')
-  return `每月 ${day} 日 ${hour} 时重置`
+  const minute = String(data.value.traffic_reset_minute ?? 0).padStart(2, '0')
+  return `每月 ${day} 日 ${hour}:${minute} 重置`
 })
 </script>
 

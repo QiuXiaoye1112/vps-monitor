@@ -91,6 +91,7 @@ export interface Client {
   public_remark: string
   traffic_reset_day?: number
   traffic_reset_hour?: number
+  traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
   traffic_compensation?: number
   mem_total: number
@@ -190,6 +191,7 @@ export interface NodeStatus {
   net_total_down: number
   traffic_reset_day?: number
   traffic_reset_hour?: number
+  traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
   traffic_compensation?: number
   traffic_up?: number

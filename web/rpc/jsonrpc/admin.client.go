@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/records"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
+	v2 "github.com/monitor-monitor/monitor/protocol/v2"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
@@ -70,6 +72,14 @@ func init() {
 	RegisterWithGroupAndMeta("clearRecords", rpc.RoleAdmin, adminClearRecords, &rpc.MethodMeta{
 		Name:    "admin:clearRecords",
 		Summary: "Delete all load records",
+		Returns: "null",
+	})
+	RegisterWithGroupAndMeta("resetClientTraffic", rpc.RoleAdmin, adminResetClientTraffic, &rpc.MethodMeta{
+		Name:    "admin:resetClientTraffic",
+		Summary: "Reset one client's cumulative traffic and compensation",
+		Params: []rpc.ParamMeta{
+			{Name: "uuid", Type: "string", Required: true, Description: "Client UUID"},
+		},
 		Returns: "null",
 	})
 }
@@ -138,6 +148,7 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 		"traffic_limit_type",
 		"traffic_reset_day",
 		"traffic_reset_hour",
+		"traffic_reset_minute",
 		"traffic_compensation",
 		"traffic_reset_enabled",
 	} {
@@ -152,7 +163,7 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 
 func normalizeClientCreateValue(key string, value interface{}) interface{} {
 	switch key {
-	case "weight", "traffic_reset_day", "traffic_reset_hour":
+	case "weight", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute":
 		if n, ok := asInt64(value); ok {
 			return int(n)
 		}
@@ -334,5 +345,43 @@ func adminClearRecords(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.Js
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "clear records", "warn")
+	return nil, nil
+}
+
+func adminResetClientTraffic(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
+	var params struct {
+		UUID string `json:"uuid"`
+	}
+	if err := req.BindParams(&params); err != nil || strings.TrimSpace(params.UUID) == "" {
+		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
+	}
+	params.UUID = strings.TrimSpace(params.UUID)
+	var snapshot v2.TrafficSnapshotResultParams
+	var clearedAt time.Time
+	err := report_cache.WithTrafficPersistencePaused(params.UUID, func() error {
+		var err error
+		snapshot, err = agent_runtime.RequestTrafficSnapshot(params.UUID, 12*time.Second)
+		if err != nil {
+			return err
+		}
+		if _, err = time.Parse(time.RFC3339Nano, snapshot.CapturedAt); err != nil {
+			return fmt.Errorf("Agent 返回的流量快照时间无效")
+		}
+		// Record history uses center receive times, so the center clock is the
+		// authoritative database boundary. Exact bytes come from the snapshot.
+		clearedAt = time.Now()
+		return clients.ResetTrafficAccounting(
+			params.UUID,
+			clearedAt,
+			snapshot.TotalUp,
+			snapshot.TotalDown,
+		)
+	})
+	if err != nil {
+		return nil, rpc.MakeError(rpc.InternalError, "流量清零失败："+err.Error(), nil)
+	}
+	monthlyTrafficCache.Delete(params.UUID)
+	actor, ip := auditActor(ctx)
+	auditlog.Log(ip, actor, "reset client traffic:"+params.UUID, "warn")
 	return nil, nil
 }

@@ -314,6 +314,33 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	return clients, nil
 }
 
+// ResetTrafficAccounting starts a fresh cumulative traffic ledger at an exact
+// agent-side counter snapshot without deleting monitoring history.
+func ResetTrafficAccounting(uuid string, clearedAt time.Time, baselineUp, baselineDown int64) error {
+	if baselineUp < 0 || baselineDown < 0 {
+		return fmt.Errorf("invalid negative traffic baseline")
+	}
+	db := dbcore.GetDBInstance()
+	result := db.Model(&models.Client{}).Where("uuid = ?", uuid).Updates(map[string]interface{}{
+		"traffic_compensation":          int64(0),
+		"traffic_carry":                 int64(0),
+		"traffic_carry_up":              int64(0),
+		"traffic_carry_down":            int64(0),
+		"traffic_compensation_reset_at": clearedAt,
+		"traffic_cleared_at":            clearedAt,
+		"traffic_baseline_up":           baselineUp,
+		"traffic_baseline_down":         baselineDown,
+		"updated_at":                    clearedAt,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("client not found: %s", uuid)
+	}
+	return nil
+}
+
 // ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将
 // 用户补偿 traffic_compensation 与上下行内部结转一并清零。
 // 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 traffic_compensation_reset_at
@@ -383,13 +410,17 @@ func trafficResetStart(client models.Client, now time.Time) time.Time {
 	if hour < 0 || hour > 23 {
 		hour = 0
 	}
+	minute := client.TrafficResetMinute
+	if minute < 0 || minute > 59 {
+		minute = 0
+	}
 	// 本月重置时间点
 	lastDayOfMonth := time.Date(localNow.Year(), localNow.Month()+1, 0, 0, 0, 0, 0, loc).Day()
 	resetDay := day
 	if resetDay > lastDayOfMonth {
 		resetDay = lastDayOfMonth
 	}
-	thisReset := time.Date(localNow.Year(), localNow.Month(), resetDay, hour, 0, 0, 0, loc)
+	thisReset := time.Date(localNow.Year(), localNow.Month(), resetDay, hour, minute, 0, 0, loc)
 	if localNow.Before(thisReset) {
 		// 当前时刻还没到本月重置点，周期起点是上个月的重置点
 		prevYear, prevMonth := localNow.Year(), localNow.Month()-1
@@ -402,7 +433,7 @@ func trafficResetStart(client models.Client, now time.Time) time.Time {
 		if prevDay > lastDayPrev {
 			prevDay = lastDayPrev
 		}
-		return time.Date(prevYear, prevMonth, prevDay, hour, 0, 0, 0, loc)
+		return time.Date(prevYear, prevMonth, prevDay, hour, minute, 0, 0, loc)
 	}
 	return thisReset
 }
@@ -437,6 +468,13 @@ func SaveClient(updates map[string]interface{}) error {
 		if val, ok := v.(float64); ok {
 			if val < 0 || val > 23 {
 				return fmt.Errorf("traffic_reset_hour must be between 0 and 23, got %v", val)
+			}
+		}
+	}
+	if v, exists := updates["traffic_reset_minute"]; exists {
+		if val, ok := v.(float64); ok {
+			if val < 0 || val > 59 {
+				return fmt.Errorf("traffic_reset_minute must be between 0 and 59, got %v", val)
 			}
 		}
 	}

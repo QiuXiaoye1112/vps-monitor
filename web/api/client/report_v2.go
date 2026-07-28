@@ -112,6 +112,18 @@ func handleV2RPC(uuid string, req v2.Request, allowWait bool) v2.Response {
 		}
 		ingestPingResult(uuid, params.TaskID, params.Value, finishedAt)
 		return v2.Success(req.ID, gin.H{"status": "success"})
+	case v2.MethodAgentTrafficSnapshotResult:
+		var params v2.TrafficSnapshotResultParams
+		if err := bindV2Params(req.Params, &params); err != nil {
+			return v2.Error(req.ID, -32602, "invalid traffic snapshot params", err.Error())
+		}
+		if err := agent_runtime.ResolveTrafficSnapshot(uuid, params); err != nil {
+			if errors.Is(err, agent_runtime.ErrTrafficSnapshotNotPending) {
+				return v2.Success(req.ID, gin.H{"status": "ignored"})
+			}
+			return v2.Error(req.ID, -32004, "traffic snapshot is no longer pending", err.Error())
+		}
+		return v2.Success(req.ID, gin.H{"status": "success"})
 	case v2.MethodAgentPull:
 		var params v2.PullParams
 		if err := bindV2Params(req.Params, &params); err != nil {

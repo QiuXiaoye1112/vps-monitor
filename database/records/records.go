@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log"
 	"sort"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
@@ -61,7 +61,9 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 		}
 
 		var clients []models.Client
-		if err := tx.Select("uuid", "traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour").Find(&clients).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("uuid", "traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute", "traffic_cleared_at").
+			Find(&clients).Error; err != nil {
 			return err
 		}
 
@@ -78,6 +80,7 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 			if client.TrafficResetEnabled {
 				foldStart, _ = TrafficWindow(client, now)
 			}
+			foldStart = trafficAccountingStart(client, foldStart)
 			var folded struct {
 				Up   int64
 				Down int64
@@ -259,9 +262,21 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	repairZeroTrafficDeltas(records, previousByClient)
+	trafficClearBaselines, err := getTrafficClearBaselines(db, records)
+	if err != nil {
+		return err
+	}
+	repairZeroTrafficDeltasWithBaselines(records, previousByClient, trafficClearBaselines)
+	trafficClearTimes := make(map[string]time.Time, len(trafficClearBaselines))
+	for clientUUID, baseline := range trafficClearBaselines {
+		trafficClearTimes[clientUUID] = baseline.At
+	}
 
 	// 按 Client 和 15 分钟时间段分组，并存储所有记录以计算分位数
+	type groupKey struct {
+		Client string
+		Slot   time.Time
+	}
 	type groupData struct {
 		Cpu             []float32
 		Gpu             []float32
@@ -288,9 +303,13 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		Uptime          []int64
 	}
 
-	groupedRecords := make(map[string]*groupData)
+	groupedRecords := make(map[groupKey]*groupData)
 	for _, record := range records {
-		key := record.Client + "_" + record.Time.ToTime().Truncate(longTermRecordInterval).Format(time.RFC3339)
+		recordTime := record.Time.ToTime()
+		key := groupKey{
+			Client: record.Client,
+			Slot:   trafficCompactionSlot(recordTime, trafficClearTimes[record.Client]),
+		}
 		if _, ok := groupedRecords[key]; !ok {
 			groupedRecords[key] = &groupData{}
 		}
@@ -362,13 +381,8 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		for key, data := range groupedRecords {
-			// 解析 Client 和时间
-			parts := strings.Split(key, "_")
-			clientUUID := parts[0]
-			timeSlot, err := time.Parse(time.RFC3339, strings.Join(parts[1:], "_"))
-			if err != nil {
-				return err
-			}
+			clientUUID := key.Client
+			timeSlot := key.Slot
 
 			cpuFloats := make([]float64, len(data.Cpu))
 			for i, v := range data.Cpu {
@@ -441,6 +455,67 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 	})
 }
 
+type trafficClearBaseline struct {
+	At   time.Time
+	Up   int64
+	Down int64
+}
+
+func getTrafficClearBaselines(db *gorm.DB, records []models.Record) (map[string]trafficClearBaseline, error) {
+	baselines := make(map[string]trafficClearBaseline)
+	if !db.Migrator().HasTable(&models.Client{}) {
+		return baselines, nil
+	}
+
+	clientIDs := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, record := range records {
+		if record.Client == "" {
+			continue
+		}
+		if _, exists := seen[record.Client]; exists {
+			continue
+		}
+		seen[record.Client] = struct{}{}
+		clientIDs = append(clientIDs, record.Client)
+	}
+	if len(clientIDs) == 0 {
+		return baselines, nil
+	}
+
+	var clients []models.Client
+	if err := db.Select("uuid", "traffic_cleared_at", "traffic_baseline_up", "traffic_baseline_down").
+		Where("uuid IN ?", clientIDs).
+		Find(&clients).Error; err != nil {
+		return nil, err
+	}
+	for _, client := range clients {
+		clearedAt := client.TrafficClearedAt.ToTime()
+		if clearedAt.IsZero() {
+			continue
+		}
+		baselines[client.UUID] = trafficClearBaseline{
+			At:   clearedAt,
+			Up:   client.TrafficBaselineUp,
+			Down: client.TrafficBaselineDown,
+		}
+	}
+	return baselines, nil
+}
+
+// trafficCompactionSlot splits the one 15-minute bucket containing a manual
+// traffic clear at the exact clear time. This keeps pre-clear deltas excluded
+// while preserving every post-clear delta after raw history is compacted.
+func trafficCompactionSlot(recordTime, clearedAt time.Time) time.Time {
+	slot := recordTime.Truncate(longTermRecordInterval)
+	if clearedAt.After(slot) &&
+		clearedAt.Before(slot.Add(longTermRecordInterval)) &&
+		!recordTime.Before(clearedAt) {
+		return clearedAt
+	}
+	return slot
+}
+
 func getPreviousTrafficRecordsBefore(db *gorm.DB, records []models.Record) (map[string]*models.Record, error) {
 	firstTimeByClient := make(map[string]time.Time)
 	for _, record := range records {
@@ -490,6 +565,14 @@ func getPreviousTrafficRecordBefore(db *gorm.DB, clientUUID string, before time.
 }
 
 func repairZeroTrafficDeltas(records []models.Record, previousByClient map[string]*models.Record) {
+	repairZeroTrafficDeltasWithBaselines(records, previousByClient, nil)
+}
+
+func repairZeroTrafficDeltasWithBaselines(
+	records []models.Record,
+	previousByClient map[string]*models.Record,
+	baselines map[string]trafficClearBaseline,
+) {
 	recordsByClient := make(map[string][]*models.Record)
 	for i := range records {
 		recordsByClient[records[i].Client] = append(recordsByClient[records[i].Client], &records[i])
@@ -504,6 +587,16 @@ func repairZeroTrafficDeltas(records []models.Record, previousByClient map[strin
 			previous = previousByClient[clientRecords[0].Client]
 		}
 		for _, current := range clientRecords {
+			if baseline, ok := baselines[current.Client]; ok &&
+				!current.Time.ToTime().Before(baseline.At) &&
+				(previous == nil || previous.Time.ToTime().Before(baseline.At)) {
+				previous = &models.Record{
+					Client:       current.Client,
+					Time:         models.FromTime(baseline.At),
+					NetTotalUp:   baseline.Up,
+					NetTotalDown: baseline.Down,
+				}
+			}
 			if previous == nil {
 				previous = current
 				continue

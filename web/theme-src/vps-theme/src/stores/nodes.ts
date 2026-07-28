@@ -27,6 +27,7 @@ export interface NodeData {
   public_remark: string
   traffic_reset_day?: number
   traffic_reset_hour?: number
+  traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
   traffic_compensation?: number
   mem_total: number
@@ -96,6 +97,7 @@ interface StatusData {
   net_total_down: number
   traffic_reset_day?: number
   traffic_reset_hour?: number
+  traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
   traffic_compensation?: number
   traffic_up?: number
@@ -194,6 +196,7 @@ const useNodesStore = defineStore('nodes', () => {
       public_remark: client.public_remark,
       traffic_reset_day: client.traffic_reset_day,
       traffic_reset_hour: client.traffic_reset_hour,
+      traffic_reset_minute: client.traffic_reset_minute,
       traffic_reset_enabled: client.traffic_reset_enabled,
       traffic_compensation: client.traffic_compensation,
       mem_total: client.mem_total,
@@ -283,6 +286,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_day = status.traffic_reset_day
     if (node.traffic_reset_hour !== status.traffic_reset_hour)
       node.traffic_reset_hour = status.traffic_reset_hour
+    if (node.traffic_reset_minute !== status.traffic_reset_minute)
+      node.traffic_reset_minute = status.traffic_reset_minute
     if (node.traffic_reset_enabled !== status.traffic_reset_enabled)
       node.traffic_reset_enabled = status.traffic_reset_enabled
     if (node.traffic_compensation !== status.traffic_compensation)
@@ -345,6 +350,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_day = client.traffic_reset_day
     if (node.traffic_reset_hour !== client.traffic_reset_hour)
       node.traffic_reset_hour = client.traffic_reset_hour
+    if (node.traffic_reset_minute !== client.traffic_reset_minute)
+      node.traffic_reset_minute = client.traffic_reset_minute
     if (node.traffic_reset_enabled !== client.traffic_reset_enabled)
       node.traffic_reset_enabled = client.traffic_reset_enabled
     if (node.traffic_compensation !== client.traffic_compensation)

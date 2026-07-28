@@ -50,3 +50,23 @@ func TestShouldResetTrafficCompensation(t *testing.T) {
 		t.Fatal("directional internal carry must reset at the same monthly boundary")
 	}
 }
+
+func TestTrafficResetStartUsesConfiguredMinute(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*60*60)
+	client := models.Client{
+		TrafficResetDay:    10,
+		TrafficResetHour:   12,
+		TrafficResetMinute: 37,
+	}
+
+	before := time.Date(2026, 7, 10, 12, 36, 59, 0, loc)
+	wantPrevious := time.Date(2026, 6, 10, 12, 37, 0, 0, loc)
+	if got := trafficResetStart(client, before); !got.Equal(wantPrevious) {
+		t.Fatalf("before minute boundary: got %v, want %v", got, wantPrevious)
+	}
+
+	atBoundary := time.Date(2026, 7, 10, 12, 37, 0, 0, loc)
+	if got := trafficResetStart(client, atBoundary); !got.Equal(atBoundary) {
+		t.Fatalf("at minute boundary: got %v, want %v", got, atBoundary)
+	}
+}

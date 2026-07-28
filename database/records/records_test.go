@@ -185,6 +185,107 @@ func TestCompactRecordPreservesExactTrafficDelta(t *testing.T) {
 	assert.True(t, compacted[0].Time.ToTime().Equal(records[2].Time.ToTime().Truncate(15*time.Minute)))
 }
 
+func TestManualTrafficClearSurvivesCompactionAndHistoryCleanup(t *testing.T) {
+	loc := models.GetAppLocation()
+	slot := time.Date(2026, 6, 15, 10, 0, 0, 0, loc)
+	clearedAt := slot.Add(7*time.Minute + 30*time.Second)
+	compactionNow := slot.Add(4*time.Hour + 30*time.Minute)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Client{}, &models.Record{}))
+	require.NoError(t, db.Table("records_long_term").AutoMigrate(&models.Record{}))
+
+	client := models.Client{
+		UUID:             "manual-clear-node",
+		Token:            "manual-clear-token",
+		TrafficClearedAt: models.FromTime(clearedAt),
+	}
+	require.NoError(t, db.Create(&client).Error)
+	require.NoError(t, db.Model(&models.Client{}).Where("uuid = ?", client.UUID).
+		Update("traffic_reset_enabled", false).Error)
+
+	for _, record := range []models.Record{
+		{
+			Client: client.UUID, Time: models.FromTime(slot.Add(5 * time.Minute)),
+			TrafficUp: 60, TrafficDown: 40,
+		},
+		{
+			Client: client.UUID, Time: models.FromTime(slot.Add(8 * time.Minute)),
+			TrafficUp: 12, TrafficDown: 8,
+		},
+		{
+			Client: client.UUID, Time: models.FromTime(slot.Add(14 * time.Minute)),
+			TrafficUp: 18, TrafficDown: 12,
+		},
+	} {
+		require.NoError(t, db.Create(&record).Error)
+	}
+
+	require.NoError(t, migrateOldRecordsAt(db, compactionNow))
+	// The raw overlap remains for an hour. Re-running compaction during that
+	// overlap must update the split rows rather than double-counting them.
+	require.NoError(t, migrateOldRecordsAt(db, compactionNow))
+
+	var compacted []models.Record
+	require.NoError(t, db.Table("records_long_term").Order("time ASC").Find(&compacted).Error)
+	require.Len(t, compacted, 2)
+	require.True(t, compacted[0].Time.ToTime().Equal(slot))
+	require.Equal(t, int64(60), compacted[0].TrafficUp)
+	require.Equal(t, int64(40), compacted[0].TrafficDown)
+	require.True(t, compacted[1].Time.ToTime().Equal(clearedAt))
+	require.Equal(t, int64(30), compacted[1].TrafficUp)
+	require.Equal(t, int64(20), compacted[1].TrafficDown)
+
+	up, down, err := sumLegacyTrafficDeltas(db, client.UUID, clearedAt, compactionNow)
+	require.NoError(t, err)
+	require.Equal(t, int64(30), up)
+	require.Equal(t, int64(20), down)
+
+	historyCutoff := slot.Add(24 * time.Hour)
+	require.NoError(t, deleteLegacyRecordsBefore(db, historyCutoff, historyCutoff))
+
+	var updated models.Client
+	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
+	require.Equal(t, int64(30), updated.TrafficCarryUp)
+	require.Equal(t, int64(20), updated.TrafficCarryDown)
+
+	up, down, err = sumLegacyTrafficDeltas(db, client.UUID, clearedAt, historyCutoff)
+	require.NoError(t, err)
+	require.Zero(t, up)
+	require.Zero(t, down)
+	require.Equal(t, int64(50), up+down+updated.TrafficCarryUp+updated.TrafficCarryDown)
+}
+
+func TestCompactionRepairsZeroDeltaFromStrictClearBaseline(t *testing.T) {
+	clearedAt := time.Date(2026, 7, 28, 12, 7, 30, 0, time.UTC)
+	records := []models.Record{{
+		Client:       "strict-clear-repair",
+		Time:         models.FromTime(clearedAt.Add(time.Minute)),
+		NetTotalUp:   1_025,
+		NetTotalDown: 2_040,
+	}}
+	previous := map[string]*models.Record{
+		"strict-clear-repair": {
+			Client:       "strict-clear-repair",
+			Time:         models.FromTime(clearedAt.Add(-time.Minute)),
+			NetTotalUp:   900,
+			NetTotalDown: 1_900,
+		},
+	}
+	baselines := map[string]trafficClearBaseline{
+		"strict-clear-repair": {
+			At:   clearedAt,
+			Up:   1_000,
+			Down: 2_000,
+		},
+	}
+
+	repairZeroTrafficDeltasWithBaselines(records, previous, baselines)
+	require.Equal(t, int64(25), records[0].TrafficUp)
+	require.Equal(t, int64(40), records[0].TrafficDown)
+}
+
 func TestRepairZeroTrafficDeltasPreservesRawResetDetailBeforeCompaction(t *testing.T) {
 	loc := models.GetAppLocation()
 	start := time.Date(2026, 6, 6, 0, 0, 0, 0, loc)

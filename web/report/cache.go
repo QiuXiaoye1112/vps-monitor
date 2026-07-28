@@ -263,6 +263,9 @@ func fillTrafficDeltas(db *gorm.DB, records []models.Record, trafficByRecord map
 		if err != nil {
 			return fmt.Errorf("load previous traffic records before %s: %w", before.Format(time.RFC3339), err)
 		}
+		if err := applyTrafficClearBaselines(db, clientUUIDs, before, previousByClient); err != nil {
+			return fmt.Errorf("load traffic clear baselines before %s: %w", before.Format(time.RFC3339), err)
+		}
 
 		for _, index := range indexes {
 			key := recordDedupKey(records[index])
@@ -316,16 +319,24 @@ func fillTrafficDeltasFromMetricStore(records []models.Record, trafficByRecord m
 		if err != nil {
 			return fmt.Errorf("load previous traffic from metric store before %s: %w", before.Format(time.RFC3339), err)
 		}
+		previousByClient := make(map[string]previousTrafficRecord, len(baseline))
+		for clientUUID, base := range baseline {
+			previousByClient[clientUUID] = previousTrafficRecord{
+				Client:       base.Client,
+				Time:         base.Time,
+				NetTotalUp:   base.NetTotalUp,
+				NetTotalDown: base.NetTotalDown,
+			}
+		}
+		if err := applyTrafficClearBaselines(dbcore.GetDBInstance(), clientUUIDs, before, previousByClient); err != nil {
+			return fmt.Errorf("load traffic clear baselines before %s: %w", before.Format(time.RFC3339), err)
+		}
 
 		for _, index := range indexes {
 			var prev *previousTrafficRecord
-			if base, ok := baseline[records[index].Client]; ok {
-				prev = &previousTrafficRecord{
-					Client:       base.Client,
-					Time:         base.Time,
-					NetTotalUp:   base.NetTotalUp,
-					NetTotalDown: base.NetTotalDown,
-				}
+			if base, ok := previousByClient[records[index].Client]; ok {
+				baseCopy := base
+				prev = &baseCopy
 			}
 
 			key := recordDedupKey(records[index])
@@ -342,6 +353,46 @@ func fillTrafficDeltasFromMetricStore(records []models.Record, trafficByRecord m
 		}
 	}
 
+	return nil
+}
+
+func applyTrafficClearBaselines(
+	db *gorm.DB,
+	clientUUIDs []string,
+	before time.Time,
+	previousByClient map[string]previousTrafficRecord,
+) error {
+	if len(clientUUIDs) == 0 {
+		return nil
+	}
+	if !db.Migrator().HasTable(&models.Client{}) {
+		return nil
+	}
+	var clientsWithBaseline []models.Client
+	if err := db.Select(
+		"uuid",
+		"traffic_cleared_at",
+		"traffic_baseline_up",
+		"traffic_baseline_down",
+	).Where("uuid IN ?", clientUUIDs).Find(&clientsWithBaseline).Error; err != nil {
+		return err
+	}
+	for _, client := range clientsWithBaseline {
+		clearedAt := client.TrafficClearedAt.ToTime()
+		if clearedAt.IsZero() || clearedAt.After(before) {
+			continue
+		}
+		previous, exists := previousByClient[client.UUID]
+		if exists && !clearedAt.After(previous.Time.ToTime()) {
+			continue
+		}
+		previousByClient[client.UUID] = previousTrafficRecord{
+			Client:       client.UUID,
+			Time:         client.TrafficClearedAt,
+			NetTotalUp:   client.TrafficBaselineUp,
+			NetTotalDown: client.TrafficBaselineDown,
+		}
+	}
 	return nil
 }
 

@@ -74,6 +74,36 @@ func TestSumLegacyTrafficDeltasUsesAllRawRowsWithoutArchive(t *testing.T) {
 	require.Equal(t, int64(120), down)
 }
 
+func TestTrafficAccountingStartUsesLatestManualClear(t *testing.T) {
+	windowStart := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	clearedAt := windowStart.Add(10 * 24 * time.Hour)
+
+	client := models.Client{TrafficClearedAt: models.FromTime(clearedAt)}
+	require.Equal(t, clearedAt, trafficAccountingStart(client, windowStart))
+
+	nextWindow := windowStart.AddDate(0, 1, 0)
+	require.Equal(t, nextWindow, trafficAccountingStart(client, nextWindow))
+}
+
+func TestTrafficWindowUsesConfiguredMinute(t *testing.T) {
+	loc := trafficLocation()
+	client := models.Client{
+		TrafficResetEnabled: true,
+		TrafficResetDay:     31,
+		TrafficResetHour:    9,
+		TrafficResetMinute:  45,
+	}
+	now := time.Date(2026, 4, 30, 9, 44, 0, 0, loc)
+
+	start, end := TrafficWindow(client, now)
+	require.Equal(t, time.Date(2026, 3, 31, 9, 45, 0, 0, loc), start)
+	require.Equal(t, time.Date(2026, 4, 30, 9, 45, 0, 0, loc), end)
+
+	start, end = TrafficWindow(client, end)
+	require.Equal(t, time.Date(2026, 4, 30, 9, 45, 0, 0, loc), start)
+	require.Equal(t, time.Date(2026, 5, 31, 9, 45, 0, 0, loc), end)
+}
+
 func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	db := newTrafficTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.Client{}))
@@ -104,6 +134,31 @@ func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	require.Equal(t, int64(0), updated.TrafficCarry)
 	require.Equal(t, int64(123), updated.TrafficCarryUp)
 	require.Equal(t, int64(456), updated.TrafficCarryDown)
+}
+
+func TestDeleteLegacyRecordsBeforeDoesNotRestoreManuallyClearedTraffic(t *testing.T) {
+	db := newTrafficTestDB(t)
+	require.NoError(t, db.AutoMigrate(&models.Client{}))
+	now := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+	historyCutoff := now.Add(-30 * 24 * time.Hour)
+	recordTime := time.Date(2026, 7, 21, 5, 0, 0, 0, time.UTC)
+	client := models.Client{
+		UUID:                "cleared-node",
+		TrafficResetEnabled: true,
+		TrafficResetDay:     21,
+		TrafficClearedAt:    models.FromTime(recordTime.Add(24 * time.Hour)),
+	}
+	require.NoError(t, db.Create(&client).Error)
+	require.NoError(t, db.Table("records_long_term").Create(&models.Record{
+		Client: client.UUID, Time: models.FromTime(recordTime),
+		TrafficUp: 123, TrafficDown: 456,
+	}).Error)
+
+	require.NoError(t, deleteLegacyRecordsBefore(db, historyCutoff, now))
+	var updated models.Client
+	require.NoError(t, db.Where("uuid = ?", client.UUID).First(&updated).Error)
+	require.Zero(t, updated.TrafficCarryUp)
+	require.Zero(t, updated.TrafficCarryDown)
 }
 
 func TestDeleteLegacyRecordsBeforeFoldsCumulativeLedgerWhenResetDisabled(t *testing.T) {
