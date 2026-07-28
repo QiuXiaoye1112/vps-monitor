@@ -1,7 +1,6 @@
 package records
 
 import (
-	"context"
 	"errors"
 	"log"
 	"sort"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/utils"
 )
@@ -20,12 +18,6 @@ import (
 const longTermRecordInterval = 15 * time.Minute
 
 func DeleteAll() error {
-	if metricstore.IsEnabled() {
-		if err := metricstore.DeleteAllRecords(context.Background()); err != nil {
-			return err
-		}
-		return DeleteAllHistory()
-	}
 	db := dbcore.GetDBInstance()
 	if err := db.Exec("DELETE FROM records_long_term").Error; err != nil {
 		return err
@@ -36,19 +28,13 @@ func DeleteAll() error {
 	return DeleteAllHistory()
 }
 
-// GetGPURecordsByClientAndTime 获取GPU记录数据（仅 metric store 启用时有数据）
+// GetGPURecordsByClientAndTime returns no history because the legacy GPU table
+// has been removed. Live GPU details still come from the latest Agent report.
 func GetGPURecordsByClientAndTime(uuid string, start, end time.Time) ([]models.GPURecord, error) {
-	if metricstore.IsEnabled() {
-		return metricstore.GetGPURecordsByClientAndTime(context.Background(), uuid, start, end)
-	}
-	// 传统 GPU 表已移除，未启用 metric store 时不再提供 GPU 历史数据
 	return []models.GPURecord{}, nil
 }
 
 func DeleteRecordBefore(before time.Time) error {
-	if metricstore.IsEnabled() {
-		return metricstore.DeleteRecordsBefore(context.Background(), before)
-	}
 	return deleteLegacyRecordsBefore(dbcore.GetDBInstance(), before, time.Now())
 }
 
@@ -120,9 +106,6 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 }
 
 func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Record, error) {
-	if metricstore.IsEnabled() {
-		return metricstore.GetRecordsByClientAndTime(context.Background(), uuid, start, end)
-	}
 	db := dbcore.GetDBInstance()
 	var records []models.Record
 
@@ -176,9 +159,6 @@ func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Reco
 
 // GetRecordsByTime 获取所有客户端在时间范围内的记录
 func GetRecordsByTime(start, end time.Time) ([]models.Record, error) {
-	if metricstore.IsEnabled() {
-		return metricstore.GetRecordsByTime(context.Background(), start, end)
-	}
 	db := dbcore.GetDBInstance()
 	fourHoursAgo := time.Now().Add(-4*time.Hour - time.Minute)
 
@@ -219,11 +199,8 @@ func GetRecordsByTime(start, end time.Time) ([]models.Record, error) {
 	return flat, nil
 }
 
-// 压缩数据库（metric store 启用时由 metric 包自行管理 rollup，无需压缩传统表）
+// CompactRecord compacts the primary SQLite history into 15-minute records.
 func CompactRecord() error {
-	if metricstore.IsEnabled() {
-		return nil
-	}
 	db := dbcore.GetDBInstance()
 	err := migrateOldRecords(db)
 	if err != nil {

@@ -12,14 +12,23 @@
 
 ## 当前任务
 
-- 状态：completed。
-- 目标：在现有节点详情页保留“系统状态、流量、Ping”，接入官方 `LoadChart` 的 CPU、内存、磁盘、网络、连接和进程历史图表，并在标题区展示最后上报时间与 IPv4/IPv6。
-- 来源：官方 `sanrokamlan-prog/komari-theme-Glassmorphism` v3.2.0 已导入的 `src/components/LoadChart.vue`，上游提交记录在 `UPSTREAM_COMMIT`。
-- 范围：只做节点详情页编排与生成主题产物同步；复用现有历史数据服务、实时刷新、时间范围和深色样式。
-- 不做：不加入硬件信息、系统信息、存储信息、网络信息卡；不改首页和 Ping 图表。
-- 验证结果：`web/theme-src/build-vps-theme.sh` 完整通过类型检查、lint 和生产构建并同步嵌入式主题；本地前端连接 `ded` 真实 API 后确认六个图表有数据，桌面端 3×2、390px 移动端单列且无横向溢出，“实时→4 小时”切换、首页↔详情页往返正常，控制台无错误，且未渲染图二的信息卡。
+- 状态：validation complete，等待发布与 `ded` 部署。
+- 目标：彻底删除未启用的 Metric Store 运行时代码与前端探测路径，并修复自动流量清零边界/并发覆盖和后台保存失败却提示成功的问题。
+- 范围：中心服务 Metric Store 包、启动/记录/Ping/GPU/历史查询分支、主题 metric 优先路径、Go 依赖；自动清零的读时边界与乐观并发保护；后台节点编辑严格 RPC 错误处理；生成主题同步、测试、发布与 `ded` 部署。
+- 数据边界：不迁移也不删除现有 SQLite 主库历史记录；旧 Metric Store 配置键只停止读取和返回，避免无关数据破坏。
+- 里程碑：Metric Store 删除属于 M5/M6 架构收敛；清零并发和后台错误反馈属于 M3/M6 正确性与可靠性修复。
+- 当前计划：清除 Metric Store -> 修复流量边界和并发 -> 修复后台保存反馈 -> 全量构建/测试/race -> 推送 GitHub -> 备份并更新 `ded`。
 
 ## 执行日志
+
+### 2026-07-29 Metric Store removal / traffic reset closure (M5/M6)
+
+- 删除 `database/metricstore`、`pkg/metric` 及 MySQL/PostgreSQL Metric Store 依赖；中心记录、Ping、流量、压缩、GPU 历史和节点删除路径统一只走主 SQLite 数据库。GPU 实时信息仍来自 Agent 最新上报，不再持久化独立 GPU 历史。
+- 删除主题的 metric definitions/query/stats 服务、series 工具和 Ping/LoadChart 优先探测路径；负载与 Ping 历史统一读取中心现有 records 接口，重新构建并同步嵌入式主题。
+- 自动清零边界改为读时立即屏蔽上周期补偿和内部结转，避免分钟任务尚未落库时短暂回流；定时落库使用 `updated_at` 乐观锁，避免覆盖并发后台编辑。
+- 节点保存仅在流量补偿数值真实变化时刷新补偿周期时间戳；普通编辑不再把上周期旧补偿重新标记为当前周期。
+- 后台编辑/新增节点改用严格 RPC；失败时保留弹窗、显示错误并恢复按钮，不再关闭弹窗后提示成功。
+- 验证：`go test ./...`、关键包 `go test -race`、`go vet ./...`、主题 type-check/lint/build、后台脚本语法、生成产物同步、`git diff --check` 和 Linux amd64 静态交叉编译均通过。
 
 ### 2026-07-25 authenticated node detail (M4)
 

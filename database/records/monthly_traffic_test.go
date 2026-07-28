@@ -104,6 +104,47 @@ func TestTrafficWindowUsesConfiguredMinute(t *testing.T) {
 	require.Equal(t, time.Date(2026, 5, 31, 9, 45, 0, 0, loc), end)
 }
 
+func TestTrafficAdjustmentsAreExcludedAtExactResetBoundary(t *testing.T) {
+	loc := trafficLocation()
+	client := models.Client{
+		TrafficResetEnabled: true,
+		TrafficResetDay:     31,
+		TrafficResetHour:    9,
+		TrafficResetMinute:  45,
+		TrafficComp:         500,
+		TrafficCarryUp:      100,
+		TrafficCarryDown:    200,
+		TrafficCompResetAt:  models.FromTime(time.Date(2026, 3, 31, 9, 45, 0, 0, loc)),
+		CreatedAt:           models.FromTime(time.Date(2026, 3, 1, 0, 0, 0, 0, loc)),
+	}
+	boundary := time.Date(2026, 4, 30, 9, 45, 0, 0, loc)
+	windowStart, _ := TrafficWindow(client, boundary)
+	compensation, carryUp, carryDown := trafficAdjustmentsForWindow(client, windowStart)
+	require.Zero(t, compensation)
+	require.Zero(t, carryUp)
+	require.Zero(t, carryDown)
+}
+
+func TestTrafficAdjustmentsChangedAfterBoundaryRemainCurrent(t *testing.T) {
+	loc := trafficLocation()
+	boundary := time.Date(2026, 4, 30, 9, 45, 0, 0, loc)
+	client := models.Client{
+		TrafficResetEnabled: true,
+		TrafficResetDay:     31,
+		TrafficResetHour:    9,
+		TrafficResetMinute:  45,
+		TrafficComp:         500,
+		TrafficCarryUp:      100,
+		TrafficCarryDown:    200,
+		TrafficCompResetAt:  models.FromTime(boundary.Add(time.Minute)),
+	}
+	windowStart, _ := TrafficWindow(client, boundary.Add(2*time.Minute))
+	compensation, carryUp, carryDown := trafficAdjustmentsForWindow(client, windowStart)
+	require.Equal(t, int64(500), compensation)
+	require.Equal(t, int64(100), carryUp)
+	require.Equal(t, int64(200), carryDown)
+}
+
 func TestDeleteLegacyRecordsBeforeFoldsCurrentBillingWindow(t *testing.T) {
 	db := newTrafficTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.Client{}))

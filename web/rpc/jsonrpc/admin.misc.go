@@ -17,6 +17,16 @@ import (
 // admin.misc.go
 // 杂项 admin RPC2 方法：会话管理、设置、客户端排序。
 
+var retiredMetricStoreSettingKeys = []string{
+	"metric_store_enabled",
+	"metric_db_driver",
+	"metric_db_dsn",
+	"metric_retention_days",
+	"metric_table_prefix",
+	"metric_max_open_conns",
+	"metric_max_idle_conns",
+}
+
 func parseUintKey(s string) (uint, error) {
 	v, err := strconv.ParseUint(s, 10, 64)
 	return uint(v), err
@@ -107,7 +117,9 @@ func adminGetSettings(_ context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonR
 	}
 	cst[config.RecordPreserveTimeKey] = config.DefaultRecordPreserveTime
 	cst[config.PingRecordPreserveTimeKey] = config.DefaultPingRecordPreserveTime
-	cst["metric_retention_days"] = 7
+	for _, key := range retiredMetricStoreSettingKeys {
+		delete(cst, key)
+	}
 	return cst, nil
 }
 
@@ -116,7 +128,7 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 	if err := req.BindParams(&cfg); err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing request body: "+err.Error(), nil)
 	}
-	for _, key := range []string{
+	for _, key := range append([]string{
 		"description",
 		"site_description",
 		"send_ip_addr_to_guest",
@@ -140,14 +152,7 @@ func adminEditSettings(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.
 		"cloudflared_enabled",
 		"notification",
 		"notification_enabled",
-		"metric_store_enabled",
-		"metric_db_driver",
-		"metric_db_dsn",
-		"metric_retention_days",
-		"metric_table_prefix",
-		"metric_max_open_conns",
-		"metric_max_idle_conns",
-	} {
+	}, retiredMetricStoreSettingKeys...) {
 		delete(cfg, key)
 	}
 	cfg[config.RecordPreserveTimeKey] = config.DefaultRecordPreserveTime

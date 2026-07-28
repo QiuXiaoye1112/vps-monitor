@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"gorm.io/gorm"
 )
@@ -23,15 +22,16 @@ type MonthlyTraffic struct {
 }
 
 func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic, error) {
-	start, end := TrafficWindow(client, now)
-	start = trafficAccountingStart(client, start)
+	windowStart, end := TrafficWindow(client, now)
+	start := trafficAccountingStart(client, windowStart)
 	up, down, err := sumTrafficDeltas(client.UUID, start, now)
 	if err != nil {
 		return MonthlyTraffic{}, err
 	}
 
-	raw := up + down + client.TrafficCarryUp + client.TrafficCarryDown
-	total := raw + client.TrafficComp
+	compensation, carryUp, carryDown := trafficAdjustmentsForWindow(client, windowStart)
+	raw := up + down + carryUp + carryDown
+	total := raw + compensation
 	if total < 0 {
 		total = 0
 	}
@@ -42,11 +42,33 @@ func CurrentMonthlyTraffic(client models.Client, now time.Time) (MonthlyTraffic,
 		Up:           up,
 		Down:         down,
 		RawTotal:     raw,
-		CarryUp:      client.TrafficCarryUp,
-		CarryDown:    client.TrafficCarryDown,
-		Compensation: client.TrafficComp,
+		CarryUp:      carryUp,
+		CarryDown:    carryDown,
+		Compensation: compensation,
 		Total:        total,
 	}, nil
+}
+
+// trafficAdjustmentsForWindow makes the configured reset boundary exact from
+// the reader's perspective. The minute scheduler still persists zeroes, but
+// stale compensation/carry from the previous window can never leak into the
+// new window while that scheduled write is pending.
+func trafficAdjustmentsForWindow(client models.Client, windowStart time.Time) (compensation, carryUp, carryDown int64) {
+	compensation = client.TrafficComp
+	carryUp = client.TrafficCarryUp
+	carryDown = client.TrafficCarryDown
+	if !client.TrafficResetEnabled || windowStart.IsZero() {
+		return
+	}
+
+	resetAt := client.TrafficCompResetAt.ToTime()
+	if resetAt.IsZero() {
+		resetAt = client.CreatedAt.ToTime()
+	}
+	if resetAt.Before(windowStart) {
+		return 0, 0, 0
+	}
+	return
 }
 
 func trafficAccountingStart(client models.Client, windowStart time.Time) time.Time {
@@ -118,23 +140,6 @@ func trafficLocation() *time.Location {
 }
 
 func sumTrafficDeltas(uuid string, start, end time.Time) (int64, int64, error) {
-	if metricstore.IsEnabled() {
-		recs, err := GetRecordsByClientAndTime(uuid, start, end)
-		if err != nil {
-			return 0, 0, err
-		}
-		var up, down int64
-		for _, rec := range recs {
-			if rec.TrafficUp > 0 {
-				up += rec.TrafficUp
-			}
-			if rec.TrafficDown > 0 {
-				down += rec.TrafficDown
-			}
-		}
-		return up, down, nil
-	}
-
 	return sumLegacyTrafficDeltas(dbcore.GetDBInstance(), uuid, start, end)
 }
 

@@ -1,12 +1,10 @@
 package tasks
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/utils"
 	"gorm.io/gorm"
@@ -314,17 +312,11 @@ func UpdatePingTaskOrder(order map[uint]int) error {
 }
 
 func SavePingRecord(record models.PingRecord) error {
-	if metricstore.IsEnabled() {
-		return metricstore.WritePingRecord(context.Background(), record)
-	}
 	db := dbcore.GetDBInstance()
 	return db.Create(&record).Error
 }
 
 func DeletePingRecordsBefore(time time.Time) error {
-	if metricstore.IsEnabled() {
-		return metricstore.DeletePingRecordsBefore(context.Background(), time)
-	}
 	db := dbcore.GetDBInstance()
 	err := db.Where("time < ?", time).Delete(&models.PingRecord{}).Error
 	return err
@@ -340,9 +332,6 @@ func DeletePingRecords(id []uint) error {
 }
 
 func DeleteAllPingRecords() error {
-	if metricstore.IsEnabled() {
-		return metricstore.DeleteAllPingRecords(context.Background())
-	}
 	db := dbcore.GetDBInstance()
 	result := db.Exec("DELETE FROM ping_records")
 	if result.RowsAffected == 0 {
@@ -360,9 +349,6 @@ func ReloadPingSchedule() error {
 }
 
 func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
-	if metricstore.IsEnabled() {
-		return metricstore.GetPingRecords(context.Background(), uuid, taskId, start, end)
-	}
 	db := dbcore.GetDBInstance()
 	var records []models.PingRecord
 	dbQuery := db.Model(&models.PingRecord{})

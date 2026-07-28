@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { ChartDashboardCardKey } from '@/stores/app'
-import type { NormalizedMetricSeries } from '@/utils/metricSeries'
 import type { RecordFormat } from '@/utils/recordHelper'
-import type { MetricQueryParams, MetricSeries, PingTaskInfo, StatusRecord } from '@/utils/rpc'
+import type { StatusRecord } from '@/utils/rpc'
 import { Icon } from '@iconify/vue'
 import { useIntervalFn } from '@vueuse/core'
 import dayjs from 'dayjs'
@@ -19,12 +18,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNodeLoadStats } from '@/composables/useNodeLoadStats'
 import { LOAD_RECORD_MAX_COUNT } from '@/constants/load'
 import { normalizeStatusRecordsPayload } from '@/services/history.service'
-import { loadMetricDefinitions, loadPublicPingTasks, queryMetrics } from '@/services/metrics.service'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { getChartSeriesPalette, getLoadChartPalette } from '@/utils/chartPalette'
 import { formatBytes, formatBytesSplit } from '@/utils/helper'
-import { metricTags, normalizeMetricSeriesList } from '@/utils/metricSeries'
 import { getSharedRpc } from '@/utils/rpc'
 import '@/utils/echarts' // 共享 ECharts 配置
 
@@ -53,38 +50,7 @@ watchEffect(() => {
   Object.assign(chartColors, getLoadChartPalette(appStore.colorVisionFriendly))
 })
 
-const LOAD_METRIC_KEYS = [
-  'cpu.usage',
-  'load.average',
-  'memory.used',
-  'memory.total',
-  'swap.used',
-  'swap.total',
-  'temperature',
-  'disk.used',
-  'disk.total',
-  'net.in.rate',
-  'net.out.rate',
-  'net.total.down',
-  'net.total.up',
-  'traffic.down',
-  'traffic.up',
-  'process.count',
-  'connections.tcp',
-  'connections.udp',
-  'gpu.usage',
-  'gpu.device.usage',
-  'gpu.memory.used',
-  'gpu.memory.total',
-  'gpu.temperature',
-  'ping.latency_ms',
-  'ping.loss',
-] as const
-
 const CUSTOM_VIEW_LABEL = '自定义'
-const PING_METRIC_KEYS = ['ping.latency_ms', 'ping.loss'] as const
-const METRIC_HISTORY_MAX_POINTS = 700
-const REALTIME_METRIC_REFRESH_MS = 30_000
 
 interface MetricChartSeriesData {
   name: string
@@ -93,8 +59,6 @@ interface MetricChartSeriesData {
   data: Array<[string, number | null]>
   dashed?: boolean
 }
-
-type LoadMetricKey = typeof LOAD_METRIC_KEYS[number]
 
 interface CustomRange {
   start: dayjs.Dayjs
@@ -229,14 +193,9 @@ const effectiveHistoryHours = computed(() => isCustomRange.value ? customRange.v
 
 // 数据状态
 const remoteData = shallowRef<StatusRecord[]>([])
-const metricData = shallowRef<RecordFormat[] | null>(null)
-const rawMetricSeries = shallowRef<NormalizedMetricSeries[]>([])
-const availableMetricKeys = shallowRef<Set<string>>(new Set())
-const pingTasks = shallowRef<PingTaskInfo[]>([])
 const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
-let lastRealtimeMetricFetchAt = 0
 let fetchInFlight = false
 let pendingVisibleFetch = false
 
@@ -355,180 +314,6 @@ function metricValue(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function getMetricDeviceKey(series: MetricSeries): string {
-  const tags = metricTags(series)
-  const index = tags.device_index ?? tags.gpu_index ?? tags.index
-  const name = tags.device_name ?? tags.gpu_name ?? tags.name
-  return String(index ?? name ?? '0')
-}
-
-function getMetricDeviceIndex(series: MetricSeries): number {
-  const tags = metricTags(series)
-  const rawIndex = tags.device_index ?? tags.gpu_index ?? tags.index
-  const numericIndex = Number(rawIndex)
-  return Number.isFinite(numericIndex) ? numericIndex : Math.abs(getMetricDeviceKey(series).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0))
-}
-
-function getMetricDeviceName(series: MetricSeries): string | undefined {
-  const tags = metricTags(series)
-  const name = tags.device_name ?? tags.gpu_name ?? tags.name
-  return typeof name === 'string' && name.trim() ? name.trim() : undefined
-}
-
-function ensureMetricRow(rows: Map<string, RecordFormat>, time: string): RecordFormat {
-  const existing = rows.get(time)
-  if (existing)
-    return existing
-
-  const node = nodeInfo.value
-  const row: RecordFormat = {
-    client: props.uuid,
-    time,
-    cpu: null,
-    gpu: null,
-    gpu_usage: null,
-    gpu_memory: null,
-    ram: null,
-    ram_total: node?.mem_total ?? null,
-    swap: null,
-    swap_total: node?.swap_total ?? null,
-    load: null,
-    temp: null,
-    disk: null,
-    disk_total: node?.disk_total ?? null,
-    net_in: null,
-    net_out: null,
-    net_total_up: null,
-    net_total_down: null,
-    traffic_up: null,
-    traffic_down: null,
-    process: null,
-    connections: null,
-    connections_udp: null,
-  }
-  rows.set(time, row)
-  return row
-}
-
-function applyMetricPoint(row: RecordFormat, key: LoadMetricKey, value: number | null, series: MetricSeries): void {
-  switch (key) {
-    case 'cpu.usage':
-      row.cpu = value
-      break
-    case 'load.average':
-      row.load = value
-      break
-    case 'memory.used':
-      row.ram = value
-      break
-    case 'memory.total':
-      row.ram_total = value
-      break
-    case 'swap.used':
-      row.swap = value
-      break
-    case 'swap.total':
-      row.swap_total = value
-      break
-    case 'temperature':
-      row.temp = value
-      break
-    case 'disk.used':
-      row.disk = value
-      break
-    case 'disk.total':
-      row.disk_total = value
-      break
-    case 'net.in.rate':
-      row.net_in = value
-      break
-    case 'net.out.rate':
-      row.net_out = value
-      break
-    case 'net.total.down':
-      row.net_total_down = value
-      break
-    case 'net.total.up':
-      row.net_total_up = value
-      break
-    case 'traffic.down':
-      row.traffic_down = value
-      break
-    case 'traffic.up':
-      row.traffic_up = value
-      break
-    case 'process.count':
-      row.process = value
-      break
-    case 'connections.tcp':
-      row.connections = value
-      break
-    case 'connections.udp':
-      row.connections_udp = value
-      break
-    case 'gpu.usage':
-      row.gpu = value
-      row.gpu_usage = value
-      break
-    case 'gpu.device.usage': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].usage = value
-      row.gpu_usage = row.gpu_usage ?? value
-      row.gpu = row.gpu ?? value
-      break
-    }
-    case 'gpu.memory.used': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].mem_used = value ?? undefined
-      row.gpu_memory = row.gpu_memory ?? value
-      break
-    }
-    case 'gpu.memory.total': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].mem_total = value ?? undefined
-      break
-    }
-    case 'gpu.temperature': {
-      const deviceIndex = getMetricDeviceIndex(series)
-      row.gpu_detailed ??= {}
-      row.gpu_detailed[deviceIndex] ??= { usage: null, memory: null, temperature: null, device_index: deviceIndex, device_name: getMetricDeviceName(series) }
-      row.gpu_detailed[deviceIndex].temperature = value
-      break
-    }
-  }
-}
-
-function finalizeGpuRows(rows: RecordFormat[]): RecordFormat[] {
-  for (const row of rows) {
-    if (!row.gpu_detailed)
-      continue
-
-    const usages: number[] = []
-    const memories: number[] = []
-    for (const detail of Object.values(row.gpu_detailed)) {
-      if (detail.mem_used != null && detail.mem_total && detail.mem_total > 0)
-        detail.memory = detail.mem_used / detail.mem_total * 100
-      if (typeof detail.usage === 'number' && Number.isFinite(detail.usage))
-        usages.push(detail.usage)
-      if (typeof detail.memory === 'number' && Number.isFinite(detail.memory))
-        memories.push(detail.memory)
-    }
-
-    if (row.gpu_usage == null && usages.length)
-      row.gpu_usage = usages.reduce((sum, value) => sum + value, 0) / usages.length
-    row.gpu ??= row.gpu_usage
-    if (row.gpu_memory == null && memories.length)
-      row.gpu_memory = memories.reduce((sum, value) => sum + value, 0) / memories.length
-  }
-  return rows
-}
-
 function getGpuDeviceNames(record: RecordFormat | null): string {
   if (!record?.gpu_detailed)
     return nodeInfo.value?.gpu_name || ''
@@ -538,117 +323,9 @@ function getGpuDeviceNames(record: RecordFormat | null): string {
     .join(' / ')
 }
 
-function metricSeriesToRecordFormat(seriesList: MetricSeries[]): RecordFormat[] {
-  const rows = new Map<string, RecordFormat>()
-  const normalizedSeriesList = normalizeMetricSeriesList(seriesList)
-
-  for (const series of normalizedSeriesList) {
-    if (!LOAD_METRIC_KEYS.includes(series.metric_key as LoadMetricKey))
-      continue
-
-    const key = series.metric_key as LoadMetricKey
-    if (key === 'ping.latency_ms' || key === 'ping.loss')
-      continue
-
-    for (const point of series.points) {
-      const row = ensureMetricRow(rows, point.time)
-      applyMetricPoint(row, key, metricValue(point.value), series)
-    }
-  }
-
-  return finalizeGpuRows([...rows.values()].sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf()))
-}
-
-interface MetricHistoryData {
-  records: RecordFormat[]
-  series: NormalizedMetricSeries[]
-}
-
-async function loadMetricCatalog(): Promise<void> {
-  const [definitions, tasks] = await Promise.all([
-    loadMetricDefinitions().catch(() => []),
-    loadPublicPingTasks().catch(() => []),
-  ])
-  availableMetricKeys.value = new Set(definitions.map(definition => definition.name))
-  pingTasks.value = tasks
-}
-
-async function loadMetricHistoryRecords(params: Pick<MetricQueryParams, 'hours' | 'start' | 'end'>): Promise<MetricHistoryData | null> {
-  const definitions = await loadMetricDefinitions()
-  const availableKeys = new Set(definitions.map(definition => definition.name))
-  availableMetricKeys.value = availableKeys
-  const metricKeys = LOAD_METRIC_KEYS.filter(key => availableKeys.has(key))
-  if (!metricKeys.length)
-    return null
-
-  const result = await queryMetrics({
-    metric_keys: metricKeys,
-    entity_id: props.uuid,
-    ...params,
-    downsample: true,
-    fill_empty: true,
-    max_points: METRIC_HISTORY_MAX_POINTS,
-    aggregation: 'avg',
-  })
-
-  const series = normalizeMetricSeriesList(result.series)
-  if (!series.some(item => item.points.length > 0))
-    return null
-
-  return {
-    records: metricSeriesToRecordFormat(result.series),
-    series,
-  }
-}
-
-async function refreshRealtimeMetricSeries(force = false): Promise<void> {
-  const cards = appStore.chartDashboardTemplate.cards
-  if (!cards.includes('ping') && !cards.includes('pingLoss')) {
-    rawMetricSeries.value = []
-    return
-  }
-
-  const now = Date.now()
-  if (!force && now - lastRealtimeMetricFetchAt < REALTIME_METRIC_REFRESH_MS)
-    return
-  lastRealtimeMetricFetchAt = now
-  const requestedUuid = props.uuid
-
-  try {
-    if (!availableMetricKeys.value.size)
-      await loadMetricCatalog()
-
-    const metricKeys = PING_METRIC_KEYS.filter(key => availableMetricKeys.value.has(key))
-    if (!metricKeys.length) {
-      rawMetricSeries.value = []
-      return
-    }
-
-    const result = await queryMetrics({
-      metric_keys: [...metricKeys],
-      entity_id: props.uuid,
-      hours: 1,
-      downsample: true,
-      fill_empty: true,
-      max_points: 150,
-      aggregation: 'avg',
-    })
-    if (!isRealtime.value || props.uuid !== requestedUuid)
-      return
-    rawMetricSeries.value = normalizeMetricSeriesList(result.series)
-  }
-  catch {
-    if (isRealtime.value && props.uuid === requestedUuid)
-      rawMetricSeries.value = []
-  }
-}
-
 async function fetchRecentData() {
   if (!props.uuid)
     return
-
-  metricData.value = null
-  void refreshRealtimeMetricSeries()
 
   // 只在首次加载时显示 loading
   if (isInitialLoad.value) {
@@ -678,8 +355,6 @@ async function fetchHistoryData(silent = false) {
     return
 
   if (isCustomRange.value && !customRange.value) {
-    metricData.value = null
-    rawMetricSeries.value = []
     remoteData.value = []
     error.value = customRangeError.value || '请选择有效的自定义时间范围'
     return
@@ -687,9 +362,6 @@ async function fetchHistoryData(silent = false) {
 
   const range = customRange.value
   const hours = effectiveHistoryHours.value
-  const metricParams: Pick<MetricQueryParams, 'hours' | 'start' | 'end'> = isCustomRange.value && range
-    ? { start: range.start.toDate().toISOString(), end: range.end.toDate().toISOString() }
-    : { hours }
 
   if (!silent)
     loading.value = true
@@ -704,20 +376,13 @@ async function fetchHistoryData(silent = false) {
           maxCount: LOAD_RECORD_MAX_COUNT,
         }
       : { uuid: props.uuid, hours, maxCount: LOAD_RECORD_MAX_COUNT }
-    const [historyResult, metricHistory] = await Promise.all([
-      rpc.getLoadRecordsRange(loadParams),
-      loadMetricHistoryRecords(metricParams).catch(() => null),
-    ])
-    metricData.value = null
+    const historyResult = await rpc.getLoadRecordsRange(loadParams)
     remoteData.value = normalizeStatusRecordsPayload(historyResult.records)
     updateObservedReportInterval(remoteData.value)
-    rawMetricSeries.value = metricHistory?.series ?? []
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
     remoteData.value = []
-    metricData.value = null
-    rawMetricSeries.value = []
   }
   finally {
     if (!silent)
@@ -752,8 +417,7 @@ async function fetchData(silent = false) {
 // ==================== 数据处理 ====================
 
 const chartData = computed(() => {
-  const data = metricData.value ?? statusToRecordFormat(remoteData.value)
-  return data
+  return statusToRecordFormat(remoteData.value)
 })
 
 const latestStatus = computed(() => {
@@ -765,13 +429,11 @@ const latestStatus = computed(() => {
 
 const hasGpuData = computed(() => chartData.value.some(record => record.gpu != null || record.gpu_usage != null || record.gpu_memory != null || record.gpu_detailed))
 
-const metricSeriesColors = reactive(getChartSeriesPalette(appStore.colorVisionFriendly))
+const detailSeriesColors = reactive(getChartSeriesPalette(appStore.colorVisionFriendly))
 
 watchEffect(() => {
-  metricSeriesColors.splice(0, metricSeriesColors.length, ...getChartSeriesPalette(appStore.colorVisionFriendly))
+  detailSeriesColors.splice(0, detailSeriesColors.length, ...getChartSeriesPalette(appStore.colorVisionFriendly))
 })
-
-const pingTaskNameMap = computed(() => new Map(pingTasks.value.map(task => [String(task.id), task.name])))
 
 function seriesHasData(series: MetricChartSeriesData): boolean {
   return series.data.some(([, value]) => value !== null && Number.isFinite(value))
@@ -816,13 +478,13 @@ const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
 const gpuMemoryChartSeries = computed<MetricChartSeriesData[]>(() => gpuDeviceEntries().flatMap((device, index) => {
   const used = recordMetricSeries(
     `${device.name} 已用`,
-    metricSeriesColors[index * 2 % metricSeriesColors.length]!,
+    detailSeriesColors[index * 2 % detailSeriesColors.length]!,
     'bytes',
     record => record.gpu_detailed?.[device.index]?.mem_used,
   )
   const total = recordMetricSeries(
     `${device.name} 总量`,
-    metricSeriesColors[(index * 2 + 1) % metricSeriesColors.length]!,
+    detailSeriesColors[(index * 2 + 1) % detailSeriesColors.length]!,
     'bytes',
     record => record.gpu_detailed?.[device.index]?.mem_total,
     true,
@@ -835,7 +497,7 @@ const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => {
   if (appStore.gpuChartEnabled) {
     series.push(...gpuDeviceEntries().map((device, index) => recordMetricSeries(
       `${device.name} 温度`,
-      metricSeriesColors[index % metricSeriesColors.length]!,
+      detailSeriesColors[index % detailSeriesColors.length]!,
       'temperature',
       record => record.gpu_detailed?.[device.index]?.temperature,
     )))
@@ -843,37 +505,9 @@ const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => {
   return series.filter(seriesHasData)
 })
 
-function pingSeries(metricKey: 'ping.latency_ms' | 'ping.loss'): MetricChartSeriesData[] {
-  return rawMetricSeries.value
-    .filter(series => series.metric_key === metricKey)
-    .map<MetricChartSeriesData>((series, index) => {
-      const tags = metricTags(series)
-      const taskId = String(tags.task_id ?? tags.task ?? '')
-      const taskName = pingTaskNameMap.value.get(taskId) || (taskId ? `任务 ${taskId}` : `Ping ${index + 1}`)
-      return {
-        name: taskName,
-        color: metricSeriesColors[index % metricSeriesColors.length]!,
-        kind: metricKey === 'ping.loss' ? 'percent' : 'milliseconds',
-        dashed: appStore.colorVisionFriendly && index % 2 === 1,
-        data: series.points.map(point => [
-          point.time,
-          point.value === null || !Number.isFinite(point.value)
-            ? null
-            : metricKey === 'ping.loss' ? point.value * 100 : point.value,
-        ] as [string, number | null]),
-      }
-    })
-    .filter(seriesHasData)
-}
-
-const pingChartSeries = computed<MetricChartSeriesData[]>(() => pingSeries('ping.latency_ms'))
-const pingLossChartSeries = computed<MetricChartSeriesData[]>(() => pingSeries('ping.loss'))
-
 const hasTrafficData = computed(() => trafficChartSeries.value.length > 0)
 const hasGpuMemoryData = computed(() => gpuMemoryChartSeries.value.length > 0)
 const hasTemperatureData = computed(() => temperatureChartSeries.value.length > 0)
-const hasPingData = computed(() => pingChartSeries.value.length > 0)
-const hasPingLossData = computed(() => pingLossChartSeries.value.length > 0)
 
 // ==================== 工具函数 ====================
 
@@ -1293,7 +927,7 @@ const gpuDeviceUsageEChartSeries = computed(() => gpuDeviceEntries().map((device
   lineStyle: {
     width: 1.2,
     type: 'dashed' as const,
-    color: metricSeriesColors[index % metricSeriesColors.length]!,
+    color: detailSeriesColors[index % detailSeriesColors.length]!,
     cap: 'round' as const,
   },
 })).filter(series => series.data.some(value => value !== null)))
@@ -1393,10 +1027,6 @@ function isChartCardEnabled(key: ChartDashboardCardKey): boolean {
       return hasTrafficData.value
     case 'temperature':
       return hasTemperatureData.value
-    case 'ping':
-      return hasPingData.value
-    case 'pingLoss':
-      return hasPingLossData.value
     default:
       return true
   }
@@ -1624,23 +1254,12 @@ watch(selectedView, () => {
 
 watch(() => props.uuid, () => {
   remoteData.value = []
-  metricData.value = null
-  rawMetricSeries.value = []
   observedReportIntervalSeconds.value = null
-  lastRealtimeMetricFetchAt = 0
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
 })
 
-watch(chartDashboardCards, () => {
-  if (isRealtime.value) {
-    lastRealtimeMetricFetchAt = 0
-    void refreshRealtimeMetricSeries(true)
-  }
-})
-
 onMounted(() => {
-  void loadMetricCatalog()
   fetchData()
 })
 </script>
@@ -1826,25 +1445,6 @@ onMounted(() => {
             <VChart :option="processChartOption" autoresize />
           </div>
         </CardX>
-
-        <MetricSeriesChartCard
-          v-if="isChartCardEnabled('ping')"
-          title="Ping 延迟"
-          icon="tabler:radar"
-          tone="cyan"
-          :series="pingChartSeries"
-          :order="getChartCardOrder('ping')"
-        />
-
-        <MetricSeriesChartCard
-          v-if="isChartCardEnabled('pingLoss')"
-          title="Ping 丢包"
-          icon="tabler:cloud-exclamation"
-          tone="rose"
-          :series="pingLossChartSeries"
-          :order="getChartCardOrder('pingLoss')"
-          percent-scale
-        />
       </div>
     </div>
 

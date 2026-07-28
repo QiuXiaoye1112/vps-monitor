@@ -35,16 +35,16 @@
 
 ## 🚀 项目定位
 
-| 项目     | 说明                                                      |
-| :------- | :-------------------------------------------------------- |
-| 当前版本 | **v3.2.0**                                                |
-| 主题定位 | Komari Monitor 可导入 zip 主题，不是普通 Web App 部署包   |
-| 视觉风格 | 毛玻璃卡片、动态背景、手动浅色 / 深色模式                 |
-| 数据能力 | Metric Store 优先，旧接口自动 fallback，兼容 Komari 1.2.x |
-| 高级工具 | 拓扑、性价比、健康摘要、快照导出、访客安全审计            |
-| 发布产物 | `komari-theme-Glassmorphism-build-<short-sha>.zip`        |
+| 项目     | 说明                                                        |
+| :------- | :---------------------------------------------------------- |
+| 当前版本 | **v3.2.0**                                                  |
+| 主题定位 | Komari Monitor 可导入 zip 主题，不是普通 Web App 部署包     |
+| 视觉风格 | 毛玻璃卡片、动态背景、手动浅色 / 深色模式                   |
+| 数据能力 | 直接读取中心 SQLite 历史记录与 Ping 记录，兼容 Komari 1.2.x |
+| 高级工具 | 拓扑、性价比、健康摘要、快照导出、访客安全审计              |
+| 发布产物 | `komari-theme-Glassmorphism-build-<short-sha>.zip`          |
 
-> 好看只是外壳。v3 真正的重点，是把 Metric、Ping、流量、费用、健康分析和运维工具整合成日常真的会打开来看的监控面板。
+> 好看只是外壳。v3 真正的重点，是把负载、Ping、流量、费用、健康分析和运维工具整合成日常真的会打开来看的监控面板。
 
 ---
 
@@ -123,7 +123,7 @@
 
 `v3.1.4` 修复首页节点卡的丢包时间格被整段平均值覆盖、导致所有格子同值同色的问题。
 
-右侧汇总仍显示整个统计周期的平均丢包率；每个时间格改为读取 Metric Store 的 `ping.loss` 分时序列，并按各 Ping 任务的实际样本数加权。空桶继续显示为无数据，旧版 Komari 的 records 负值丢包逻辑仍作为 fallback 保留。
+右侧汇总仍显示整个统计周期的平均丢包率；每个时间格按 Ping 历史记录中的实际样本计算，负值继续作为丢包哨兵，空桶显示为无数据。
 
 ---
 
@@ -212,35 +212,14 @@
 | Network    | 实时速率、累计流量、连接与 Ping 分析 |
 | GPU        | GPU 利用率、设备、显存与温度         |
 | Operations | 资源、连接、进程、温度与网络质量     |
-| Full       | 覆盖完整官方 Metric 能力             |
+| Full       | 展示全部可用负载与网络图表           |
 | Custom     | 自己决定卡片和图表顺序               |
 
 ---
 
-## 📈 Metric 接口升级
+## 📈 历史数据接口
 
-新版接口优先，旧版 Komari 后端继续保持兼容。
-
-```text
-新版 Metric API 有效
-        ↓
-public:queryMetrics / public:getPingMetricStats
-        ↓
-无数据或接口不可用
-        ↓
-common:getRecords / legacy records fallback
-        ↓
-保持图表与 Ping 正常展示
-```
-
-| 项目                        | 状态                |
-| :-------------------------- | :------------------ |
-| `public:queryMetrics`       | ✅ 优先使用         |
-| `public:getPingMetricStats` | ✅ 优先使用         |
-| `common:getRecords`         | ✅ 自动 fallback    |
-| 自定义 `start` / `end`      | ✅                  |
-| Metric `null` 断点          | ✅ 保留，不误判丢包 |
-| 旧接口负值丢包哨兵          | ✅ 兼容             |
+负载图直接读取中心服务的 `common:getRecords` 历史记录，Ping 图读取 Ping 历史记录；自定义时间范围会在服务端可用的保留时长内回溯并在前端裁剪。Ping 负值继续按丢包处理，空时间桶不伪造样本。
 
 ---
 
@@ -308,7 +287,7 @@ API / RPC
 - [x] 请求去重与并发限制
 - [x] 超时、重试和 Abort 清理
 - [x] TTL / LRU-like / 引用计数缓存
-- [x] Metric Store 优先与旧接口 fallback
+- [x] SQLite 历史记录与 Ping 记录共享数据流
 - [x] 共享 Ping / 负载历史数据流
 - [x] 登录权限与敏感操作校验
 - [x] Vue 响应式节点索引和实时更新
@@ -486,10 +465,9 @@ dist/
 <details>
 <summary><strong>v3.1.4 · 首页分时丢包修复</strong></summary>
 
-- 首页 Metric Store 查询同时读取 `ping.latency_ms` 与 `ping.loss`
-- 每个丢包时间格按对应时间桶和 point `count` 加权计算，不再复用整段平均值
-- `null` 空桶保持无数据，周期平均丢包文字继续使用精确汇总统计
-- Metric 分时丢包数据不完整时自动回退旧 records 负值丢包逻辑
+- 每个丢包时间格按对应时间桶中的实际 Ping 样本计算，不再复用整段平均值
+- 空桶保持无数据，周期平均丢包文字继续使用完整记录汇总
+- 历史记录负值按丢包处理
 
 </details>
 

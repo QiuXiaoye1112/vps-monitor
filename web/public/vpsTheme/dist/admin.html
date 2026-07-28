@@ -2047,6 +2047,7 @@
         editForm.onsubmit = async function (e) {
           e.preventDefault();
           var f = new FormData(e.target);
+          var submitButton = e.target.querySelector('button[type="submit"]');
           var compGB = parseFloat(f.get("traffic_compensation")) || 0;
           var data = {
             uuid: uuid,
@@ -2064,10 +2065,25 @@
             traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
             ping_task_order: collectNodePingOrder(e.target),
           };
-          await RPC("admin:editClient", data);
-          closeModal(id);
-          toast("已保存");
-          navigate("dashboard");
+          submitButton.disabled = true;
+          submitButton.textContent = "保存中…";
+          try {
+            await RPCStrict("admin:editClient", data);
+            closeModal(id);
+            toast("已保存");
+            navigate("dashboard");
+          } catch (err) {
+            toast(
+              "保存失败：" +
+                (err && err.message ? err.message : "请稍后重试"),
+              "error",
+            );
+          } finally {
+            if (submitButton.isConnected) {
+              submitButton.disabled = false;
+              submitButton.textContent = "保存";
+            }
+          }
         };
       }
 
@@ -2519,6 +2535,9 @@
             addForm.onsubmit = async function (e) {
               e.preventDefault();
               var f = new FormData(e.target);
+              var submitButton = e.target.querySelector(
+                'button[type="submit"]',
+              );
               var compGB = parseFloat(f.get("traffic_compensation")) || 0;
               var data = {
                 name: f.get("name"),
@@ -2537,28 +2556,43 @@
                   f.get("traffic_reset_enabled") === "true",
                 ping_task_order: collectNodePingOrder(e.target),
               };
-              var r = await RPC("admin:addClient", data);
-              closeModal(id);
-              if (r && r.token) {
-                var id2 = uid();
-                openModal(
-                  id2,
-                  "\u5df2\u521b\u5efa",
-                  '<div class="token-box mb-3" id="ntk' +
-                    id2 +
-                    '">' +
-                    E(r.token) +
-                    '</div><p class="text-xs text-muted mb-1">UUID: ' +
-                    E(r.uuid || "") +
-                    '</p><p class="text-xs text-muted">\u70b9\u51fb Token \u590d\u5236</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\'' +
-                    id2 +
-                    "')\">\u5b8c\u6210</button>",
+              submitButton.disabled = true;
+              submitButton.textContent = "创建中…";
+              try {
+                var r = await RPCStrict("admin:addClient", data);
+                closeModal(id);
+                if (r && r.token) {
+                  var id2 = uid();
+                  openModal(
+                    id2,
+                    "\u5df2\u521b\u5efa",
+                    '<div class="token-box mb-3" id="ntk' +
+                      id2 +
+                      '">' +
+                      E(r.token) +
+                      '</div><p class="text-xs text-muted mb-1">UUID: ' +
+                      E(r.uuid || "") +
+                      '</p><p class="text-xs text-muted">\u70b9\u51fb Token \u590d\u5236</p><button class="btn btn-primary btn-sm w-full" onclick="closeModal(\'' +
+                      id2 +
+                      "')\">\u5b8c\u6210</button>",
+                  );
+                  _d.getElementById("ntk" + id2).onclick = function () {
+                    copy(this.textContent);
+                  };
+                }
+                navigate("dashboard");
+              } catch (err) {
+                toast(
+                  "创建失败：" +
+                    (err && err.message ? err.message : "请稍后重试"),
+                  "error",
                 );
-                _d.getElementById("ntk" + id2).onclick = function () {
-                  copy(this.textContent);
-                };
+              } finally {
+                if (submitButton.isConnected) {
+                  submitButton.disabled = false;
+                  submitButton.textContent = "创建";
+                }
               }
-              navigate("dashboard");
             };
           };
         var pbtn = _d.getElementById("addPingBtn");

@@ -594,7 +594,7 @@ func getLoadRecordsCombined(uuid string, start, end time.Time) ([]models.Record,
 	if uuid != "" {
 		return recordsdb.GetRecordsByClientAndTime(uuid, start, end)
 	}
-	// 所有客户端：统一通过 records 包查询，启用 metric store 时自动走 metric store
+	// 所有客户端统一通过主数据库的 records 包查询。
 	return recordsdb.GetRecordsByTime(start, end)
 }
 

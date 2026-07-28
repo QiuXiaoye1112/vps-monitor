@@ -20,7 +20,6 @@ import (
 	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/records"
 	"github.com/monitor-monitor/monitor/database/tasks"
@@ -64,11 +63,6 @@ func RunServer() {
 	conf, err := config.GetManyAs[config.Settings]()
 	if err != nil {
 		log.Fatal(err)
-	}
-	// 初始化独立 metrics 数据库（如已启用）
-	if err := metricstore.InitializeStore(); err != nil {
-		log.Printf("Failed to initialize metric store: %v", err)
-		auditlog.EventLog("error", fmt.Sprintf("Failed to initialize metric store: %v", err))
 	}
 	go geoip.InitGeoIp()
 	go DoScheduledWork()
@@ -207,9 +201,6 @@ func OnShutdown() {
 		log.Printf("Failed to flush history reports on shutdown: %v", err)
 	}
 	cloudflared.Shutdown()
-	if err := metricstore.CloseStore(); err != nil {
-		log.Printf("Failed to close metric store: %v", err)
-	}
 }
 
 func OnFatal(err error) {

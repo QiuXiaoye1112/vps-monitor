@@ -1,7 +1,6 @@
 package report
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sort"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/protocol/v1"
 	"github.com/monitor-monitor/monitor/utils"
@@ -60,7 +58,6 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 
 	lastMinute := now.Add(-time.Minute).Unix()
 	var records []models.Record
-	var gpuRecords []models.GPURecord
 	trafficByRecord := make(map[string]cachedTrafficSummary)
 
 	reportCacheMu.Lock()
@@ -96,13 +93,10 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 				key := recordDedupKey(r)
 				trafficByRecord[key] = summarizeCachedTraffic(filtered)
 				records = append(records, r)
-				gpuRecords = append(gpuRecords, utils.AverageGPUReports(uuid, now, filtered, 0.3)...)
 			}
 		}()
 	}
 	reportCacheMu.Unlock()
-
-	useMetricStore := metricstore.IsEnabled()
 
 	if len(records) > 0 {
 		unique := make(map[string]models.Record)
@@ -117,48 +111,17 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 				dedupedTraffic[key] = summary
 			}
 		}
-		if useMetricStore {
-			// metric store 启用：增量基线来自 metric store，记录写入 metric store
-			if err := fillTrafficDeltasFromMetricStore(deduped, dedupedTraffic); err != nil {
-				log.Printf("Failed to fill traffic deltas from metric store: %v", err)
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := fillTrafficDeltas(tx, deduped, dedupedTraffic); err != nil {
 				return err
 			}
-			ctx := context.Background()
-			for i := range deduped {
-				if err := metricstore.WriteRecord(ctx, deduped[i]); err != nil {
-					log.Printf("Failed to write record to metric store: %v", err)
-					return err
-				}
-			}
-		} else {
-			if err := db.Transaction(func(tx *gorm.DB) error {
-				if err := fillTrafficDeltas(tx, deduped, dedupedTraffic); err != nil {
-					return err
-				}
-				if err := tx.Model(&models.Record{}).Create(&deduped).Error; err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				log.Printf("Failed to save records to database: %v", err)
+			if err := tx.Model(&models.Record{}).Create(&deduped).Error; err != nil {
 				return err
 			}
-		}
-	}
-
-	// GPU 数据仅在 metric store 启用时持久化（已移除传统 GPU 表）
-	if useMetricStore && len(gpuRecords) > 0 {
-		gpuUnique := make(map[string]models.GPURecord)
-		for _, rec := range gpuRecords {
-			key := rec.Client + "_" + strconv.Itoa(rec.DeviceIndex) + "_" + strconv.FormatInt(rec.Time.ToTime().Unix(), 10)
-			gpuUnique[key] = rec
-		}
-		ctx := context.Background()
-		for _, rec := range gpuUnique {
-			if err := metricstore.WriteGPURecord(ctx, rec); err != nil {
-				log.Printf("Failed to write GPU record to metric store: %v", err)
-				return err
-			}
+			return nil
+		}); err != nil {
+			log.Printf("Failed to save records to database: %v", err)
+			return err
 		}
 	}
 
@@ -284,72 +247,6 @@ func fillTrafficDeltas(db *gorm.DB, records []models.Record, trafficByRecord map
 			}
 			records[index].TrafficUp = utils.ComputeTrafficDelta(records[index].NetTotalUp, previous.NetTotalUp)
 			records[index].TrafficDown = utils.ComputeTrafficDelta(records[index].NetTotalDown, previous.NetTotalDown)
-		}
-	}
-
-	return nil
-}
-
-// fillTrafficDeltasFromMetricStore 在 metric store 启用时计算流量增量，
-// 基线（上一周期累计流量）从 metric store 查询。
-func fillTrafficDeltasFromMetricStore(records []models.Record, trafficByRecord map[string]cachedTrafficSummary) error {
-	ctx := context.Background()
-	recordsByTime := make(map[time.Time][]int)
-	for i := range records {
-		before := records[i].Time.ToTime().Round(0)
-		recordsByTime[before] = append(recordsByTime[before], i)
-	}
-
-	for before, indexes := range recordsByTime {
-		clientUUIDs := make([]string, 0, len(indexes))
-		seen := make(map[string]struct{}, len(indexes))
-		for _, index := range indexes {
-			clientUUID := records[index].Client
-			if clientUUID == "" {
-				continue
-			}
-			if _, exists := seen[clientUUID]; exists {
-				continue
-			}
-			seen[clientUUID] = struct{}{}
-			clientUUIDs = append(clientUUIDs, clientUUID)
-		}
-
-		baseline, err := metricstore.GetLatestTrafficBefore(ctx, clientUUIDs, before)
-		if err != nil {
-			return fmt.Errorf("load previous traffic from metric store before %s: %w", before.Format(time.RFC3339), err)
-		}
-		previousByClient := make(map[string]previousTrafficRecord, len(baseline))
-		for clientUUID, base := range baseline {
-			previousByClient[clientUUID] = previousTrafficRecord{
-				Client:       base.Client,
-				Time:         base.Time,
-				NetTotalUp:   base.NetTotalUp,
-				NetTotalDown: base.NetTotalDown,
-			}
-		}
-		if err := applyTrafficClearBaselines(dbcore.GetDBInstance(), clientUUIDs, before, previousByClient); err != nil {
-			return fmt.Errorf("load traffic clear baselines before %s: %w", before.Format(time.RFC3339), err)
-		}
-
-		for _, index := range indexes {
-			var prev *previousTrafficRecord
-			if base, ok := previousByClient[records[index].Client]; ok {
-				baseCopy := base
-				prev = &baseCopy
-			}
-
-			key := recordDedupKey(records[index])
-			if summary, ok := trafficByRecord[key]; ok && len(summary.Points) > 0 {
-				records[index].TrafficUp, records[index].TrafficDown = sumCachedTrafficDeltas(summary, prev)
-				continue
-			}
-
-			if prev == nil {
-				continue
-			}
-			records[index].TrafficUp = utils.ComputeTrafficDelta(records[index].NetTotalUp, prev.NetTotalUp)
-			records[index].TrafficDown = utils.ComputeTrafficDelta(records[index].NetTotalDown, prev.NetTotalDown)
 		}
 	}
 

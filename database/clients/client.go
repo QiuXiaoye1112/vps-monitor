@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
-	"github.com/monitor-monitor/monitor/database/metricstore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/utils"
@@ -22,13 +20,6 @@ import (
 func DeleteClient(clientUuid string) error {
 	if strings.TrimSpace(clientUuid) == "" {
 		return fmt.Errorf("invalid client UUID")
-	}
-
-	// The metric store is a separate database and cannot participate in the
-	// GORM transaction below. Delete it first so a metric-store error cannot
-	// leave a deleted node's history behind.
-	if err := metricstore.DeleteEntity(context.Background(), clientUuid); err != nil {
-		return fmt.Errorf("delete client metrics: %w", err)
 	}
 
 	db := dbcore.GetDBInstance()
@@ -354,20 +345,10 @@ func ResetTrafficCompensationForDueClients() {
 	}
 	now := time.Now()
 	for _, c := range allClients {
-		if !shouldResetTrafficCompensation(c, now) {
-			continue
-		}
-		if err := db.Model(&models.Client{}).Where("uuid = ?", c.UUID).
-			Updates(map[string]interface{}{
-				"traffic_compensation":          int64(0),
-				"traffic_carry":                 int64(0), // Clear any pre-v3 residue as well.
-				"traffic_carry_up":              int64(0),
-				"traffic_carry_down":            int64(0),
-				"traffic_compensation_reset_at": now,
-				"updated_at":                    now,
-			}).Error; err != nil {
+		reset, err := resetTrafficCompensationIfDue(db, c, now)
+		if err != nil {
 			log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
-		} else {
+		} else if reset {
 			log.Printf(
 				"[traffic_comp_reset] reset traffic accounting for %s (compensation=%d, carry_up=%d, carry_down=%d)",
 				c.UUID,
@@ -377,6 +358,35 @@ func ResetTrafficCompensationForDueClients() {
 			)
 		}
 	}
+}
+
+// resetTrafficCompensationIfDue uses the client snapshot's updated_at as an
+// optimistic lock. If an admin edit wins the race, the stale scheduled update
+// affects zero rows instead of overwriting the newer compensation value.
+func resetTrafficCompensationIfDue(db *gorm.DB, client models.Client, now time.Time) (bool, error) {
+	if !shouldResetTrafficCompensation(client, now) {
+		return false, nil
+	}
+
+	start := trafficResetStart(client, now)
+	query := db.Model(&models.Client{}).Where("uuid = ?", client.UUID)
+	if client.UpdatedAt.ToTime().IsZero() {
+		query = query.Where("updated_at IS NULL")
+	} else {
+		query = query.Where("updated_at = ?", client.UpdatedAt)
+	}
+	result := query.Updates(map[string]interface{}{
+		"traffic_compensation":          int64(0),
+		"traffic_carry":                 int64(0), // Clear any pre-v3 residue as well.
+		"traffic_carry_up":              int64(0),
+		"traffic_carry_down":            int64(0),
+		"traffic_compensation_reset_at": start,
+		"updated_at":                    now,
+	})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
 
 func shouldResetTrafficCompensation(client models.Client, now time.Time) bool {
@@ -439,7 +449,10 @@ func trafficResetStart(client models.Client, now time.Time) time.Time {
 }
 
 func SaveClient(updates map[string]interface{}) error {
-	db := dbcore.GetDBInstance()
+	return saveClient(dbcore.GetDBInstance(), updates, time.Now())
+}
+
+func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) error {
 	clientUUID, ok := updates["uuid"].(string)
 	if !ok || clientUUID == "" {
 		return fmt.Errorf("invalid client UUID")
@@ -450,51 +463,114 @@ func SaveClient(updates map[string]interface{}) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	if v, exists := updates["traffic_limit"]; exists {
-		if val, ok := v.(float64); ok {
-			if val < 0 || val > math.MaxInt64-1 {
-				return fmt.Errorf("traffic_limit must be a valid non-negative int64 value, got %v", val)
+	toInt64 := func(value interface{}) (int64, bool) {
+		switch typed := value.(type) {
+		case float64:
+			if math.IsNaN(typed) || math.IsInf(typed, 0) || math.Trunc(typed) != typed ||
+				typed < -9223372036854775808.0 || typed >= 9223372036854775808.0 {
+				return 0, false
 			}
-		}
-	}
-	if v, exists := updates["traffic_reset_day"]; exists {
-		if val, ok := v.(float64); ok {
-			if val < 1 || val > 31 {
-				return fmt.Errorf("traffic_reset_day must be between 1 and 31, got %v", val)
+			return int64(typed), true
+		case float32:
+			numeric := float64(typed)
+			if math.IsNaN(numeric) || math.IsInf(numeric, 0) || math.Trunc(numeric) != numeric ||
+				numeric < -9223372036854775808.0 || numeric >= 9223372036854775808.0 {
+				return 0, false
 			}
-		}
-	}
-	if v, exists := updates["traffic_reset_hour"]; exists {
-		if val, ok := v.(float64); ok {
-			if val < 0 || val > 23 {
-				return fmt.Errorf("traffic_reset_hour must be between 0 and 23, got %v", val)
+			return int64(numeric), true
+		case int:
+			return int64(typed), true
+		case int8:
+			return int64(typed), true
+		case int16:
+			return int64(typed), true
+		case int32:
+			return int64(typed), true
+		case int64:
+			return typed, true
+		case uint:
+			if uint64(typed) > math.MaxInt64 {
+				return 0, false
 			}
-		}
-	}
-	if v, exists := updates["traffic_reset_minute"]; exists {
-		if val, ok := v.(float64); ok {
-			if val < 0 || val > 59 {
-				return fmt.Errorf("traffic_reset_minute must be between 0 and 59, got %v", val)
+			return int64(typed), true
+		case uint8:
+			return int64(typed), true
+		case uint16:
+			return int64(typed), true
+		case uint32:
+			return int64(typed), true
+		case uint64:
+			if typed > math.MaxInt64 {
+				return 0, false
 			}
-		}
-	}
-	if v, exists := updates["traffic_compensation"]; exists {
-		if val, ok := v.(float64); ok {
-			if val < -math.MaxInt64 || val > math.MaxInt64-1 {
-				return fmt.Errorf("traffic_compensation must be a valid int64 value, got %v", val)
-			}
+			return int64(typed), true
+		case json.Number:
+			parsed, err := typed.Int64()
+			return parsed, err == nil
+		default:
+			return 0, false
 		}
 	}
 
-	if _, exists := updates["traffic_compensation"]; exists {
-		updates["traffic_compensation_reset_at"] = time.Now()
+	validateInteger := func(key string, min, max int64) error {
+		value, exists := updates[key]
+		if !exists {
+			return nil
+		}
+		numeric, ok := toInt64(value)
+		if !ok {
+			return fmt.Errorf("%s must be a valid integer, got %v", key, value)
+		}
+		if numeric < min || numeric > max {
+			return fmt.Errorf("%s must be between %v and %v, got %v", key, min, max, value)
+		}
+		return nil
 	}
 
-	updates["updated_at"] = time.Now()
-
-	err := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(updates).Error
-	if err != nil {
+	if err := validateInteger("traffic_limit", 0, math.MaxInt64); err != nil {
 		return err
+	}
+	if err := validateInteger("traffic_reset_day", 1, 31); err != nil {
+		return err
+	}
+	if err := validateInteger("traffic_reset_hour", 0, 23); err != nil {
+		return err
+	}
+	if err := validateInteger("traffic_reset_minute", 0, 59); err != nil {
+		return err
+	}
+	if err := validateInteger("traffic_compensation", math.MinInt64, math.MaxInt64); err != nil {
+		return err
+	}
+
+	// The edit form submits compensation on every save. Only a real value
+	// change starts compensation in the current billing period; otherwise a
+	// stale pre-boundary value could be reclassified as current and survive an
+	// automatic clear.
+	if value, exists := updates["traffic_compensation"]; exists {
+		normalized, _ := toInt64(value)
+		var current models.Client
+		if err := db.Select("uuid", "traffic_compensation").
+			Where("uuid = ?", clientUUID).
+			First(&current).Error; err != nil {
+			return err
+		}
+		if normalized == current.TrafficComp {
+			delete(updates, "traffic_compensation")
+		} else {
+			updates["traffic_compensation"] = normalized
+			updates["traffic_compensation_reset_at"] = now
+		}
+	}
+
+	updates["updated_at"] = now
+
+	result := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 	return nil
 }
