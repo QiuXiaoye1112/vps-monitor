@@ -7,6 +7,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const writeTimeout = 30 * time.Second
+
 type SafeConn struct {
 	conn *websocket.Conn
 	mu   sync.Mutex
@@ -24,13 +26,30 @@ func NewSafeConn(conn *websocket.Conn) *SafeConn {
 func (sc *SafeConn) WriteMessage(messageType int, data []byte) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	return sc.conn.WriteMessage(messageType, data)
+	if err := sc.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+		return err
+	}
+	err := sc.conn.WriteMessage(messageType, data)
+	_ = sc.conn.SetWriteDeadline(time.Time{})
+	return err
 }
 
 func (sc *SafeConn) WriteJSON(v interface{}) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	return sc.conn.WriteJSON(v)
+	if err := sc.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+		return err
+	}
+	err := sc.conn.WriteJSON(v)
+	_ = sc.conn.SetWriteDeadline(time.Time{})
+	return err
+}
+
+func (sc *SafeConn) WriteControl(messageType int, data []byte, deadline time.Time) error {
+	// Gorilla permits WriteControl concurrently with all other methods. Keeping
+	// it outside the data-writer mutex lets heartbeat Pongs bypass a stalled
+	// report write.
+	return sc.conn.WriteControl(messageType, data, deadline)
 }
 
 func (sc *SafeConn) Close() error {
@@ -46,6 +65,9 @@ func (sc *SafeConn) ReadJSON(v interface{}) error {
 }
 func (sc *SafeConn) SetReadDeadline(t time.Time) error {
 	return sc.conn.SetReadDeadline(t)
+}
+func (sc *SafeConn) SetPingHandler(h func(appData string) error) {
+	sc.conn.SetPingHandler(h)
 }
 func (sc *SafeConn) GetConn() *websocket.Conn {
 	sc.mu.Lock()

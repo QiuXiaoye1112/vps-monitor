@@ -179,6 +179,7 @@ func WebSocketV2RPC(c *gin.Context) {
 	}
 	conn := connection.NewSafeConn(unsafeConn)
 	defer conn.Close()
+	configureClientHeartbeat(conn)
 
 	uuid, ok := clientUUIDFromContext(c)
 	if !ok {

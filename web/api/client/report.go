@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	// 如果超过这个时间没有收到任何消息，则认为连接已死
-	// 因为目前server没有存agent的信息上报间隔。只有写一个默认的
-	readWait        = 11 * time.Second
+	// Agent 每 30 秒发送一次 Ping。保留一个完整周期以上的抖动空间，
+	// 并在每次收到 Ping 时刷新读截止时间。
+	readWait        = 65 * time.Second
+	pongWriteWait   = 10 * time.Second
 	postPresenceTTL = 35 * time.Second
 )
 
@@ -151,6 +152,7 @@ func WebSocketReport(c *gin.Context) {
 	}
 	conn := connection.NewSafeConn(unsafeConn)
 	defer conn.Close()
+	configureClientHeartbeat(conn)
 
 	_, message, err := conn.ReadMessage()
 	if err != nil {
@@ -212,6 +214,20 @@ func WebSocketReport(c *gin.Context) {
 		}
 		processMessage(conn, message, uuid)
 	}
+}
+
+func configureClientHeartbeat(conn *connection.SafeConn) {
+	_ = conn.SetReadDeadline(time.Now().Add(readWait))
+	conn.SetPingHandler(func(appData string) error {
+		if err := conn.SetReadDeadline(time.Now().Add(readWait)); err != nil {
+			return err
+		}
+		return conn.WriteControl(
+			websocket.PongMessage,
+			[]byte(appData),
+			time.Now().Add(pongWriteWait),
+		)
+	})
 }
 
 // 将消息处理逻辑提取到一个函数中，方便复用
