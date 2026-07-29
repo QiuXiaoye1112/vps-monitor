@@ -13,13 +13,22 @@
 ## 当前任务
 
 - 状态：completed。
-- 目标：从 Agent、中心服务和内置主题中完整移除 GPU 监控能力。
-- 范围：Agent GPU 参数、采集器和上报字段；中心协议、实时缓存映射、聚合、普通历史字段、GPU 明细兼容 API；主题 GPU 类型、设置、卡片、图表和统计入口；生成主题同步及全量验证。
+- 目标：发布并部署已完成 GPU 源码移除及心跳加固的 Center / Agent 最终整合版本。
+- 范围：Center `v1.3.3`、Agent `v1.4.0` 的 main、正式 Release、多平台资产、Center 线上更新及发布后验证。
 - 数据边界：不重建或破坏现有 SQLite 主库；旧库中的 `gpu` / `gpu_name` 物理列允许保留，但源码中已无对应模型、读取、写入、聚合或返回逻辑。
 - 里程碑：M5/M6 架构收敛与死代码清理。
-- 完成结果：相关能力均为源码级删除，不保留空实现、兼容 API、隐藏开关或废弃分支；嵌入式主题已由新源码重新构建。
+- 完成结果：两个仓库最终整合代码和正式 Release 已发布；Center 已由正式 Release 资产更新，Agent 仅发布未部署。
 
 ## 执行日志
+
+### 2026-07-29 v1.3.3 / Agent v1.4.0 final integrated release
+
+- Center 最终运行提交 `755410f17074813920d625a8c8827da9e10e3c29` 已推送 `main`；在 GPU 源码移除基础上增加 65 秒读等待、WebSocket ping/pong 响应、写入截止时间和心跳回归测试。
+- Center `go test ./...`、关键包 race 测试及 `go vet ./...` 通过；正式 Release `v1.3.3` 指向该运行提交，Linux AMD64 静态资产 SHA-256 为 `12c2b88084d84fe920103eece2facfdbe4b2b4708f5d5c1890110dc2661ac2fe`。
+- Agent 最终整合提交 `6c39a07b415d0cc1dad164d423b136467ef999d9` 已推送 `main`，包含 GPU 采集/上报源码删除、三次心跳未响应暂停全部上报及恢复、基础信息变化检测、IP 检测修复、待发送任务结果队列/重试和连接超时处理，并非仅发布 GPU 删除差异。
+- Agent 修复 Release 工作流版本注入路径并让根命令消费 `update.CurrentVersion`；正式 Release `v1.4.0` 指向最终整合提交，GitHub Actions release run `30430270477` 的 13 个 Linux/Windows/macOS/FreeBSD 构建任务全部成功，另保留兼容命名的 Linux AMD64 资产。
+- `ded` 的 Center 已使用从 GitHub `v1.3.3` Release 重新下载且摘要一致的资产更新；`/api/version` 返回 `v1.3.3 (755410f)`，首页和后台返回 200，公开 RPC 返回 4 个节点且 GPU 字段计数为 0，Center 与现有 Agent 服务均 active。
+- Agent 服务按发布边界未在 `ded` 更新；Center 临时候选与回滚文件已在验证后删除。
 
 ### 2026-07-29 GPU monitoring source removal (M5/M6)
 
