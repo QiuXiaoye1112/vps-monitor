@@ -28,6 +28,8 @@
 - 内置主题物理删除 GPU 类型、状态归一化、卡片键、预设、设置解析、详情图表、显存/温度系列及 RPC 响应扩展，并重新构建同步 `web/public/vpsTheme/dist`。
 - 代码扫描确认 Agent、中心 Go 源码、主题 TypeScript/Vue 源码和新嵌入式业务产物中不存在 GPU 监控字段或文案；第三方 3D 依赖自身的 WebGPU 渲染实现不属于监控能力，保持不变。
 - 验证：中心 `go test ./...`、关键包 `go test -race`、`go vet ./...` 通过；主题 lint、TypeScript 检查、生产构建及嵌入式同步通过；Agent 采集/协议相关测试和 vet、Linux/Windows/FreeBSD amd64 跨平台构建通过。Agent 全包测试仅有既有公网 ICMP/HTTP 用例因本机原始套接字权限与外部目标响应失败。
+- 中心发布提交为 `5ed3e2fa03f7e683183bcbae23ebc69f295a554c`；以 Go 1.25.0、Zig 0.16.0、Linux AMD64 musl 静态构建为 `v1.3.2 (5ed3e2f)`，SHA-256 为 `68b1051892c59aa132c9a40e59870ee45d16e80821c4b2583caccf3237068350`。
+- `ded` 的 `/opt/monitor/vps-monitor` 已替换为同一摘要二进制，`vps-monitor.service` active；本机和 `https://monitor.ethantechie.top/` 的版本、首页、后台及公开 RPC 验证通过，4 个节点的公开基础信息/实时状态 GPU 字段计数均为 0。临时候选和回滚文件验证后已删除，Agent 服务未更新。
 
 ### 2026-07-29 Metric Store removal / traffic reset closure (M5/M6)
 
