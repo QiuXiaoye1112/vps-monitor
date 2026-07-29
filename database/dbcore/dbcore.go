@@ -331,7 +331,10 @@ func GetDBInstance() *gorm.DB {
 			&models.TaskResult{},
 		)
 		if err != nil {
-			log.Printf("Failed to create Task and TaskResult table, it may already exist: %v", err)
+			log.Fatalf("Failed to migrate Task and TaskResult tables: %v", err)
+		}
+		if !instance.Migrator().HasIndex(&models.TaskResult{}, "idx_client_task") {
+			log.Fatalf("Failed to create unique task result index idx_client_task")
 		}
 
 		// Manually create composite indexes

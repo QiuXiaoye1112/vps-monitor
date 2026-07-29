@@ -5,6 +5,8 @@ import (
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func CreateTask(taskId string, clients []string, command string) error {
@@ -84,14 +86,29 @@ func DeleteTaskByTaskId(taskId string) error {
 }
 
 func SaveTaskResult(taskId, clientId, result string, exitCode int, timestamp models.LocalTime) error {
-	return dbcore.GetDBInstance().
-		Model(&models.TaskResult{}).
-		Where("task_id = ? AND client = ?", taskId, clientId).
-		Updates(map[string]interface{}{
+	return saveTaskResult(dbcore.GetDBInstance(), taskId, clientId, result, exitCode, timestamp)
+}
+
+func saveTaskResult(db *gorm.DB, taskId, clientId, result string, exitCode int, timestamp models.LocalTime) error {
+	record := models.TaskResult{
+		TaskId:     taskId,
+		Client:     clientId,
+		Result:     result,
+		ExitCode:   &exitCode,
+		FinishedAt: &timestamp,
+		CreatedAt:  models.FromTime(time.Now()),
+	}
+	return db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "client"},
+			{Name: "task_id"},
+		},
+		DoUpdates: clause.Assignments(map[string]interface{}{
 			"result":      result,
 			"exit_code":   exitCode,
 			"finished_at": timestamp,
-		}).Error
+		}),
+	}).Create(&record).Error
 }
 
 func ClearTaskResultsByTimeBefore(before time.Time) error {

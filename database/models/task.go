@@ -8,8 +8,8 @@ type Task struct {
 }
 
 type TaskResult struct {
-	TaskId     string     `json:"task_id" gorm:"type:varchar(36);index"`
-	Client     string     `json:"client" gorm:"type:varchar(36)"`
+	TaskId     string     `json:"task_id" gorm:"type:varchar(36);uniqueIndex:idx_client_task,priority:2"`
+	Client     string     `json:"client" gorm:"type:varchar(36);uniqueIndex:idx_client_task,priority:1"`
 	ClientInfo Client     `json:"client_info" gorm:"foreignKey:Client;references:UUID;constraint:OnDelete:CASCADE,OnUpdate:CASCADE"`
 	Result     string     `json:"result" gorm:"type:longtext"`
 	ExitCode   *int       `json:"exit_code" gorm:"type:int"`
