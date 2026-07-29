@@ -66,7 +66,6 @@ func getHistoryRecordsByClientAndTime(db *gorm.DB, clientUUID string, start, end
 			client,
 			MAX(time) AS time,
 			AVG(cpu) AS cpu,
-			AVG(gpu) AS gpu,
 			CAST(AVG(ram) AS INTEGER) AS ram,
 			MAX(ram_total) AS ram_total,
 			CAST(AVG(swap) AS INTEGER) AS swap,

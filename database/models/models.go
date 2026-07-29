@@ -18,7 +18,6 @@ type Client struct {
 	CpuPhysicalCores    int       `json:"cpu_physical_cores" gorm:"type:int"`
 	OS                  string    `json:"os" gorm:"type:varchar(100)"`
 	KernelVersion       string    `json:"kernel_version" gorm:"type:varchar(100)"`
-	GpuName             string    `json:"gpu_name" gorm:"type:varchar(100)"`
 	IPv4                string    `json:"ipv4,omitempty" gorm:"type:varchar(100)"`
 	IPv6                string    `json:"ipv6,omitempty" gorm:"type:varchar(100)"`
 	Region              string    `json:"region" gorm:"type:varchar(100)"`
@@ -87,7 +86,6 @@ type Record struct {
 	Client         string    `json:"client" gorm:"type:varchar(36);index"`
 	Time           LocalTime `json:"time" gorm:"index"`
 	Cpu            float32   `json:"cpu" gorm:"type:decimal(5,2)"` // e.g., 75.50%
-	Gpu            float32   `json:"gpu" gorm:"type:decimal(5,2)"`
 	Ram            int64     `json:"ram" gorm:"type:bigint"`
 	RamTotal       int64     `json:"ram_total" gorm:"type:bigint"`
 	Swap           int64     `json:"swap" gorm:"type:bigint"`
@@ -106,18 +104,6 @@ type Record struct {
 	Connections    int       `json:"connections"`
 	ConnectionsUdp int       `json:"connections_udp"`
 	//Uptime         int64     `json:"uptime" gorm:"type:bigint"`
-}
-
-// GPURecord logs individual GPU metrics over time
-type GPURecord struct {
-	Client      string    `json:"client" gorm:"type:varchar(36);index"` // 客户端UUID
-	Time        LocalTime `json:"time" gorm:"index"`                    // 记录时间
-	DeviceIndex int       `json:"device_index" gorm:"index"`            // GPU设备索引 (0,1,2...)
-	DeviceName  string    `json:"device_name" gorm:"type:varchar(100)"` // GPU型号
-	MemTotal    int64     `json:"mem_total" gorm:"type:bigint"`         // 显存总量(字节)
-	MemUsed     int64     `json:"mem_used" gorm:"type:bigint"`          // 显存使用(字节)
-	Utilization float32   `json:"utilization" gorm:"type:decimal(5,2)"` // GPU使用率(%)
-	Temperature int       `json:"temperature"`                          // GPU温度(°C)
 }
 
 // StringArray represents a slice of strings stored as JSON in the database

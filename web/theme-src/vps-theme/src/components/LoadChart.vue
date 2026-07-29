@@ -20,7 +20,7 @@ import { LOAD_RECORD_MAX_COUNT } from '@/constants/load'
 import { normalizeStatusRecordsPayload } from '@/services/history.service'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { getChartSeriesPalette, getLoadChartPalette } from '@/utils/chartPalette'
+import { getLoadChartPalette } from '@/utils/chartPalette'
 import { formatBytes, formatBytesSplit } from '@/utils/helper'
 import { getSharedRpc } from '@/utils/rpc'
 import '@/utils/echarts' // 共享 ECharts 配置
@@ -239,58 +239,29 @@ const rpc = getSharedRpc()
 
 // ==================== 数据获取 ====================
 
-function gpuDetailsFromStatus(record: StatusRecord): RecordFormat['gpu_detailed'] {
-  if (!record.gpu_detailed_info?.length)
-    return undefined
-
-  const details: NonNullable<RecordFormat['gpu_detailed']> = {}
-  record.gpu_detailed_info.forEach((item, index) => {
-    const deviceIndex = item.device_index ?? index
-    const memUsed = metricValue(item.memory_used)
-    const memTotal = metricValue(item.memory_total)
-    details[deviceIndex] = {
-      usage: metricValue(item.utilization ?? item.usage),
-      memory: memUsed != null && memTotal && memTotal > 0 ? memUsed / memTotal * 100 : null,
-      temperature: metricValue(item.temperature),
-      device_index: deviceIndex,
-      device_name: item.device_name || item.name,
-      mem_total: memTotal ?? undefined,
-      mem_used: memUsed ?? undefined,
-    }
-  })
-  return details
-}
-
 function statusToRecordFormat(records: StatusRecord[]): RecordFormat[] {
-  return records.map((r) => {
-    const gpuDetailed = gpuDetailsFromStatus(r)
-    return {
-      client: r.client,
-      time: r.time,
-      cpu: r.cpu ?? null,
-      gpu: r.gpu_average_usage ?? r.gpu ?? null,
-      gpu_usage: r.gpu_average_usage ?? r.gpu ?? null,
-      gpu_memory: null,
-      gpu_detailed: gpuDetailed,
-      ram: r.ram ?? null,
-      ram_total: r.ram_total ?? null,
-      swap: r.swap ?? null,
-      swap_total: r.swap_total ?? null,
-      load: r.load ?? null,
-      temp: r.temp ?? null,
-      disk: r.disk ?? null,
-      disk_total: r.disk_total ?? null,
-      net_in: r.net_in ?? null,
-      net_out: r.net_out ?? null,
-      net_total_up: r.net_total_up ?? null,
-      net_total_down: r.net_total_down ?? null,
-      traffic_up: r.traffic_up ?? null,
-      traffic_down: r.traffic_down ?? null,
-      process: r.process ?? null,
-      connections: r.connections ?? null,
-      connections_udp: r.connections_udp ?? null,
-    }
-  })
+  return records.map(r => ({
+    client: r.client,
+    time: r.time,
+    cpu: r.cpu ?? null,
+    ram: r.ram ?? null,
+    ram_total: r.ram_total ?? null,
+    swap: r.swap ?? null,
+    swap_total: r.swap_total ?? null,
+    load: r.load ?? null,
+    temp: r.temp ?? null,
+    disk: r.disk ?? null,
+    disk_total: r.disk_total ?? null,
+    net_in: r.net_in ?? null,
+    net_out: r.net_out ?? null,
+    net_total_up: r.net_total_up ?? null,
+    net_total_down: r.net_total_down ?? null,
+    traffic_up: r.traffic_up ?? null,
+    traffic_down: r.traffic_down ?? null,
+    process: r.process ?? null,
+    connections: r.connections ?? null,
+    connections_udp: r.connections_udp ?? null,
+  }))
 }
 
 function updateObservedReportInterval(records: StatusRecord[]): void {
@@ -312,15 +283,6 @@ function updateObservedReportInterval(records: StatusRecord[]): void {
 
 function metricValue(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function getGpuDeviceNames(record: RecordFormat | null): string {
-  if (!record?.gpu_detailed)
-    return nodeInfo.value?.gpu_name || ''
-  return Object.values(record.gpu_detailed)
-    .map(detail => detail.device_name || (detail.device_index === undefined ? '' : `GPU ${detail.device_index}`))
-    .filter(Boolean)
-    .join(' / ')
 }
 
 async function fetchRecentData() {
@@ -420,21 +382,6 @@ const chartData = computed(() => {
   return statusToRecordFormat(remoteData.value)
 })
 
-const latestStatus = computed(() => {
-  const data = chartData.value
-  if (!data.length)
-    return null
-  return data.at(-1) ?? null
-})
-
-const hasGpuData = computed(() => chartData.value.some(record => record.gpu != null || record.gpu_usage != null || record.gpu_memory != null || record.gpu_detailed))
-
-const detailSeriesColors = reactive(getChartSeriesPalette(appStore.colorVisionFriendly))
-
-watchEffect(() => {
-  detailSeriesColors.splice(0, detailSeriesColors.length, ...getChartSeriesPalette(appStore.colorVisionFriendly))
-})
-
 function seriesHasData(series: MetricChartSeriesData): boolean {
   return series.data.some(([, value]) => value !== null && Number.isFinite(value))
 }
@@ -455,19 +402,6 @@ function recordMetricSeries(
   }
 }
 
-function gpuDeviceEntries(): Array<{ index: number, name: string }> {
-  const devices = new Map<number, string>()
-  for (const record of chartData.value) {
-    for (const [rawIndex, detail] of Object.entries(record.gpu_detailed ?? {})) {
-      const index = detail.device_index ?? Number(rawIndex)
-      devices.set(index, detail.device_name || `GPU ${index + 1}`)
-    }
-  }
-  return [...devices.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([index, name]) => ({ index, name }))
-}
-
 const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
   recordMetricSeries('累计下载', chartColors.quinary, 'bytes', record => record.net_total_down),
   recordMetricSeries('累计上传', chartColors.quaternary, 'bytes', record => record.net_total_up),
@@ -475,38 +409,11 @@ const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
   recordMetricSeries('周期上传', chartColors.secondary, 'bytes', record => record.traffic_up, true),
 ].filter(seriesHasData))
 
-const gpuMemoryChartSeries = computed<MetricChartSeriesData[]>(() => gpuDeviceEntries().flatMap((device, index) => {
-  const used = recordMetricSeries(
-    `${device.name} 已用`,
-    detailSeriesColors[index * 2 % detailSeriesColors.length]!,
-    'bytes',
-    record => record.gpu_detailed?.[device.index]?.mem_used,
-  )
-  const total = recordMetricSeries(
-    `${device.name} 总量`,
-    detailSeriesColors[(index * 2 + 1) % detailSeriesColors.length]!,
-    'bytes',
-    record => record.gpu_detailed?.[device.index]?.mem_total,
-    true,
-  )
-  return [used, total].filter(seriesHasData)
-}))
-
-const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => {
-  const series = [recordMetricSeries('系统温度', chartColors.secondary, 'temperature', record => record.temp)]
-  if (appStore.gpuChartEnabled) {
-    series.push(...gpuDeviceEntries().map((device, index) => recordMetricSeries(
-      `${device.name} 温度`,
-      detailSeriesColors[index % detailSeriesColors.length]!,
-      'temperature',
-      record => record.gpu_detailed?.[device.index]?.temperature,
-    )))
-  }
-  return series.filter(seriesHasData)
-})
+const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => [
+  recordMetricSeries('系统温度', chartColors.secondary, 'temperature', record => record.temp),
+].filter(seriesHasData))
 
 const hasTrafficData = computed(() => trafficChartSeries.value.length > 0)
-const hasGpuMemoryData = computed(() => gpuMemoryChartSeries.value.length > 0)
 const hasTemperatureData = computed(() => temperatureChartSeries.value.length > 0)
 
 // ==================== 工具函数 ====================
@@ -919,99 +826,6 @@ const networkChartOption = computed(() => ({
   ],
 }))
 
-const gpuDeviceUsageEChartSeries = computed(() => gpuDeviceEntries().map((device, index) => ({
-  name: device.name,
-  type: 'line',
-  data: chartData.value.map(record => record.gpu_detailed?.[device.index]?.usage ?? null),
-  showSymbol: false,
-  lineStyle: {
-    width: 1.2,
-    type: 'dashed' as const,
-    color: detailSeriesColors[index % detailSeriesColors.length]!,
-    cap: 'round' as const,
-  },
-})).filter(series => series.data.some(value => value !== null)))
-
-// GPU 图表
-const gpuChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.senary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${item.seriesName}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(1) ?? '-'}%</span></div>`
-      }
-
-      if (record.gpu_detailed) {
-        html += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid ${chartThemeColors.value.splitLineColor}">`
-        for (const detail of Object.values(record.gpu_detailed)) {
-          const name = detail.device_name || (detail.device_index === undefined ? 'GPU' : `GPU ${detail.device_index}`)
-          const usage = detail.usage == null ? '-' : `${detail.usage.toFixed(1)}%`
-          const memory = detail.memory == null ? '-' : `${detail.memory.toFixed(1)}%`
-          const temp = detail.temperature == null ? '' : ` · ${Math.round(detail.temperature)}℃`
-          html += `<div style="display:flex;align-items:center;gap:8px;color:${chartThemeColors.value.textSecondary}"><span>${name}</span><span style="margin-left:auto">${usage} / ${memory}${temp}</span></div>`
-        }
-        html += '</div>'
-      }
-
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['GPU 使用率', '显存使用率', ...gpuDeviceUsageEChartSeries.value.map(series => series.name)],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: 'GPU %',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    max: 100,
-    axisLabel: { ...baseYAxisConfig.value.axisLabel, formatter: '{value}%' },
-  },
-  series: [
-    {
-      name: 'GPU 使用率',
-      type: 'line',
-      data: chartData.value.map(r => r.gpu_usage ?? r.gpu),
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.senary, cap: 'round' as const },
-    },
-    {
-      name: '显存使用率',
-      type: 'line',
-      data: chartData.value.map(r => r.gpu_memory),
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-    },
-    ...gpuDeviceUsageEChartSeries.value,
-  ],
-}))
-
 const chartDashboardCards = computed(() => appStore.chartDashboardTemplate.cards)
 
 function isChartCardEnabled(key: ChartDashboardCardKey): boolean {
@@ -1019,10 +833,6 @@ function isChartCardEnabled(key: ChartDashboardCardKey): boolean {
     return false
 
   switch (key) {
-    case 'gpu':
-      return appStore.gpuChartEnabled && hasGpuData.value
-    case 'gpuMemory':
-      return appStore.gpuChartEnabled && hasGpuMemoryData.value
     case 'traffic':
       return hasTrafficData.value
     case 'temperature':
@@ -1378,33 +1188,6 @@ onMounted(() => {
           tone="sky"
           :series="trafficChartSeries"
           :order="getChartCardOrder('traffic')"
-        />
-
-        <!-- GPU 卡片 -->
-        <CardX v-if="isChartCardEnabled('gpu')" size="small" class="bg-background/50 border-none hover:bg-background transition-all rounded-md" :style="getChartCardStyle('gpu')">
-          <template #header>
-            <MetricChartHeader title="GPU 利用率" icon="tabler:device-desktop-analytics" tone="cyan" :subtitle="getGpuDeviceNames(latestStatus)">
-              <div class="text-xs flex gap-1 items-baseline shrink-0">
-                <template v-if="latestStatus?.gpu_usage != null || latestStatus?.gpu != null">
-                  <span>{{ (latestStatus.gpu_usage ?? latestStatus.gpu ?? 0).toFixed(1) }}</span>
-                  <span>%</span>
-                </template>
-                <span v-else>-</span>
-              </div>
-            </MetricChartHeader>
-          </template>
-          <div class="h-48">
-            <VChart :option="gpuChartOption" autoresize />
-          </div>
-        </CardX>
-
-        <MetricSeriesChartCard
-          v-if="isChartCardEnabled('gpuMemory')"
-          title="GPU 显存"
-          icon="tabler:stack-2"
-          tone="violet"
-          :series="gpuMemoryChartSeries"
-          :order="getChartCardOrder('gpuMemory')"
         />
 
         <MetricSeriesChartCard

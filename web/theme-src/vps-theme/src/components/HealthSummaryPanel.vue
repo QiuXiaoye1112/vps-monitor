@@ -193,7 +193,6 @@ function buildCurrentLoadRecordsByClient(): Map<string, StatusRecord[]> {
       client: node.uuid,
       time: now,
       cpu: node.cpu || 0,
-      gpu: node.gpu || 0,
       ram: node.ram || 0,
       ram_total: node.mem_total || 0,
       swap: node.swap || 0,

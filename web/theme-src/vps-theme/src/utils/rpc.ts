@@ -83,7 +83,6 @@ export interface Client {
   cpu_physical_cores?: number
   os: string
   kernel_version: string
-  gpu_name?: string
   ipv4?: string
   ipv6?: string
   region: string
@@ -155,26 +154,11 @@ export interface NodeStatusPing {
   max: number
 }
 
-export interface GpuDetailedInfo {
-  name?: string
-  device_name?: string
-  device_index?: number
-  memory_total?: number
-  memory_used?: number
-  utilization?: number
-  usage?: number
-  temperature?: number
-}
-
 /** 节点状态 */
 export interface NodeStatus {
   client: string
   time: string
   cpu: number
-  gpu: number
-  gpu_count?: number
-  gpu_average_usage?: number
-  gpu_detailed_info?: GpuDetailedInfo[]
   ram: number
   ram_total: number
   swap: number
@@ -212,10 +196,6 @@ export interface StatusRecord {
   client: string
   time: string
   cpu: number
-  gpu: number
-  gpu_count?: number
-  gpu_average_usage?: number
-  gpu_detailed_info?: GpuDetailedInfo[]
   ram: number
   ram_total: number
   swap: number
@@ -878,8 +858,8 @@ export class KomariRpc {
     return this.client.call<StatusRecord[]>('public:getClientRecentRecords', { uuid }, signal)
   }
 
-  async getPublicRecordsByUUID(params: { uuid: string, load_type?: string, hours?: number | string }, signal?: AbortSignal): Promise<{ count: number, records: Array<Partial<StatusRecord>>, load_type?: string, has_gpu_data?: boolean, gpu_devices?: Record<string, unknown> }> {
-    return this.client.call<{ count: number, records: Array<Partial<StatusRecord>>, load_type?: string, has_gpu_data?: boolean, gpu_devices?: Record<string, unknown> }>('public:getRecordsByUUID', params, signal)
+  async getPublicRecordsByUUID(params: { uuid: string, load_type?: string, hours?: number | string }, signal?: AbortSignal): Promise<{ count: number, records: Array<Partial<StatusRecord>>, load_type?: string }> {
+    return this.client.call<{ count: number, records: Array<Partial<StatusRecord>>, load_type?: string }>('public:getRecordsByUUID', params, signal)
   }
 
   async getPublicPingRecords(params: { uuid?: string, task_id?: string | number, hours?: number | string }, signal?: AbortSignal): Promise<{ count: number, records: PingRecord[], tasks?: PingTaskInfo[], basic_info?: Array<{ client: string, loss: number, min: number, max: number }> }> {

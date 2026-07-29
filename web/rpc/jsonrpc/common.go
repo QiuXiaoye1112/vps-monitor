@@ -374,7 +374,6 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		Client              string              `json:"client"`
 		Time                models.LocalTime    `json:"time"`
 		Cpu                 float32             `json:"cpu"`
-		Gpu                 float32             `json:"gpu"`
 		Ram                 int64               `json:"ram"`
 		RamTotal            int64               `json:"ram_total"`
 		Swap                int64               `json:"swap"`
@@ -450,7 +449,6 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			Client:              uuid,
 			Time:                models.FromTime(rep.UpdatedAt),
 			Cpu:                 float32(rep.CPU.Usage),
-			Gpu:                 0,
 			Ram:                 rep.Ram.Used,
 			RamTotal:            rep.Ram.Total,
 			Swap:                rep.Swap.Used,
@@ -607,7 +605,6 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 		Client         string           `json:"client"`
 		Time           models.LocalTime `json:"time"`
 		Cpu            float32          `json:"cpu"`
-		Gpu            float32          `json:"gpu"`
 		Ram            int64            `json:"ram"`
 		RamTotal       int64            `json:"ram_total"`
 		Swap           int64            `json:"swap"`
@@ -643,7 +640,6 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 			Client:         params.UUID,
 			Time:           models.FromTime(r.UpdatedAt),
 			Cpu:            float32(r.CPU.Usage),
-			Gpu:            0,
 			Ram:            r.Ram.Used,
 			RamTotal:       r.Ram.Total,
 			Swap:           r.Swap.Used,

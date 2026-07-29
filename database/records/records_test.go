@@ -43,7 +43,7 @@ func TestCompactRecord(t *testing.T) {
 	// 插入数据
 	for i := 0; i < totalMinutes; i++ {
 		recTime := now.Add(-time.Duration(i) * time.Minute)
-		rec := models.Record{Client: uuid, Time: models.FromTime(recTime), Cpu: float32(i), Gpu: float32(i), Load: float32(i), Temp: float32(i), Ram: int64(i)}
+		rec := models.Record{Client: uuid, Time: models.FromTime(recTime), Cpu: float32(i), Load: float32(i), Temp: float32(i), Ram: int64(i)}
 		err := db.Create(&rec).Error
 		assert.NoError(t, err)
 
@@ -65,13 +65,12 @@ func TestCompactRecord(t *testing.T) {
 	defer fOrig.Close()
 	wOrig := csv.NewWriter(fOrig)
 	defer wOrig.Flush()
-	wOrig.Write([]string{"Client", "Time", "Cpu", "Gpu", "Load", "Temp", "Ram"})
+	wOrig.Write([]string{"Client", "Time", "Cpu", "Load", "Temp", "Ram"})
 	for _, r := range origRecs {
 		wOrig.Write([]string{
 			r.Client,
 			r.Time.ToTime().Format(time.RFC3339),
 			strconv.FormatFloat(float64(r.Cpu), 'f', -1, 32),
-			strconv.FormatFloat(float64(r.Gpu), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Load), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Temp), 'f', -1, 32),
 			strconv.FormatInt(r.Ram, 10),
@@ -100,13 +99,12 @@ func TestCompactRecord(t *testing.T) {
 	defer fComp.Close()
 	wComp := csv.NewWriter(fComp)
 	defer wComp.Flush()
-	wComp.Write([]string{"Client", "Time", "Cpu", "Gpu", "Load", "Temp", "Ram"})
+	wComp.Write([]string{"Client", "Time", "Cpu", "Load", "Temp", "Ram"})
 	for _, r := range compRecs {
 		wComp.Write([]string{
 			r.Client,
 			r.Time.ToTime().Format(time.RFC3339),
 			strconv.FormatFloat(float64(r.Cpu), 'f', -1, 32),
-			strconv.FormatFloat(float64(r.Gpu), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Load), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Temp), 'f', -1, 32),
 			strconv.FormatInt(r.Ram, 10),
@@ -119,13 +117,12 @@ func TestCompactRecord(t *testing.T) {
 	defer fComp.Close()
 	wComp = csv.NewWriter(fComp)
 	defer wComp.Flush()
-	wComp.Write([]string{"Client", "Time", "Cpu", "Gpu", "Load", "Temp", "Ram"})
+	wComp.Write([]string{"Client", "Time", "Cpu", "Load", "Temp", "Ram"})
 	for _, r := range compRecs {
 		wComp.Write([]string{
 			r.Client,
 			r.Time.ToTime().Format(time.RFC3339),
 			strconv.FormatFloat(float64(r.Cpu), 'f', -1, 32),
-			strconv.FormatFloat(float64(r.Gpu), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Load), 'f', -1, 32),
 			strconv.FormatFloat(float64(r.Temp), 'f', -1, 32),
 			strconv.FormatInt(r.Ram, 10),

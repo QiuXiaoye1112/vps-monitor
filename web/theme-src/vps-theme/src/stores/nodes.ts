@@ -19,7 +19,6 @@ export interface NodeData {
   cpu_physical_cores?: number
   os: string
   kernel_version: string
-  gpu_name?: string
   ipv4?: string
   ipv6?: string
   region: string
@@ -53,7 +52,6 @@ export interface NodeData {
   online: boolean
   time: string
   cpu: number
-  gpu: number
   ram: number
   swap: number
   load: number
@@ -83,7 +81,6 @@ interface StatusData {
   online: boolean
   time: string
   cpu: number
-  gpu: number
   ram: number
   swap: number
   load: number
@@ -188,7 +185,6 @@ const useNodesStore = defineStore('nodes', () => {
       cpu_physical_cores: client.cpu_physical_cores,
       os: client.os,
       kernel_version: client.kernel_version,
-      gpu_name: client.gpu_name,
       ipv4: client.ipv4,
       ipv6: client.ipv6,
       region: client.region,
@@ -222,7 +218,6 @@ const useNodesStore = defineStore('nodes', () => {
       online: false,
       time: '',
       cpu: 0,
-      gpu: 0,
       ram: 0,
       swap: 0,
       load: 0,
@@ -258,8 +253,6 @@ const useNodesStore = defineStore('nodes', () => {
       node.time = status.time
     if (node.cpu !== status.cpu)
       node.cpu = status.cpu
-    if (node.gpu !== status.gpu)
-      node.gpu = status.gpu
     if (node.ram !== status.ram)
       node.ram = status.ram
     if (node.swap !== status.swap)
@@ -334,8 +327,6 @@ const useNodesStore = defineStore('nodes', () => {
       node.os = client.os
     if (node.kernel_version !== client.kernel_version)
       node.kernel_version = client.kernel_version
-    if (node.gpu_name !== client.gpu_name)
-      node.gpu_name = client.gpu_name
     if (node.ipv4 !== client.ipv4)
       node.ipv4 = client.ipv4
     if (node.ipv6 !== client.ipv6)

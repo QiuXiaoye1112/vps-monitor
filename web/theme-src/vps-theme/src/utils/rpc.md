@@ -217,7 +217,6 @@ interface Client {
   cpu_cores: number
   os: string
   kernel_version: string
-  gpu_name?: string
   ipv4?: string
   ipv6?: string
   region: string
@@ -248,7 +247,6 @@ interface NodeStatus {
   client: string
   time: string
   cpu: number // 百分比 0-100
-  gpu: number // 百分比 0-100
   ram: number // 已用字节
   ram_total: number // 总量字节
   swap: number

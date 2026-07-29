@@ -80,7 +80,6 @@ export function normalizeStatusRecord(record: Partial<StatusRecord>): StatusReco
     client: record.client,
     time: record.time,
     cpu: numberOrZero(record.cpu),
-    gpu: numberOrZero(record.gpu),
     ram: numberOrZero(record.ram),
     ram_total: numberOrZero(record.ram_total),
     swap: numberOrZero(record.swap),

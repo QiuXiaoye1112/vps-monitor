@@ -86,7 +86,6 @@ func publicClientInfo(node models.Client) map[string]any {
 		"cpu_physical_cores":    node.CpuPhysicalCores,
 		"os":                    node.OS,
 		"kernel_version":        node.KernelVersion,
-		"gpu_name":              node.GpuName,
 		"region":                node.Region,
 		"mem_total":             node.MemTotal,
 		"swap_total":            node.SwapTotal,
@@ -224,30 +223,6 @@ func publicGetRecordsByUUID(ctx context.Context, req *rpc.JsonRpcRequest) (any, 
 			"load_type": params.LoadType,
 		}
 	}
-	if params.LoadType == "" || params.LoadType == "all" || params.LoadType == "gpu" {
-		gpuRecords, err := records.GetGPURecordsByClientAndTime(params.UUID, time.Now().Add(-time.Duration(hoursInt)*time.Hour), time.Now())
-		if err == nil && len(gpuRecords) > 0 {
-			gpuDevices := make(map[string]any)
-			for _, record := range gpuRecords {
-				deviceKey := strconv.Itoa(record.DeviceIndex)
-				if gpuDevices[deviceKey] == nil {
-					gpuDevices[deviceKey] = map[string]any{
-						"device_index": record.DeviceIndex,
-						"device_name":  record.DeviceName,
-						"records":      []models.GPURecord{},
-					}
-				}
-				device := gpuDevices[deviceKey].(map[string]any)
-				recs := device["records"].([]models.GPURecord)
-				device["records"] = append(recs, record)
-				gpuDevices[deviceKey] = device
-			}
-			response["gpu_devices"] = gpuDevices
-			response["has_gpu_data"] = true
-		} else {
-			response["has_gpu_data"] = false
-		}
-	}
 	return response, nil
 }
 
@@ -286,8 +261,6 @@ func filterPublicRecordsByLoadType(recs []models.Record, loadType string) []map[
 		switch loadType {
 		case "cpu":
 			record["cpu"] = r.Cpu
-		case "gpu":
-			record["gpu"] = r.Gpu
 		case "ram":
 			record["ram"] = r.Ram
 			record["ram_total"] = r.RamTotal

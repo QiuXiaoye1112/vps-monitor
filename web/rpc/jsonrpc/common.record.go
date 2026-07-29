@@ -56,7 +56,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		Hours    int    `json:"hours"`     // time window in hours; default 1 if start/end not provided
 		Start    string `json:"start"`     // RFC3339 start time (optional)
 		End      string `json:"end"`       // RFC3339 end time (optional)
-		LoadType string `json:"load_type"` // for type=load: cpu|gpu|ram|swap|load|temp|disk|network|process|connections|all
+		LoadType string `json:"load_type"` // for type=load: cpu|ram|swap|load|temp|disk|network|process|connections|all
 		TaskID   int    `json:"task_id"`   // for type=ping: optional task id; -1 or omitted means all
 		MaxCount int    `json:"maxCount"`  // max number of points; -1 unlimited; default 4000
 	}
@@ -763,7 +763,6 @@ type flatRecord struct {
 	Client         string           `json:"client"`
 	Time           models.LocalTime `json:"time"`
 	Cpu            *float32         `json:"cpu,omitempty"`
-	Gpu            *float32         `json:"gpu,omitempty"`
 	Ram            *int64           `json:"ram,omitempty"`
 	RamTotal       *int64           `json:"ram_total,omitempty"`
 	Swap           *int64           `json:"swap,omitempty"`
@@ -795,9 +794,6 @@ func filterRecordsByLoadType(recs []models.Record, loadType string) []flatRecord
 		case "cpu":
 			v := r.Cpu
 			fr.Cpu = &v
-		case "gpu":
-			v := r.Gpu
-			fr.Gpu = &v
 		case "ram":
 			v := r.Ram
 			fr.Ram = &v

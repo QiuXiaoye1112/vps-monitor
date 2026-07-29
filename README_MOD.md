@@ -25,7 +25,7 @@ VPS-Monitor-Complete/          # 中心主机面板（Go 后端）
 monitor-agent/                 # 被控节点 Agent（Go，独立项目）
 ├── main.go
 ├── cmd/                       # CLI + 配置
-├── monitoring/                # 数据采集（CPU/内存/磁盘/网络/GPU）
+├── monitoring/                # 数据采集（CPU/内存/磁盘/网络）
 │   └── unit/                  # 各平台采集实现
 ├── server/                    # 上报 + WebSocket 连接
 ├── protocol/                  # 通信协议
@@ -48,7 +48,7 @@ monitor-agent/                 # 被控节点 Agent（Go，独立项目）
 | 文件 | 改动 | 说明 |
 |------|------|------|
 | `monitoring/monitoring.go` | 删除 Load 采集 | 前端不显示系统负载 |
-| `server/basicInfo.go` | 删除 9 个字段 | cpu_name/cores/arch/kernel/ip/gpu/virtualization/version |
+| `server/basicInfo.go` | 精简基础信息字段 | cpu_name/cores/arch/kernel/ip/virtualization/version |
 | 全局 | Monitor → Monitor | 所有文案/日志/二进制名改名 |
 | `cmd/root.go` | 移除自动更新 | `update` 包不再导入调用 |
 | `go.mod` | `monitor-agent` → `monitor-agent` | 模块名更改 |

@@ -28,12 +28,6 @@ func DeleteAll() error {
 	return DeleteAllHistory()
 }
 
-// GetGPURecordsByClientAndTime returns no history because the legacy GPU table
-// has been removed. Live GPU details still come from the latest Agent report.
-func GetGPURecordsByClientAndTime(uuid string, start, end time.Time) ([]models.GPURecord, error) {
-	return []models.GPURecord{}, nil
-}
-
 func DeleteRecordBefore(before time.Time) error {
 	return deleteLegacyRecordsBefore(dbcore.GetDBInstance(), before, time.Now())
 }
@@ -256,7 +250,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 	}
 	type groupData struct {
 		Cpu             []float32
-		Gpu             []float32
 		Load            []float32
 		Temp            []float32
 		Ram             []int64
@@ -292,7 +285,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		}
 		data := groupedRecords[key]
 		data.Cpu = append(data.Cpu, record.Cpu)
-		data.Gpu = append(data.Gpu, record.Gpu)
 		data.Load = append(data.Load, record.Load)
 		data.Temp = append(data.Temp, record.Temp)
 		data.Ram = append(data.Ram, record.Ram)
@@ -365,10 +357,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 			for i, v := range data.Cpu {
 				cpuFloats[i] = float64(v)
 			}
-			gpuFloats := make([]float64, len(data.Gpu))
-			for i, v := range data.Gpu {
-				gpuFloats[i] = float64(v)
-			}
 			loadFloats := make([]float64, len(data.Load))
 			for i, v := range data.Load {
 				loadFloats[i] = float64(v)
@@ -390,7 +378,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 				Client:         clientUUID,
 				Time:           models.FromTime(timeSlot),
 				Cpu:            float32(getPercentile(cpuFloats, high_percentile)),
-				Gpu:            float32(getPercentile(gpuFloats, high_percentile)),
 				Load:           float32(getPercentile(loadFloats, high_percentile)),
 				Temp:           float32(getPercentile(tempFloats, high_percentile)),
 				Ram:            getIntPercentile(data.Ram, high_percentile),

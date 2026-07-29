@@ -340,7 +340,6 @@ func migrateLegacyClientInfo(db *gorm.DB) error {
 		client.Arch = info.Arch
 		client.CpuCores = info.CpuCores
 		client.OS = info.OS
-		client.GpuName = info.GpuName
 		client.IPv4 = info.IPv4
 		client.IPv6 = info.IPv6
 		client.Region = info.Region

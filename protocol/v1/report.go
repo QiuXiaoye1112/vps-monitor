@@ -23,7 +23,6 @@ type Report struct {
 	Disk        DiskReport        `json:"disk"`
 	Network     NetworkReport     `json:"network"`
 	Connections ConnectionsReport `json:"connections"`
-	GPU         *GPUDetailReport  `json:"gpu,omitempty"`
 	Uptime      int64             `json:"uptime"`
 	Process     int               `json:"process"`
 	Message     string            `json:"message"`
@@ -35,26 +34,6 @@ type CPUReport struct {
 	Name  string  `json:"name,omitempty"`
 	Cores int     `json:"cores,omitempty"`
 	Arch  string  `json:"arch,omitempty"`
-	Usage float64 `json:"usage,omitempty"`
-}
-
-type GPUDetailReport struct {
-	Count        int             `json:"count"`
-	AverageUsage float64         `json:"average_usage"`
-	DetailedInfo []GPUDeviceInfo `json:"detailed_info"`
-}
-
-type GPUDeviceInfo struct {
-	Name        string  `json:"name"`
-	MemoryTotal int64   `json:"memory_total"`
-	MemoryUsed  int64   `json:"memory_used"`
-	Utilization float64 `json:"utilization"`
-	Temperature int     `json:"temperature"`
-}
-
-// GPUReport is the legacy v1 single-GPU shape kept for wire compatibility.
-type GPUReport struct {
-	Name  string  `json:"name,omitempty"`
 	Usage float64 `json:"usage,omitempty"`
 }
 

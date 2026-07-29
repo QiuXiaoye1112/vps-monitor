@@ -66,7 +66,6 @@ export interface NodeInfo {
   cpu_physical_cores?: number
   os: string
   kernel_version: string
-  gpu_name: string
   region: string
   mem_total: number
   swap_total: number
@@ -139,7 +138,6 @@ export interface LoadRecord {
   client: string
   time: string
   cpu: number
-  gpu: number
   ram: number
   ram_total: number
   swap: number
