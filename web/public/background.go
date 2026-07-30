@@ -149,7 +149,7 @@ func serveBackgroundImage(c *gin.Context) {
 		c.Status(404)
 		return
 	}
-	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.Header("Cache-Control", noStoreCacheControl)
 	c.Header("Content-Type", mimeType)
 	c.Header("Last-Modified", info.ModTime().UTC().Format(time.RFC1123))
 	c.File(filePath)

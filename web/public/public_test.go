@@ -2,6 +2,7 @@ package public
 
 import (
 	"bytes"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/monitor-monitor/monitor/pkg/config"
 )
 
 func TestMain(m *testing.M) {
@@ -167,5 +169,88 @@ func TestUnknownAPIAndStaticAssetReturn404(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("SPA route returned %d, want 200", w.Code)
+	}
+}
+
+func TestStaticCacheControlOnlyCachesHashedRootAssets(t *testing.T) {
+	tests := map[string]string{
+		"/assets/index-VFHjFlts.js":                 immutableAssetCacheControl,
+		"/assets/HomeView-D-5KPCcO.js":              immutableAssetCacheControl,
+		"/assets/index-DAuABzih.css":                immutableAssetCacheControl,
+		"/assets/app.js":                            noStoreCacheControl,
+		"/assets/app-abcdefg.js":                    noStoreCacheControl,
+		"/assets/app-abcdefghi.js":                  noStoreCacheControl,
+		"/images/flags/JP.svg":                      noStoreCacheControl,
+		"/themes/VPS/dist/assets/index-VFHjFlts.js": noStoreCacheControl,
+		"/api/public":                               noStoreCacheControl,
+		"/api/clients/v2/rpc":                       noStoreCacheControl,
+		"/admin":                                    noStoreCacheControl,
+		"/terminal-assets/terminal-page.js":         noStoreCacheControl,
+	}
+	for requestPath, want := range tests {
+		if got := staticCacheControl(requestPath); got != want {
+			t.Errorf("staticCacheControl(%q) = %q, want %q", requestPath, got, want)
+		}
+	}
+}
+
+func TestEmbeddedHashedAssetsUseImmutableCacheControl(t *testing.T) {
+	previousTheme, err := config.GetAs[string](config.ThemeKey, VpsTheme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Set(config.ThemeKey, VpsTheme); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = config.Set(config.ThemeKey, previousTheme)
+	})
+
+	matches, err := fs.Glob(PublicFS, "vpsTheme/dist/assets/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("embedded VPS theme has no assets")
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	Static(r.Group("/"), func(handlers ...gin.HandlerFunc) {
+		r.NoRoute(handlers...)
+	})
+
+	checked := 0
+	for _, match := range matches {
+		extension := filepath.Ext(match)
+		if extension != ".js" && extension != ".css" {
+			continue
+		}
+		requestPath := "/assets/" + filepath.Base(match)
+		req := httptest.NewRequest(http.MethodGet, requestPath, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s returned %d", requestPath, w.Code)
+		}
+		if got := w.Header().Get("Cache-Control"); got != immutableAssetCacheControl {
+			t.Fatalf("GET %s Cache-Control = %q, want %q", requestPath, got, immutableAssetCacheControl)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("embedded VPS theme has no JS/CSS assets")
+	}
+
+	for _, requestPath := range []string{"/", "/images/flags/JP.svg"} {
+		req := httptest.NewRequest(http.MethodGet, requestPath, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s returned %d", requestPath, w.Code)
+		}
+		if got := w.Header().Get("Cache-Control"); got != noStoreCacheControl {
+			t.Fatalf("GET %s Cache-Control = %q, want %q", requestPath, got, noStoreCacheControl)
+		}
 	}
 }

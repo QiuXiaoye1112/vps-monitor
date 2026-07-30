@@ -43,6 +43,9 @@ func TestSaveAndServeBackgroundImage(t *testing.T) {
 	if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, "image/png") {
 		t.Fatalf("unexpected Content-Type %q", got)
 	}
+	if got := w.Header().Get("Cache-Control"); got != noStoreCacheControl {
+		t.Fatalf("unexpected Cache-Control %q", got)
+	}
 }
 
 func TestBackgroundImageValidationAndVideoMigration(t *testing.T) {

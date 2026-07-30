@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,25 @@ import (
 )
 
 var startTimeUnix = time.Now().Unix()
+
+const (
+	noStoreCacheControl        = "no-store"
+	immutableAssetCacheControl = "public, max-age=31536000, immutable"
+)
+
+// Vite's production build appends an eight-character base64url content hash.
+// Restrict long-lived caching to root /assets JS/CSS so HTML, API responses,
+// WebSockets, custom-theme files and unhashed resources cannot become stale.
+var hashedAssetPathPattern = regexp.MustCompile(
+	`^/assets/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css)$`,
+)
+
+func staticCacheControl(requestPath string) string {
+	if hashedAssetPathPattern.MatchString(requestPath) {
+		return immutableAssetCacheControl
+	}
+	return noStoreCacheControl
+}
 
 //go:embed defaultTheme vpsTheme terminalAssets
 var PublicFS embed.FS
@@ -590,12 +610,7 @@ self.addEventListener('activate', (event) => {
 
 		content, mimeType, exists := getFileContent(themeID, filePath)
 		if exists {
-			normalizedFilePath := filepath.ToSlash(filePath)
-			if strings.HasSuffix(normalizedFilePath, "images/ethan-avatar.png") ||
-				strings.HasSuffix(normalizedFilePath, "vps-clean.js") ||
-				strings.HasSuffix(normalizedFilePath, "vps-admin-clean.js") {
-				c.Header("Cache-Control", "no-store")
-			}
+			c.Header("Cache-Control", staticCacheControl(c.Request.URL.Path))
 			c.Data(http.StatusOK, mimeType, content)
 			return
 		}
@@ -658,14 +673,7 @@ self.addEventListener('activate', (event) => {
 
 		content, mimeType, exists := getFileContent(currentTheme, distPath)
 		if exists {
-			normalizedDistPath := filepath.ToSlash(distPath)
-			if strings.HasSuffix(normalizedDistPath, "images/ethan-avatar.png") ||
-				strings.HasSuffix(normalizedDistPath, "vps-clean.js") ||
-				strings.HasSuffix(normalizedDistPath, "vps-admin-clean.js") ||
-				strings.HasSuffix(normalizedDistPath, ".js") ||
-				strings.HasSuffix(normalizedDistPath, ".css") {
-				c.Header("Cache-Control", "no-store")
-			}
+			c.Header("Cache-Control", staticCacheControl(reqPath))
 			c.Data(http.StatusOK, mimeType, content)
 			return
 		}

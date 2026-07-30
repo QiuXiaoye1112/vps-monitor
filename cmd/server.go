@@ -107,9 +107,9 @@ func RunServer() {
 	r.Use(api.IdentityMiddleware())
 
 	r.Use(func(c *gin.Context) {
-		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
-			c.Header("Cache-Control", "no-store")
-		}
+		// Dynamic responses and unhashed files must never be cached. The static
+		// theme handler explicitly overrides this only for hashed /assets JS/CSS.
+		c.Header("Cache-Control", "no-store")
 		c.Next()
 	})
 
