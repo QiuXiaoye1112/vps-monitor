@@ -167,12 +167,12 @@ function getMetricStyle(index: number): Record<string, string> {
       >
         <div class="flex h-full flex-col justify-between gap-1">
           <div class="flex items-start justify-between gap-2">
-            <span class="text-xs font-medium tracking-wider text-muted-foreground truncate">{{ metric.label }}</span>
+            <span class="text-xs font-semibold tracking-wider text-[var(--glass-light-text)] dark:text-[var(--glass-dark-muted-text)] truncate">{{ metric.label }}</span>
             <Icon
               :icon="metric.icon"
               :width="20"
               :height="20"
-              class="shrink-0 text-slate-500/20 group-hover:text-slate-500 transition-colors"
+              class="shrink-0 text-[var(--glass-light-text)] opacity-60 group-hover:opacity-90 dark:text-[var(--glass-dark-muted-text)] transition-opacity"
             />
           </div>
           <div class="flex min-w-0 flex-col gap-1.5">
@@ -182,7 +182,7 @@ function getMetricStyle(index: number): Record<string, string> {
               :style="getMetricStyle(index)"
             >
               <span class="text-md md:text-2xl font-bold leading-none tracking-tight truncate">{{ metric.value }}</span>
-              <span v-if="metric.unit" class="text-[11px] md:text-xs font-medium text-muted-foreground truncate">
+              <span v-if="metric.unit" class="text-[11px] md:text-xs font-semibold text-[var(--glass-light-text)] dark:text-[var(--glass-dark-muted-text)] truncate">
                 {{ metric.unit }}
               </span>
             </div>

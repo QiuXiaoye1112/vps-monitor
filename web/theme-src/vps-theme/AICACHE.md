@@ -13,13 +13,19 @@
 ## 当前任务
 
 - 状态：completed。
-- 目标：修复新增节点仍被旧嵌入后台覆盖为权重 `0`、无法稳定置顶的问题，并发布部署中心修正版。
-- 范围：同步运行时嵌入后台；新增服务端创建参数防护和嵌入产物回归测试；发布 Center `v1.3.7` 并更新 `ded`。
-- 数据边界：不自动调整任何现有节点顺序，不创建生产测试节点，不重建或修改现有 SQLite 数据。
-- 里程碑：M5/M6 创建链路闭环与发布验证。
-- 完成结果：新增节点权重由服务端独占计算；嵌入后台已同步移除创建时的 `weight=0`；回归测试同时覆盖接口防护和最终嵌入产物。
+- 目标：提高首页四张总览卡在亮色模式和深色背景图片上的文字可读性。
+- 范围：只调整 `NodeGeneralCards` 的标题、单位和图标前景色并同步嵌入产物；保持卡片透明度、主数值、节点卡及暗色模式视觉层级；发布 Center `v1.3.8` 并更新 `ded`。
+- 数据边界：纯前端 M4 视觉修复，不修改接口、配置或数据库。
+- 里程碑：M4 UI/UX 可读性修复。
+- 完成结果：总览卡次要文字显式使用高对比度亮色前景和暗色次要前景变量，不再依赖会因类合并而失效的全局后代选择器。
 
 ## 执行日志
+
+### 2026-07-31 light-mode general-card contrast
+
+- 浏览器计算样式确认：`CardX` 默认的 `bg-card` 被组件传入的 `bg-background/50` 经 class merge 移除，导致标题与单位的 `text-muted-foreground` 没有命中毛玻璃文字覆盖，退回低对比度默认灰色。
+- 标题和单位在亮色模式显式使用 `--glass-light-text`，暗色模式使用 `--glass-dark-muted-text`，标题与单位字重提高到 `600`；图标复用相同变量并保留 60% 到 90% 的层级变化。
+- 卡片背景透明度和主数值颜色保持不变，节点卡与其他界面不受影响。
 
 ### 2026-07-31 v1.3.7 new-node prepend closure
 
@@ -329,6 +335,7 @@
 
 ## 验证记录
 
+- 2026-07-31 light-mode general-card contrast：`web/theme-src/build-vps-theme.sh` 完成锁定依赖检查、TypeScript 检查、ESLint、生产构建和嵌入产物同步；本地浏览器在亮色模式确认标题与单位计算颜色为 `rgb(16, 21, 28)`、字重 `600`，图标使用同色 60% 透明度；暗色模式标题保持 `rgb(214, 218, 228)`。卡片透明背景未改变。
 - 2026-07-31 v1.3.7：`web/theme-src/build-vps-theme.sh` 完成依赖锁定安装、TypeScript 检查、ESLint、生产构建和嵌入同步；`go test ./database/clients ./web/rpc/jsonrpc ./web/public`、`go test ./...`、`go vet ./...` 与 `git diff --check` 全部通过。嵌入后台仅保留编辑节点时的权重字段，创建节点处理区已无 `weight`。
 - 2026-07-29 v1.3.1：`go test ./...` 全包通过；`go test -race ./database/clients ./database/records ./web/report ./web/rpc/jsonrpc` 通过；`go vet ./...` 通过；`web/theme-src/build-vps-theme.sh` 完成 type-check、lint、生产构建和嵌入式产物同步；后台内联脚本可解析且源文件与生成文件一致；Linux amd64 musl 静态构建通过。`ded` 部署后 RPC 返回 `{"version":"v1.3.1","hash":"c85d24a"}`，运行二进制 SHA-256 为 `22be6ba687c220d593bfa3669c5a62661772687cd4eb45add9e757998e5096e4`。
 - 2026-07-14 v3.1.4 Issue #18 release：`bun run lint`、`bun run build`、`git diff --check` 通过；发布提交 `91c9b06` 已推送 `main`，Actions run `#29312369165`（#49）成功，tag / Release target 均为完整提交 `91c9b06fc5c4b5ee2636dc18779861186806abd7`，Issue #18 已关闭。线上 zip `komari-theme-Glassmorphism-build-91c9b06.zip` 大小 5,114,852 bytes，SHA-256 `f8b4c9b6f61cc66d755d7a612357d16d1d2774f9494b9b0c3ce87e572ee5da9b`，下载复核顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.4`。构建仍只有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
