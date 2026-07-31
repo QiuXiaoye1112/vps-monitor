@@ -1,11 +1,13 @@
 package clients
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/google/uuid"
 )
+
+var clientCreationMu sync.Mutex
 
 func DeleteClient(clientUuid string) error {
 	if strings.TrimSpace(clientUuid) == "" {
@@ -227,6 +231,12 @@ func CreateClientWithNameAndGroup(name, group string) (clientUUID, token string,
 }
 
 func createClient(name, group string) (clientUUID, token string, err error) {
+	// Serialize the read-minimum/create pair so concurrent additions cannot
+	// receive the same leading weight. Client lists sort weight ascending, so a
+	// value below the current minimum puts every newly created node first.
+	clientCreationMu.Lock()
+	defer clientCreationMu.Unlock()
+
 	db := dbcore.GetDBInstance()
 	token = utils.GenerateToken()
 	clientUUID = uuid.New().String()
@@ -234,6 +244,7 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 	if name == "" {
 		name = "client_" + clientUUID[0:8]
 	}
+	now := time.Now()
 	client := models.Client{
 		UUID:                clientUUID,
 		Token:               token,
@@ -241,11 +252,23 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 		Group:               strings.TrimSpace(group),
 		TrafficResetEnabled: true,
 		PingTaskOrder:       models.UintArray{},
-		CreatedAt:           models.FromTime(time.Now()),
-		UpdatedAt:           models.FromTime(time.Now()),
+		CreatedAt:           models.FromTime(now),
+		UpdatedAt:           models.FromTime(now),
 	}
 
-	err = db.Create(&client).Error
+	err = db.Transaction(func(tx *gorm.DB) error {
+		var minimum sql.NullInt64
+		if err := tx.Model(&models.Client{}).Select("MIN(weight)").Scan(&minimum).Error; err != nil {
+			return err
+		}
+		if minimum.Valid {
+			if minimum.Int64 <= int64(math.MinInt) {
+				return fmt.Errorf("client weight range exhausted")
+			}
+			client.Weight = int(minimum.Int64 - 1)
+		}
+		return tx.Create(&client).Error
+	})
 	if err != nil {
 		return "", "", err
 	}

@@ -2515,7 +2515,7 @@
               '<form id="anf' +
                 id +
                 '"><div class="modal-grid"><div class="form-group"><label>名称</label><input name="name" required placeholder="VPS-1"></div><div class="form-group"><label>分组</label><input name="group" placeholder="例如: 日本节点"></div></div>' +
-                '<input name="weight" type="hidden" value="0"><div class="modal-grid"><div class="form-group"><label>自动清零</label><select name="traffic_reset_enabled"><option value="true" selected>开启</option><option value="false">关闭</option></select></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" selected>否</option><option value="true">是</option></select></div></div>' +
+                '<div class="modal-grid"><div class="form-group"><label>自动清零</label><select name="traffic_reset_enabled"><option value="true" selected>开启</option><option value="false">关闭</option></select></div><div class="form-group"><label>隐藏</label><select name="hidden"><option value="false" selected>否</option><option value="true">是</option></select></div></div>' +
                 '<h4 class="sec-title">流量</h4>' +
                 '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" selected>合计</option><option value="up">上行</option><option value="down">下行</option></select></div><div class="form-group">' +
                 renderTrafficPlanControl(id, 1, 0, 0) +
@@ -2542,7 +2542,6 @@
               var data = {
                 name: f.get("name"),
                 group: f.get("group"),
-                weight: parseInt(f.get("weight")) || 0,
                 hidden: f.get("hidden") === "true",
                 traffic_limit:
                   (parseInt(f.get("traffic_limit")) || 0) * 1073741824,
