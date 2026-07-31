@@ -13,13 +13,20 @@
 ## 当前任务
 
 - 状态：completed。
-- 目标：发布并部署已完成 GPU 源码移除及心跳加固的 Center / Agent 最终整合版本。
-- 范围：Center `v1.3.3`、Agent `v1.4.0` 的 main、正式 Release、多平台资产、Center 线上更新及发布后验证。
-- 数据边界：不重建或破坏现有 SQLite 主库；旧库中的 `gpu` / `gpu_name` 物理列允许保留，但源码中已无对应模型、读取、写入、聚合或返回逻辑。
-- 里程碑：M5/M6 架构收敛与死代码清理。
-- 完成结果：两个仓库最终整合代码和正式 Release 已发布；Center 已由正式 Release 资产更新，Agent 仅发布未部署。
+- 目标：修复新增节点仍被旧嵌入后台覆盖为权重 `0`、无法稳定置顶的问题，并发布部署中心修正版。
+- 范围：同步运行时嵌入后台；新增服务端创建参数防护和嵌入产物回归测试；发布 Center `v1.3.7` 并更新 `ded`。
+- 数据边界：不自动调整任何现有节点顺序，不创建生产测试节点，不重建或修改现有 SQLite 数据。
+- 里程碑：M5/M6 创建链路闭环与发布验证。
+- 完成结果：新增节点权重由服务端独占计算；嵌入后台已同步移除创建时的 `weight=0`；回归测试同时覆盖接口防护和最终嵌入产物。
 
 ## 执行日志
+
+### 2026-07-31 v1.3.7 new-node prepend closure
+
+- 复现并确认 `v1.3.6` 的遗漏：源码后台已不提交创建权重，但运行时读取的 `web/public/vpsTheme/dist/admin.html` 仍提交 `weight: 0`，把数据库创建阶段计算的负权重覆盖为 `0`。
+- 重新同步后台源码到嵌入产物；创建 RPC 的允许字段中移除 `weight`，因此旧浏览器标签页或旧后台也无法覆盖服务端分配的置顶权重。
+- 新增嵌入产物回归测试，直接限定“添加节点”处理区不得出现权重表单或权重请求字段；编辑节点的既有权重排序能力保持不变。
+- 全量主题构建、Go 测试和 vet 通过；未修改现有节点顺序或生产数据库。
 
 ### 2026-07-29 v1.3.3 / Agent v1.4.0 final integrated release
 
@@ -322,6 +329,7 @@
 
 ## 验证记录
 
+- 2026-07-31 v1.3.7：`web/theme-src/build-vps-theme.sh` 完成依赖锁定安装、TypeScript 检查、ESLint、生产构建和嵌入同步；`go test ./database/clients ./web/rpc/jsonrpc ./web/public`、`go test ./...`、`go vet ./...` 与 `git diff --check` 全部通过。嵌入后台仅保留编辑节点时的权重字段，创建节点处理区已无 `weight`。
 - 2026-07-29 v1.3.1：`go test ./...` 全包通过；`go test -race ./database/clients ./database/records ./web/report ./web/rpc/jsonrpc` 通过；`go vet ./...` 通过；`web/theme-src/build-vps-theme.sh` 完成 type-check、lint、生产构建和嵌入式产物同步；后台内联脚本可解析且源文件与生成文件一致；Linux amd64 musl 静态构建通过。`ded` 部署后 RPC 返回 `{"version":"v1.3.1","hash":"c85d24a"}`，运行二进制 SHA-256 为 `22be6ba687c220d593bfa3669c5a62661772687cd4eb45add9e757998e5096e4`。
 - 2026-07-14 v3.1.4 Issue #18 release：`bun run lint`、`bun run build`、`git diff --check` 通过；发布提交 `91c9b06` 已推送 `main`，Actions run `#29312369165`（#49）成功，tag / Release target 均为完整提交 `91c9b06fc5c4b5ee2636dc18779861186806abd7`，Issue #18 已关闭。线上 zip `komari-theme-Glassmorphism-build-91c9b06.zip` 大小 5,114,852 bytes，SHA-256 `f8b4c9b6f61cc66d755d7a612357d16d1d2774f9494b9b0c3ce87e572ee5da9b`，下载复核顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.4`。构建仍只有既有 `@vueuse/core` PURE 注释与 `globe` 大 chunk 警告。
 - 2026-07-14 v3.1.3 release：发布提交 `4f37416` 已推送 `main`；GitHub Actions run `#29311122789` 成功。Release `v3.1.3` 为正式发布（非 draft / prerelease），target 为完整提交 `4f3741692bd81141ed542614d5b31a01ff0dc0fc`，zip 资产 `komari-theme-Glassmorphism-build-4f37416.zip` 上传状态为 `uploaded`。下载复核：大小 5,120,783 bytes，SHA-256 `f4d5f1be0c769ffc5372ab6a9b780042768f82529827b7222a843ef642605bee`，顶层结构 `komari-theme.json`、`preview.png`、`dist/`，包内版本 `3.1.3`。

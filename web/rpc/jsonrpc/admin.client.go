@@ -142,7 +142,6 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 	for _, key := range []string{
 		"name",
 		"group",
-		"weight",
 		"hidden",
 		"traffic_limit",
 		"traffic_limit_type",
@@ -163,7 +162,7 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 
 func normalizeClientCreateValue(key string, value interface{}) interface{} {
 	switch key {
-	case "weight", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute":
+	case "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute":
 		if n, ok := asInt64(value); ok {
 			return int(n)
 		}

@@ -96,6 +96,28 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 	}
 }
 
+func TestVPSAdminCreateCannotOverrideServerAssignedWeight(t *testing.T) {
+	raw, err := PublicFS.ReadFile("vpsTheme/dist/admin.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(raw)
+	start := strings.Index(html, `var abtn = _d.getElementById("addNodeBtn")`)
+	if start < 0 {
+		t.Fatal("add-node handler is missing from embedded admin")
+	}
+	endOffset := strings.Index(html[start:], `var pbtn = _d.getElementById("addPingBtn")`)
+	if endOffset < 0 {
+		t.Fatal("could not determine embedded add-node handler boundary")
+	}
+	addNodeHandler := html[start : start+endOffset]
+	for _, forbidden := range []string{`name="weight"`, `weight:`} {
+		if strings.Contains(addNodeHandler, forbidden) {
+			t.Fatalf("embedded add-node handler must not submit %q", forbidden)
+		}
+	}
+}
+
 func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 	raw, err := PublicFS.ReadFile("vpsTheme/dist/index.html")
 	if err != nil {

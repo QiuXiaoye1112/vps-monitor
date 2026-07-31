@@ -25,7 +25,6 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 	for _, key := range []string{
 		"name",
 		"group",
-		"weight",
 		"hidden",
 		"traffic_limit",
 		"traffic_limit_type",
@@ -45,8 +44,8 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 	if _, ok := update["token"]; ok {
 		t.Fatal("token must not be accepted during client creation update")
 	}
-	if got, ok := update["weight"].(int); !ok || got != 3 {
-		t.Fatalf("weight = %#v, want int(3)", update["weight"])
+	if _, ok := update["weight"]; ok {
+		t.Fatal("weight must remain server-controlled during client creation")
 	}
 	if got, ok := update["traffic_limit"].(int64); !ok || got != 500*1024*1024*1024 {
 		t.Fatalf("traffic_limit = %#v, want int64 500GiB", update["traffic_limit"])
