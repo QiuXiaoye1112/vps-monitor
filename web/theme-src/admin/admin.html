@@ -1803,7 +1803,7 @@
       }
 
       function backupPage() {
-        return '<div class="card"><h3>备份管理</h3><div class="flex gap-3 mb-4"><a href="/api/admin/download/backup" class="btn btn-primary btn-sm">下载备份</a></div><div class="card" style="background:rgba(255,255,255,.02)"><h4>上传恢复</h4><form id="backupForm" enctype="multipart/form-data"><input type="file" name="file" accept=".zip,.json" class="mb-2"><button class="btn btn-outline btn-sm" type="submit">上传恢复</button></form></div></div>';
+        return '<div class="card"><h3>备份管理</h3><div class="flex gap-3 mb-4"><a href="/api/admin/download/backup" class="btn btn-primary btn-sm">下载备份</a></div><div class="card" style="background:rgba(255,255,255,.02)"><h4>上传恢复</h4><form id="backupForm" enctype="multipart/form-data"><input type="file" name="backup" accept=".zip" class="mb-2"><button class="btn btn-outline btn-sm" type="submit">上传恢复</button></form></div></div>';
       }
 
       // ====== ACTIONS ======
