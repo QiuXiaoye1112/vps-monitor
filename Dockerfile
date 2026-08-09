@@ -19,9 +19,9 @@ RUN set -eux; \
     curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${cloudflared_arch}" -o /usr/local/bin/cloudflared; \
     chmod +x /usr/local/bin/cloudflared
 
-COPY monitor-${TARGETOS}-${TARGETARCH} /app/monitor
+COPY vps-monitor-${TARGETOS}-${TARGETARCH} /app/vps-monitor
 
-RUN chmod +x /app/monitor
+RUN chmod +x /app/vps-monitor
 
 ENV GIN_MODE=release
 ENV MONITOR_DB_TYPE=sqlite
@@ -35,4 +35,4 @@ ENV MONITOR_LISTEN=0.0.0.0:25774
 
 EXPOSE 25774
 
-CMD ["/app/monitor", "server"]
+CMD ["/app/vps-monitor", "server"]

@@ -12,6 +12,12 @@ const appStore = useAppStore()
 
 onMounted(async () => {
   try {
+    const backgroundReady = (window as Window & {
+      __VPS_BACKGROUND_READY__?: Promise<unknown>
+    }).__VPS_BACKGROUND_READY__
+    if (backgroundReady)
+      await backgroundReady
+
     await initApp()
     await nextTick()
   }

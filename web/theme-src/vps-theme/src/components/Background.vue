@@ -59,8 +59,13 @@ function clearImageLoader() {
 }
 
 function loadImage(url: string) {
-  const preloadedUrl = (window as Window & { __VPS_BACKGROUND_PRELOADED__?: string }).__VPS_BACKGROUND_PRELOADED__
-  if (preloadedUrl === url) {
+  const backgroundWindow = window as Window & {
+    __VPS_BACKGROUND_PRELOADED__?: string
+    __VPS_BACKGROUND_PRELOADED_URLS__?: Record<string, boolean>
+  }
+  const preloadedUrl = backgroundWindow.__VPS_BACKGROUND_PRELOADED__
+  const preloadedUrls = backgroundWindow.__VPS_BACKGROUND_PRELOADED_URLS__
+  if (preloadedUrl === url || preloadedUrls?.[url]) {
     isLoaded.value = true
     hasError.value = false
     return

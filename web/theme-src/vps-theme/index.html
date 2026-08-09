@@ -64,50 +64,72 @@
         const lightUrl = typeof settings.lightBackgroundUrl === 'string' ? settings.lightBackgroundUrl.trim() : ''
         const darkUrl = typeof settings.darkBackgroundUrl === 'string' ? settings.darkBackgroundUrl.trim() : ''
         const url = (dark ? darkUrl || lightUrl : lightUrl).trim()
+        const urls = [...new Set([lightUrl, darkUrl].filter(Boolean))]
         window.__VPS_BACKGROUND_READY__ = Promise.resolve()
         window.__VPS_BACKGROUND_PRELOADED__ = ''
-        if (!enabled || !url) return
+        window.__VPS_BACKGROUND_PRELOADED_URLS__ = {}
+        if (!enabled || urls.length === 0) return
 
-        document.documentElement.dataset.vpsCustomBackground = 'true'
-        document.documentElement.style.setProperty('--vps-bootstrap-color', dark ? '#0f172a' : '#f8fafc')
-        const blur = Number.isFinite(settings.backgroundBlur) ? Math.max(0, settings.backgroundBlur) : 0
-        document.documentElement.style.setProperty('--vps-bootstrap-blur', `${blur}px`)
-        document.documentElement.style.setProperty('--vps-bootstrap-scale', blur > 0 ? '1.04' : '1')
-        const overlay = Number.isFinite(settings.backgroundOverlay)
-          ? Math.max(-100, Math.min(100, settings.backgroundOverlay))
-          : 0
-        if (overlay < 0) {
-          document.documentElement.style.setProperty('--vps-bootstrap-opacity', String(1 - Math.abs(overlay) / 100))
-        } else if (overlay > 0) {
-          document.documentElement.style.setProperty('--vps-bootstrap-overlay', String(overlay / 100))
+        if (url) {
+          document.documentElement.dataset.vpsCustomBackground = 'true'
+          document.documentElement.style.setProperty('--vps-bootstrap-color', dark ? '#0f172a' : '#f8fafc')
+          const blur = Number.isFinite(settings.backgroundBlur) ? Math.max(0, settings.backgroundBlur) : 0
+          document.documentElement.style.setProperty('--vps-bootstrap-blur', `${blur}px`)
+          document.documentElement.style.setProperty('--vps-bootstrap-scale', blur > 0 ? '1.04' : '1')
+          const overlay = Number.isFinite(settings.backgroundOverlay)
+            ? Math.max(-100, Math.min(100, settings.backgroundOverlay))
+            : 0
+          if (overlay < 0) {
+            document.documentElement.style.setProperty('--vps-bootstrap-opacity', String(1 - Math.abs(overlay) / 100))
+          } else if (overlay > 0) {
+            document.documentElement.style.setProperty('--vps-bootstrap-overlay', String(overlay / 100))
+          }
+          document.documentElement.style.setProperty('--vps-bootstrap-image', `url(${JSON.stringify(url)})`)
         }
-        document.documentElement.style.setProperty('--vps-bootstrap-image', `url(${JSON.stringify(url)})`)
 
         window.__VPS_BACKGROUND_READY__ = new Promise((resolve) => {
+          let remaining = urls.length
           let settled = false
-          const finish = (loaded) => {
-            if (settled) return
+          const timeout = window.setTimeout(() => {
             settled = true
-            if (loaded) window.__VPS_BACKGROUND_PRELOADED__ = url
+            resolve()
+          }, 4000)
+          const done = (backgroundUrl, loaded) => {
+            if (loaded) {
+              window.__VPS_BACKGROUND_PRELOADED_URLS__[backgroundUrl] = true
+              if (backgroundUrl === url) window.__VPS_BACKGROUND_PRELOADED__ = backgroundUrl
+            }
+            remaining -= 1
+            if (remaining > 0 || settled) return
+            settled = true
+            window.clearTimeout(timeout)
             resolve()
           }
-          const timeout = window.setTimeout(() => finish(false), 4000)
-          const done = (loaded) => {
-            window.clearTimeout(timeout)
-            finish(loaded)
-          }
-          const preload = document.createElement('link')
-          preload.rel = 'preload'
-          preload.as = 'image'
-          preload.href = url
-          preload.fetchPriority = 'high'
-          document.head.appendChild(preload)
-          const image = new Image()
-          image.decoding = 'async'
-          image.fetchPriority = 'high'
-          image.onload = () => done(true)
-          image.onerror = () => done(false)
-          image.src = url
+          urls.forEach((backgroundUrl) => {
+            const preload = document.createElement('link')
+            preload.rel = 'preload'
+            preload.as = 'image'
+            preload.href = backgroundUrl
+            preload.fetchPriority = 'high'
+            document.head.appendChild(preload)
+            const image = new Image()
+            image.decoding = 'async'
+            image.fetchPriority = 'high'
+            let finished = false
+            const finishImage = (loaded) => {
+              if (finished) return
+              finished = true
+              done(backgroundUrl, loaded)
+            }
+            image.onload = async () => {
+              try {
+                await image.decode()
+              } catch (_) {}
+              finishImage(true)
+            }
+            image.onerror = () => finishImage(false)
+            image.src = backgroundUrl
+          })
         })
       })()
     </script>

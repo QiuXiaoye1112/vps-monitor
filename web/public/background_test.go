@@ -43,7 +43,7 @@ func TestSaveAndServeBackgroundImage(t *testing.T) {
 	if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, "image/png") {
 		t.Fatalf("unexpected Content-Type %q", got)
 	}
-	if got := w.Header().Get("Cache-Control"); got != noStoreCacheControl {
+	if got := w.Header().Get("Cache-Control"); got != immutableAssetCacheControl {
 		t.Fatalf("unexpected Cache-Control %q", got)
 	}
 }

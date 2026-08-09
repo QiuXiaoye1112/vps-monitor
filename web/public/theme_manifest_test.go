@@ -127,6 +127,9 @@ func TestVPSThemeBootstrapsCustomBackgroundBeforeAppMount(t *testing.T) {
 	for _, required := range []string{
 		vpsThemeBootstrapMarker,
 		`window.__VPS_BACKGROUND_READY__`,
+		`window.__VPS_BACKGROUND_PRELOADED_URLS__`,
+		`const urls = [...new Set([lightUrl, darkUrl].filter(Boolean))]`,
+		`urls.forEach((backgroundUrl) =>`,
 		`rel = 'preload'`,
 		`preload.as = 'image'`,
 		`fetchPriority = 'high'`,

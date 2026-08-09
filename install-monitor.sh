@@ -27,11 +27,11 @@ log_step() {
 # Global variables
 INSTALL_DIR="/opt/monitor"
 DATA_DIR="/opt/monitor"
-SERVICE_NAME="monitor"
-BINARY_PATH="$INSTALL_DIR/monitor"
+SERVICE_NAME="vps-monitor"
+BINARY_PATH="$INSTALL_DIR/vps-monitor"
 DEFAULT_PORT="25774"
 LISTEN_PORT=""
-REPO="monitor-monitor/monitor"
+REPO="QiuXiaoye1112/vps-monitor"
 # 发布通道: stable（稳定版）或 snapshot（快照版）
 CHANNEL="stable"
 # TUI 工具: whiptail / dialog / 空（回退纯文本）
@@ -163,7 +163,7 @@ show_banner() {
     clear
     echo "=============================================================="
     echo "                 VPS Monitor Installer"
-    echo "       https://github.com/monitor-monitor/monitor"
+    echo "       https://github.com/QiuXiaoye1112/vps-monitor"
     echo "=============================================================="
     echo
 }
@@ -267,7 +267,7 @@ install_dependencies() {
 # Get download URL based on channel
 get_download_url() {
     local arch=$1
-    local file_name="monitor-linux-${arch}"
+    local file_name="vps-monitor-linux-${arch}"
 
     if [ "$CHANNEL" = "snapshot" ]; then
         # 获取最新的 snapshot 预发布版本

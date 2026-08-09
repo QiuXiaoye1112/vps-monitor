@@ -149,7 +149,9 @@ func serveBackgroundImage(c *gin.Context) {
 		c.Status(404)
 		return
 	}
-	c.Header("Cache-Control", noStoreCacheControl)
+	// The URL contains the file modification time, so each uploaded image gets
+	// a new cache key and can safely be reused for instant theme switches.
+	c.Header("Cache-Control", immutableAssetCacheControl)
 	c.Header("Content-Type", mimeType)
 	c.Header("Last-Modified", info.ModTime().UTC().Format(time.RFC1123))
 	c.File(filePath)
