@@ -101,3 +101,26 @@ func TestGetPingRecordsUsesStoredTimeFormat(t *testing.T) {
 	require.Equal(t, 3, records[0].Value)
 	require.Equal(t, 2, records[1].Value)
 }
+
+func TestGetLatestPingRecordUsesNewestTaskRecord(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PingRecord{}))
+
+	client := "ping-node"
+	old := models.FromTime(time.Date(2026, 8, 10, 1, 0, 0, 0, time.UTC))
+	newest := models.FromTime(time.Date(2026, 8, 10, 3, 0, 0, 0, time.UTC))
+	require.NoError(t, db.Create(&models.PingRecord{Client: client, TaskId: 1, Time: old, Value: 10}).Error)
+	require.NoError(t, db.Create(&models.PingRecord{Client: client, TaskId: 2, Time: newest, Value: 20}).Error)
+
+	got, err := getLatestPingRecord(db, client, -1)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, newest.ToTime(), got.Time.ToTime())
+	require.Equal(t, uint(2), got.TaskId)
+
+	got, err = getLatestPingRecord(db, client, 1)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, old.ToTime(), got.Time.ToTime())
+}

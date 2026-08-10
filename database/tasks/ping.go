@@ -359,6 +359,32 @@ func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.Pin
 	return getPingRecords(db, uuid, taskId, start, end)
 }
 
+// GetLatestPingRecord returns the newest retained Ping record for a client,
+// optionally limited to one task.
+func GetLatestPingRecord(uuid string, taskId int) (*models.PingRecord, error) {
+	return getLatestPingRecord(dbcore.GetDBInstance(), uuid, taskId)
+}
+
+func getLatestPingRecord(db *gorm.DB, uuid string, taskId int) (*models.PingRecord, error) {
+	if db == nil || uuid == "" {
+		return nil, nil
+	}
+
+	query := db.Model(&models.PingRecord{}).Where("client = ?", uuid)
+	if taskId >= 0 {
+		query = query.Where("task_id = ?", uint(taskId))
+	}
+
+	var records []models.PingRecord
+	if err := query.Order("time DESC").Limit(1).Find(&records).Error; err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	return &records[0], nil
+}
+
 func getPingRecords(db *gorm.DB, uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
 	var records []models.PingRecord
 	dbQuery := db.Model(&models.PingRecord{})

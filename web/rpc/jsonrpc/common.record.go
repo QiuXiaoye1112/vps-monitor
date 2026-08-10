@@ -242,11 +242,21 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		}{Count: total, Records: grouped, From: models.FromTime(startTime), To: models.FromTime(endTime)}, nil
 
 	case "ping":
-		startTime, endTime = clampPingRecordRange(startTime, endTime)
 		taskId := params.TaskID
 		if taskId == 0 {
 			taskId = -1
 		}
+		if params.UUID != "" && relativeWindow {
+			latest, err := tasks.GetLatestPingRecord(params.UUID, taskId)
+			if err != nil {
+				return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch latest Ping record", err.Error())
+			}
+			if latest != nil {
+				endTime = latest.Time.ToTime()
+				startTime = endTime.Add(-time.Duration(relativeHours) * time.Hour)
+			}
+		}
+		startTime, endTime = clampPingRecordRange(startTime, endTime)
 		recs, err := tasks.GetPingRecords(params.UUID, taskId, startTime, endTime)
 		if err != nil {
 			return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch ping records", err.Error())
