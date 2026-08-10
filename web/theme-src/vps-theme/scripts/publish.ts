@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline/promises'
 const VERSION_RE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Z.-]+)?$/i
 const VERSION_FIELD_RE = /^(\s*"version"\s*:\s*")([^"]*)(")/m
 const PATCH_VERSION_RE = /^(\d+)\.(\d+)\.(\d+)$/
-const VERSION_SOURCE_FILE = 'komari-theme.json'
+const VERSION_SOURCE_FILE = 'vps-monitor-theme.json'
 
 function readThemeVersion(): string {
   const themeManifest = JSON.parse(readFileSync(resolve(process.cwd(), VERSION_SOURCE_FILE), 'utf8')) as { version?: unknown }

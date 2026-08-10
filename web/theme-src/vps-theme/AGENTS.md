@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Root-scope guide for AI agents working in `komari-theme-Glassmorphism`.
+Root-scope guide for AI agents working in `vps-monitor-theme-Glassmorphism`.
 
 For the complete AI/developer manual, read [AIAGENTREADME.md](AIAGENTREADME.md). For persistent task handoff and progress tracking, read and update [AICACHE.md](AICACHE.md).
 
@@ -8,9 +8,9 @@ For the complete AI/developer manual, read [AIAGENTREADME.md](AIAGENTREADME.md).
 
 - Updated: 2026-07-12
 - Branch: `main`
-- App: Vue 3 + Vite + reka-ui + Tailwind CSS v4 theme for Komari Monitor
+- App: Vue 3 + Vite + reka-ui + Tailwind CSS v4 theme for VPS Monitor Monitor
 - Package manager: `bun` >= 1.2
-- Theme manifest and version source: [komari-theme.json](komari-theme.json)
+- Theme manifest and version source: [vps-monitor-theme.json](vps-monitor-theme.json)
 
 ## Required workflow for agents
 
@@ -28,14 +28,14 @@ For the complete AI/developer manual, read [AIAGENTREADME.md](AIAGENTREADME.md).
 
 ## What this repo builds
 
-This repository builds a Komari theme package, not a generic deployed web app.
+This repository builds a VPS Monitor theme package, not a generic deployed web app.
 
 Release contract:
 
-- `bun run build` must output `dist/` and `komari-theme-Glassmorphism-build-<short-sha>.zip`.
-- Zip layout must stay: `komari-theme.json`, `preview.png`, `dist/`.
+- `bun run build` must output `dist/` and `vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`.
+- Zip layout must stay: `vps-monitor-theme.json`, `preview.png`, `dist/`.
 - Packaged `preview.png` comes from [docs/preview.png](docs/preview.png).
-- Do not rename [komari-theme.json](komari-theme.json), [docs/preview.png](docs/preview.png), or the zip pattern.
+- Do not rename [vps-monitor-theme.json](vps-monitor-theme.json), [docs/preview.png](docs/preview.png), or the zip pattern.
 
 ## Commands
 
@@ -84,7 +84,7 @@ Quick placement guide:
 
 ## Safeguards
 
-- [komari-theme.json](komari-theme.json) is the only release-version source; do not add `package.json.version`.
+- [vps-monitor-theme.json](vps-monitor-theme.json) is the only release-version source; do not add `package.json.version`.
 - Default node card size must remain `compact`; `mini` is optional.
 - Realtime node metrics must update without page refresh; node indexes must point to Vue-reactive node objects.
 - Public home/detail routes stay public; sensitive actions/data paths perform permission checks instead of router guards.

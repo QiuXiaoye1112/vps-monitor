@@ -1,11 +1,11 @@
-# Komari RPC2 客户端 SDK
+# VPS Monitor RPC2 客户端 SDK
 
-基于 JSON-RPC 2.0 规范的 Komari RPC 客户端，支持 HTTP POST 和 WebSocket 两种传输方式。
+基于 JSON-RPC 2.0 规范的 VPS Monitor RPC 客户端，支持 HTTP POST 和 WebSocket 两种传输方式。
 
 ## 安装与引入
 
 ```typescript
-import { getSharedRpc, KomariRpc, RpcError } from '@/utils/rpc'
+import { getSharedRpc, RpcError, VpsMonitorRpc } from '@/utils/rpc'
 ```
 
 ## 快速开始
@@ -29,7 +29,7 @@ const pong = await rpc.ping() // 'pong'
 ### 创建独立实例
 
 ```typescript
-const rpc = new KomariRpc({
+const rpc = new VpsMonitorRpc({
   baseUrl: '/api/rpc2', // 基础路径
   timeout: 30000, // 超时时间（毫秒）
   useWebSocket: false, // 是否使用 WebSocket
@@ -109,7 +109,7 @@ const node = await rpc.getNodes('uuid-xxx') // Client
 ```typescript
 const info = await rpc.getPublicInfo()
 // {
-//   sitename: 'Komari Monitor',
+//   sitename: 'VPS Monitor Monitor',
 //   description: '...',
 //   oauth_enable: true,
 //   ...
@@ -312,7 +312,7 @@ catch (error) {
 WebSocket 模式适用于需要频繁调用的场景，可以减少连接开销：
 
 ```typescript
-const rpc = new KomariRpc({ useWebSocket: true })
+const rpc = new VpsMonitorRpc({ useWebSocket: true })
 
 // 或者动态切换
 rpc.getClient().setTransport(true)
@@ -382,5 +382,5 @@ export const useNodeStore = defineStore('node', () => {
 
 ## 参考文档
 
-- [Komari RPC2 接口文档](https://www.komari.wiki/dev/rpc.html)
+- [VPS Monitor RPC2 接口文档](https://www.vps-monitor.wiki/dev/rpc.html)
 - [JSON-RPC 2.0 规范](https://www.jsonrpc.org/specification)

@@ -4,7 +4,7 @@
  */
 
 import type { RealtimeEvent } from '@/utils/realtime'
-import type { Client, KomariRpc, NodeStatus } from '@/utils/rpc'
+import type { Client, NodeStatus, VpsMonitorRpc } from '@/utils/rpc'
 import { REALTIME_CONFIG } from '@/constants/realtime'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
@@ -37,7 +37,7 @@ const DEFAULT_CONFIG: Required<InitConfig> = {
 /** 初始化状态管理 */
 class InitManager {
   private config: Required<InitConfig>
-  private rpc: KomariRpc
+  private rpc: VpsMonitorRpc
   private appStore: ReturnType<typeof useAppStore>
   private nodesStore: ReturnType<typeof useNodesStore>
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null

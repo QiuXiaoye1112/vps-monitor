@@ -13,15 +13,15 @@ This file is the Claude Code entrypoint for this repository. The full AI/develop
 
 ## What this project is
 
-Komari Glassmorphism is a Komari Monitor theme built with Vue 3 + Vite. The release artifact is a Komari-importable zip package, not a generic deployed web app.
+VPS Monitor Glassmorphism is a VPS Monitor Monitor theme built with Vue 3 + Vite. The release artifact is a VPS Monitor-importable zip package, not a generic deployed web app.
 
 Key release facts:
 
-- [komari-theme.json](komari-theme.json) is release input and the only release-version source.
+- [vps-monitor-theme.json](vps-monitor-theme.json) is release input and the only release-version source.
 - Do not add a top-level `version` to [package.json](package.json).
 - `bun run build` must preserve zip packaging from [vite.config.ts](vite.config.ts).
-- Build output must include `dist/` and `komari-theme-Glassmorphism-build-<short-sha>.zip`.
-- Zip layout must stay: `komari-theme.json`, `preview.png`, `dist/`.
+- Build output must include `dist/` and `vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`.
+- Zip layout must stay: `vps-monitor-theme.json`, `preview.png`, `dist/`.
 
 ## Commands
 
@@ -71,7 +71,7 @@ Do not store secrets, tokens, private passwords, or private server credentials i
 - Do not parse raw `theme_settings` in components; normalize in [src/stores/app.ts](src/stores/app.ts).
 - Do not add ad-hoc caches for provider metadata, history records, or request deduplication.
 - Keep `nodeCardSize` default as `compact`; `mini` is optional and must not replace compact behavior.
-- Do not rename [komari-theme.json](komari-theme.json), [docs/preview.png](docs/preview.png), or the zip naming pattern.
+- Do not rename [vps-monitor-theme.json](vps-monitor-theme.json), [docs/preview.png](docs/preview.png), or the zip naming pattern.
 - Runtime image filenames under [public/images/](public/images/) are code contracts; check helpers before renaming.
 
 For detailed explanations and development paths, use [AIAGENTREADME.md](AIAGENTREADME.md).

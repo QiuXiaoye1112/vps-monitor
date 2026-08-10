@@ -1,8 +1,8 @@
 import { NETWORK_CONFIG } from '@/constants/network'
 
 /**
- * Komari RPC2 Client SDK
- * @see https://www.komari.wiki/dev/rpc.html
+ * VPS Monitor RPC2 Client SDK
+ * @see https://www.vps-monitor.wiki/dev/rpc.html
  */
 
 // ==================== 类型定义 ====================
@@ -675,13 +675,13 @@ export class RpcClient {
   }
 }
 
-// ==================== KomariRpc 类 ====================
+// ==================== VpsMonitorRpc 类 ====================
 
 /**
- * Komari RPC 高级封装
- * 提供常用的 Komari API 方法
+ * VPS Monitor RPC 高级封装
+ * 提供常用的 VPS Monitor API 方法
  */
-export class KomariRpc {
+export class VpsMonitorRpc {
   private client: RpcClient
 
   constructor(options: RpcClientOptions = {}) {
@@ -886,14 +886,14 @@ export class KomariRpc {
 
 // ==================== 单例 ====================
 
-let sharedRpc: KomariRpc | null = null
+let sharedRpc: VpsMonitorRpc | null = null
 
 /**
- * 获取共享的 KomariRpc 实例
+ * 获取共享的 VpsMonitorRpc 实例
  */
-export function getSharedRpc(): KomariRpc {
+export function getSharedRpc(): VpsMonitorRpc {
   if (!sharedRpc) {
-    sharedRpc = new KomariRpc()
+    sharedRpc = new VpsMonitorRpc()
   }
   return sharedRpc
 }

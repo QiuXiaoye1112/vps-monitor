@@ -43,4 +43,4 @@ __screenshots__/
 *.timestamp-*-*.mjs
 
 # Theme build output
-komari-theme-*.zip
+vps-monitor-theme-*.zip

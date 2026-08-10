@@ -1,6 +1,6 @@
 # v3 Architecture
 
-Komari Theme Glassmorphism v3 moves new code toward a layered architecture:
+VPS Monitor Theme Glassmorphism v3 moves new code toward a layered architecture:
 
 ```text
 Vue Component
@@ -8,7 +8,7 @@ Vue Component
   -> Service (business logic)
   -> RequestManager / CacheService
   -> API / RPC
-  -> Komari backend
+  -> VPS Monitor backend
 ```
 
 ## Rules

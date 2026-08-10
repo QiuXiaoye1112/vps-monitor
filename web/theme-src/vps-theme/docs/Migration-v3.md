@@ -2,7 +2,7 @@
 
 ## Breaking changes
 
-No public Komari API response formats are changed by the v3 foundation work.
+No public VPS Monitor API response formats are changed by the v3 foundation work.
 
 ## Theme settings
 

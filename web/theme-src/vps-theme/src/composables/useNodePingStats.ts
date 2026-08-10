@@ -48,7 +48,7 @@ interface SharedPingRecordsEntry {
 
 const HISTORY_BUCKET_COUNT = 20
 const CACHE_VERSION = 8
-const CACHE_KEY_PREFIX = 'komari-theme-emerald:node-ping-stats'
+const CACHE_KEY_PREFIX = 'vps-monitor-theme-emerald:node-ping-stats'
 const FULL_LOSS_EPSILON = 1e-6
 const sharedPingRecordsCache = new Map<string, SharedPingRecordsEntry>()
 

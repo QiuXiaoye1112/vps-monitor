@@ -1,5 +1,5 @@
 {
-  "name": "komari-theme-Glassmorphism",
+  "name": "vps-monitor-theme-Glassmorphism",
   "type": "module",
   "packageManager": "bun@1.3.14",
   "author": {
@@ -18,7 +18,7 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "publish": "bun scripts/publish.ts",
-    "sync:admin": "bun scripts/sync-komari-admin.ts",
+    "sync:admin": "bun scripts/sync-vps-monitor-admin.ts",
     "lint": "eslint . --fix --cache",
     "lint:eslint": "eslint . --fix --cache"
   },

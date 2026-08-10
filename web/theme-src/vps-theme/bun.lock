@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "komari-theme-Glassmorphism",
+      "name": "vps-monitor-theme-Glassmorphism",
       "dependencies": {
         "@iconify/vue": "^4.3.0",
         "@vueuse/core": "^14.2.1",

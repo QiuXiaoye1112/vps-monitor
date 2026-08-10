@@ -168,6 +168,7 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 		`background-image`,
 		`__VPS_BACKGROUND_PRELOADED__`,
 		`VPS Monitor`,
+		`VPS Monitor Glassmorphism`,
 		`累计流量`,
 		`流量重置时间`,
 	} {
@@ -177,7 +178,6 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 	}
 	for _, removed := range []string{
 		`background-video`,
-		`Komari Glassmorphism`,
 		`搜索节点`,
 		`显示高级工具`,
 	} {

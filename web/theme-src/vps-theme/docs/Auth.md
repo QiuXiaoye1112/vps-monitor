@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`services/auth.service.ts` verifies the current session with Komari `/api/me` via `verifyLogin()`.
+`services/auth.service.ts` verifies the current session with VPS Monitor `/api/me` via `verifyLogin()`.
 
 ## Flow
 

@@ -305,7 +305,7 @@ function formatTraffic(tib: number): string {
                 固定账单明细
               </h3>
               <p class="text-xs text-muted-foreground">
-                沿用 Komari 原生价格、周期和到期时间。
+                沿用 VPS Monitor 原生价格、周期和到期时间。
               </p>
             </div>
             <select
@@ -373,7 +373,7 @@ function formatTraffic(tib: number): string {
 
         <TabsContent value="metered" class="space-y-3">
           <div class="rounded-md border border-sky-500/20 bg-sky-500/7 px-3 py-2 text-xs text-muted-foreground">
-            按量费用估算器仅在当前浏览器计算，不写入 Komari。当前探针累计流量可能因机器重启、Agent 重启或网卡变化而重置，也可能包含安装 Komari 前的流量。1 TiB = 1024⁴ bytes，本结果不是正式账单。
+            按量费用估算器仅在当前浏览器计算，不写入 VPS Monitor。当前探针累计流量可能因机器重启、Agent 重启或网卡变化而重置，也可能包含安装 VPS Monitor 前的流量。1 TiB = 1024⁴ bytes，本结果不是正式账单。
           </div>
 
           <div class="flex flex-wrap items-end gap-3">
