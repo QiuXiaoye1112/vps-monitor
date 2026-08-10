@@ -457,10 +457,12 @@ const useNodesStore = defineStore('nodes', () => {
   }
 
   /**
-   * 更新节点基本信息
+   * 增量更新节点基本信息。
+   *
+   * 该方法可能只接收到单个节点（例如基础信息变化事件），因此不能
+   * 根据本次参数删除其它节点。完整列表的清理只在 initNodes() 中执行。
    */
   function updateNodeClients(clients: Record<string, Client>): void {
-    const newUuids = new Set(Object.keys(clients))
     // 仅在结构或 weight 变化时才重排序，避免每轮轮询都触发数组排序的响应式开销
     let needSort = false
 
@@ -478,16 +480,6 @@ const useNodesStore = defineStore('nodes', () => {
         // 添加新节点（不带状态）
         const newNode = createNodeFromClient(client)
         addIndexedNode(newNode)
-        needSort = true
-      }
-    }
-
-    // 移除不存在的节点
-    for (let i = nodes.value.length - 1; i >= 0; i--) {
-      const node = nodes.value[i]
-      if (node && !newUuids.has(node.uuid)) {
-        nodeIndex.delete(node.uuid)
-        nodes.value.splice(i, 1)
         needSort = true
       }
     }
