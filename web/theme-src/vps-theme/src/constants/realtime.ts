@@ -8,8 +8,4 @@ export const REALTIME_CONFIG = {
     healthCheckAttempts: 3,
     healthCheckRetryInterval: TIME_MS.second,
   },
-  polling: {
-    clientsRefreshInterval: TIME_MS.minute,
-    postFailureThreshold: 3,
-  },
 } as const

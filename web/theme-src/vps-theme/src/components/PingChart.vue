@@ -13,6 +13,7 @@ import { PING_RECORD_MAX_COUNT } from '@/constants/load'
 import { loadPingRecordsWithTasks } from '@/services/history.service'
 import { useAppStore } from '@/stores/app'
 import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette } from '@/utils/chartPalette'
+import { subscribeRealtimeEvents } from '@/utils/realtime'
 import { cutPeakValues, interpolateNullsLinear } from '@/utils/recordHelper'
 import '@/utils/echarts' // 共享 ECharts 配置
 
@@ -620,7 +621,13 @@ onMounted(() => {
   fetchRecords()
 })
 
+const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+  if (event.kind === 'ping' && event.uuid === props.uuid)
+    void fetchRecords()
+})
+
 onBeforeUnmount(() => {
+  unsubscribeRealtime()
   coarsePointerMediaQuery?.removeEventListener('change', syncTouchTooltipMode)
 })
 </script>

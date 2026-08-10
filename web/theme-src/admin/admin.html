@@ -1405,7 +1405,7 @@
             h +=
               '<tr draggable="true" data-uuid="' +
               n.uuid +
-              '" class="draggable-row">';
+              '" class="draggable-row node-draggable-row">';
             h +=
               '<td style="cursor:grab;color:var(--muted);user-select:none;text-align:center" class="drag-handle">☰</td>';
             h += '<td class="font-bold">' + E(n.name) + "</td>";
@@ -1445,11 +1445,13 @@
         if (!tasks.length)
           return h + '<div class="card empty-state">暂无 Ping 任务</div>';
         h +=
-          '<div class="card"><table class="ping-table"><colgroup><col style="width:140px"><col><col style="width:80px"><col style="width:100px"><col style="width:150px"></colgroup><thead><tr><th>名称</th><th>目标</th><th>类型</th><th>间隔(S)</th><th>操作</th></tr></thead><tbody>';
+          '<div class="card"><div class="flex justify-between items-center mb-3"><h3>任务列表</h3><span class="text-xs text-muted">拖动 ☰ 调整顺序</span></div><table class="ping-table"><colgroup><col style="width:32px"><col style="width:140px"><col><col style="width:80px"><col style="width:100px"><col style="width:150px"></colgroup><thead><tr><th style="width:32px"></th><th>名称</th><th>目标</th><th>类型</th><th>间隔(S)</th><th>操作</th></tr></thead><tbody>';
         for (var i = 0; i < tasks.length; i++) {
           var t = tasks[i];
           h +=
-            '<tr><td class="ping-name">' +
+            '<tr draggable="true" data-task-id="' +
+            t.id +
+            '" class="draggable-row ping-draggable-row"><td style="cursor:grab;color:var(--muted);user-select:none;text-align:center" class="drag-handle">☰</td><td class="ping-name">' +
             E(t.name) +
             '</td><td class="ping-target" title="' +
             E(t.target) +
@@ -1542,7 +1544,6 @@
         });
         var s = r.ok ? await r.json() : {};
         var defaults = {
-          dataUpdateInterval: 1,
           nodeCardSize: "compact",
           stopEarth:false,
           earthRenderer:"cobe",
@@ -1558,7 +1559,6 @@
           {
             title: "通用",
             fields: [
-              { k: "dataUpdateInterval", l: "数据更新间隔(秒)", t: "num" },
               {
                 k: "nodeCardSize",
                 l: "节点卡片尺寸",
@@ -1848,7 +1848,7 @@
             id +
             '" type="number" min="0.1" step="0.1" value="1"></div><div class="form-group"><label>历史图间隔(秒)</label><input id="historyInterval' +
             id +
-            '" type="number" min="1" max="60" step="1" value="5"></div></div>' +
+            '" type="number" min="1" max="60" step="1" value="60"></div></div>' +
             '<p class="text-xs text-muted mb-3">实时状态控制卡片右上角数值；历史图间隔只控制六个历史图的数据精度。</p>' +
             '<div class="sec-title">可选配置</div>' +
             '<div class="modal-grid"><div class="form-group"><label>自定义 DNS</label><input id="dns' +
@@ -2175,7 +2175,7 @@
           });
         } else html += '<div class="node-ping-empty">尚未选择任务</div>';
         html +=
-          '</div></div><div><div class="text-xs text-muted mb-2">未选择</div><div class="node-ping-list node-ping-unselected">';
+          '</div></div><div><div class="flex justify-between items-center mb-2"><span class="text-xs text-muted">未选择</span><span class="text-xs text-muted">按 Ping 任务页顺序</span></div><div class="node-ping-list node-ping-unselected">';
         if (unselected.length) {
           unselected.forEach(function (task) {
             html += row(task, false);
@@ -2405,8 +2405,8 @@
       }
 
       var dragSrc = null;
-      function initDragDrop() {
-        var rows = document.querySelectorAll(".draggable-row");
+      function initOrderDragDrop(selector, dataKey, method, successMessage) {
+        var rows = document.querySelectorAll(selector);
         rows.forEach(function (r) {
           // 只在拖拽手柄上允许拖拽
           var handle = r.querySelector(".drag-handle");
@@ -2441,9 +2441,11 @@
             });
           });
           r.addEventListener("dragover", function (e) {
+            if (!dragSrc || this === dragSrc || this.parentNode !== dragSrc.parentNode)
+              return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
-            if (this !== dragSrc) this.classList.add("drag-over");
+            this.classList.add("drag-over");
           });
           r.addEventListener("dragleave", function () {
             this.classList.remove("drag-over");
@@ -2452,9 +2454,8 @@
             e.stopPropagation();
             this.classList.remove("drag-over");
             if (dragSrc === this) return;
-            var allRows = Array.from(
-              document.querySelectorAll(".draggable-row"),
-            );
+            var allRows = Array.from(this.parentNode.querySelectorAll(selector));
+            if (allRows.indexOf(dragSrc) < 0) return;
             var fromIdx = allRows.indexOf(dragSrc);
             var toIdx = allRows.indexOf(this);
             if (fromIdx < toIdx) {
@@ -2462,23 +2463,34 @@
             } else {
               this.parentNode.insertBefore(dragSrc, this);
             }
-            // 保存新顺序：weight 从大到小（最上面权重最大）
-            var newRows = Array.from(
-              document.querySelectorAll(".draggable-row"),
-            );
-            var total = newRows.length;
+            // 按当前列表顺序重新保存 weight。
+            var newRows = Array.from(this.parentNode.querySelectorAll(selector));
             var order = {};
             newRows.forEach(function (r, i) {
-              order[r.dataset.uuid] = i;
+              order[r.dataset[dataKey]] = i;
             });
-            await RPC("admin:orderClients", order);
-            toast("排序已保存");
-            newRows.forEach(function (r, i) {
-              var wb = r.querySelector(".weight-badge");
-              if (wb) wb.textContent = total - i;
-            });
+            try {
+              await RPCStrict(method, order);
+              toast(successMessage);
+            } catch (err) {
+              toast("排序保存失败：" + (err.message || "请稍后重试"), "error");
+            }
           });
         });
+      }
+      function initDragDrop() {
+        initOrderDragDrop(
+          ".node-draggable-row",
+          "uuid",
+          "admin:orderClients",
+          "排序已保存",
+        );
+        initOrderDragDrop(
+          ".ping-draggable-row",
+          "taskId",
+          "admin:orderPingTask",
+          "Ping 任务排序已保存",
+        );
         document.querySelectorAll(".weight-badge").forEach(function (badge) {
           badge.addEventListener("click", function () {
             var uuid = badge.dataset.uuid;

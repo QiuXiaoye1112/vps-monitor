@@ -471,6 +471,29 @@ func TestApplyLocalTimeRangeUsesStoredTimeFormat(t *testing.T) {
 	require.Equal(t, 3, records[1].Process)
 }
 
+func TestGetLatestRecordByClientUsesNewestRetainedTable(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Record{}))
+	require.NoError(t, db.Table("records_long_term").AutoMigrate(&models.Record{}))
+	require.NoError(t, db.Table(HistoryTable).AutoMigrate(&models.Record{}))
+
+	client := "latest-client"
+	old := models.FromTime(time.Date(2026, 8, 10, 1, 0, 0, 0, time.UTC))
+	mid := models.FromTime(time.Date(2026, 8, 10, 2, 0, 0, 0, time.UTC))
+	newest := models.FromTime(time.Date(2026, 8, 10, 3, 0, 0, 0, time.UTC))
+
+	require.NoError(t, db.Create(&models.Record{Client: client, Time: old, Cpu: 1}).Error)
+	require.NoError(t, db.Table("records_long_term").Create(&models.Record{Client: client, Time: mid, Cpu: 2}).Error)
+	require.NoError(t, db.Table(HistoryTable).Create(&models.Record{Client: client, Time: newest, Cpu: 3}).Error)
+
+	got, err := getLatestRecordByClient(db, client)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, newest.ToTime(), got.Time.ToTime())
+	require.Equal(t, float32(3), got.Cpu)
+}
+
 func TestTrafficResetSwitch(t *testing.T) {
 	loc := trafficLocation()
 

@@ -11,7 +11,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	reportmodel "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/monitor-monitor/monitor/utils"
 	"github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
@@ -33,13 +33,13 @@ func DeleteClientReports(uuid string) {
 	DeleteClientHistoryReports(uuid)
 }
 
-func AppendClientReport(uuid string, report v1.Report) (v1.Report, error) {
+func AppendClientReport(uuid string, report reportmodel.Report) (reportmodel.Report, error) {
 	reportCacheMu.Lock()
 	defer reportCacheMu.Unlock()
 
 	reports, ok := cachedReports(uuid)
 	if !ok {
-		return v1.Report{}, fmt.Errorf("invalid report type for UUID %s", uuid)
+		return reportmodel.Report{}, fmt.Errorf("invalid report type for UUID %s", uuid)
 	}
 	report.UUID = uuid
 	report.UpdatedAt = time.Now()
@@ -62,20 +62,20 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 
 	reportCacheMu.Lock()
 	// 先收集所有需要保存的数据，但不修改缓存
-	filteredByUUID := make(map[string][]v1.Report)
+	filteredByUUID := make(map[string][]reportmodel.Report)
 	for uuid, x := range Records.Items() {
 		func() {
 			if uuid == "" {
 				return
 			}
 
-			reports, ok := x.Object.([]v1.Report)
+			reports, ok := x.Object.([]reportmodel.Report)
 			if !ok {
 				log.Printf("Invalid report type for UUID %s", uuid)
 				return
 			}
 
-			var filtered []v1.Report
+			var filtered []reportmodel.Report
 			for _, r := range reports {
 				if r.UpdatedAt.Unix() >= lastMinute {
 					if err := clients.ReportVerify(r); err != nil {
@@ -134,11 +134,11 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 		if !ok || cached == nil {
 			continue
 		}
-		reports, ok := cached.([]v1.Report)
+		reports, ok := cached.([]reportmodel.Report)
 		if !ok {
 			continue
 		}
-		var remaining []v1.Report
+		var remaining []reportmodel.Report
 		for _, r := range reports {
 			if r.UpdatedAt.Unix() >= lastMinute {
 				remaining = append(remaining, r)
@@ -151,12 +151,12 @@ func saveClientReportToDB(db *gorm.DB, now time.Time) error {
 	return nil
 }
 
-func cachedReports(uuid string) ([]v1.Report, bool) {
+func cachedReports(uuid string) ([]reportmodel.Report, bool) {
 	cached, ok := Records.Get(uuid)
 	if !ok || cached == nil {
-		return []v1.Report{}, true
+		return []reportmodel.Report{}, true
 	}
-	reports, ok := cached.([]v1.Report)
+	reports, ok := cached.([]reportmodel.Report)
 	return reports, ok
 }
 
@@ -176,7 +176,7 @@ type cachedTrafficSummary struct {
 	Points []trafficTotalPoint
 }
 
-func summarizeCachedTraffic(reports []v1.Report) cachedTrafficSummary {
+func summarizeCachedTraffic(reports []reportmodel.Report) cachedTrafficSummary {
 	points := make([]trafficTotalPoint, 0, len(reports))
 	for _, report := range reports {
 		points = append(points, trafficTotalPoint{

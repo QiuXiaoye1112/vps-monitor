@@ -111,6 +111,7 @@ export interface Client {
   ping_task_order?: number[]
   created_at: string
   updated_at: string
+  last_report_at?: string | null
 }
 
 /** 公开站点信息 */
@@ -733,11 +734,16 @@ export class KomariRpc {
     return this.client.call<Record<string, Client>>('common:getNodes')
   }
 
+  async getNode(uuid: string): Promise<Client> {
+    return this.client.call<Client>('common:getNodes', { uuid })
+  }
+
   /**
    * 获取所有节点最新状态
    */
-  async getNodesLatestStatus(): Promise<Record<string, NodeStatus>> {
-    return this.client.call<Record<string, NodeStatus>>('common:getNodesLatestStatus')
+  async getNodesLatestStatus(uuids?: string[]): Promise<Record<string, NodeStatus>> {
+    const params = uuids?.length ? { uuids } : undefined
+    return this.client.call<Record<string, NodeStatus>>('common:getNodesLatestStatus', params)
   }
 
   /**

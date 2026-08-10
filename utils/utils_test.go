@@ -4,20 +4,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	report "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAverageReportUsesLatestNetworkTotals(t *testing.T) {
 	base := time.Date(2026, 6, 13, 12, 0, 0, 0, time.UTC)
-	record := AverageReport("client-latest-total", base.Add(time.Minute), []v1.Report{
+	record := AverageReport("client-latest-total", base.Add(time.Minute), []report.Report{
 		{
 			UpdatedAt: base.Add(10 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 300, TotalDown: 500},
+			Network:   report.NetworkReport{TotalUp: 300, TotalDown: 500},
 		},
 		{
 			UpdatedAt: base.Add(50 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 360, TotalDown: 620},
+			Network:   report.NetworkReport{TotalUp: 360, TotalDown: 620},
 		},
 	}, 0)
 

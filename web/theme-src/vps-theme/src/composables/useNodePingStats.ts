@@ -3,6 +3,7 @@ import { useThrottleFn } from '@vueuse/core'
 import { computed, onScopeDispose, ref, shallowRef, toValue, watch } from 'vue'
 import { PING_RECORD_MAX_COUNT } from '@/constants/load'
 import { abortPingRecords, loadPingRecords } from '@/services/history.service'
+import { subscribeRealtimeEvents } from '@/utils/realtime'
 
 export interface NodePingHistoryPoint {
   time: string
@@ -40,7 +41,7 @@ interface SharedPingRecordsEntry {
   loading: ReturnType<typeof ref<boolean>>
   error: ReturnType<typeof ref<string | null>>
   promise: Promise<void> | null
-  refreshTimer: ReturnType<typeof setInterval> | null
+  unsubscribeRealtime: (() => void) | null
   subscribers: number
   lastFetchedAt: number
 }
@@ -49,7 +50,6 @@ const HISTORY_BUCKET_COUNT = 20
 const CACHE_VERSION = 8
 const CACHE_KEY_PREFIX = 'komari-theme-emerald:node-ping-stats'
 const FULL_LOSS_EPSILON = 1e-6
-const PING_RECORD_REFRESH_INTERVAL_MS = 60_000
 const sharedPingRecordsCache = new Map<string, SharedPingRecordsEntry>()
 
 interface TaskRecordSummary {
@@ -180,7 +180,7 @@ function createSharedPingRecordsEntry(): SharedPingRecordsEntry {
     loading: ref(false),
     error: ref<string | null>(null),
     promise: null,
-    refreshTimer: null,
+    unsubscribeRealtime: null,
     subscribers: 0,
     lastFetchedAt: 0,
   }
@@ -246,27 +246,38 @@ async function loadSharedPingRecords(entry: SharedPingRecordsEntry, hours: numbe
   return entry.promise
 }
 
-function startSharedPingRecordsRefresh(entry: SharedPingRecordsEntry, hours: number, maxCount?: number, uuid?: string): void {
-  if (entry.refreshTimer)
+function appendPingRecord(entry: SharedPingRecordsEntry, event: { uuid: string, task_id?: number, time?: string, value?: number }, targetUUID?: string, maxCount?: number): void {
+  if (targetUUID && event.uuid !== targetUUID)
+    return
+  if (!entry.data.value || typeof event.task_id !== 'number' || typeof event.value !== 'number' || !event.time)
     return
 
-  entry.refreshTimer = setInterval(() => {
-    void loadSharedPingRecords(entry, hours, maxCount, uuid).catch(() => {})
-  }, PING_RECORD_REFRESH_INTERVAL_MS)
-}
-
-function stopSharedPingRecordsRefresh(entry: SharedPingRecordsEntry): void {
-  if (!entry.refreshTimer)
-    return
-
-  clearInterval(entry.refreshTimer)
-  entry.refreshTimer = null
+  const recordsByClient = new Map(entry.data.value.recordsByClient)
+  const records = [...(recordsByClient.get(event.uuid) ?? []), {
+    client: event.uuid,
+    task_id: event.task_id,
+    time: event.time,
+    value: event.value,
+  }]
+  records.sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime())
+  const limitedRecords = maxCount && records.length > maxCount ? records.slice(-maxCount) : records
+  recordsByClient.set(event.uuid, limitedRecords)
+  entry.data.value = { recordsByClient }
+  entry.lastFetchedAt = Date.now()
 }
 
 function retainSharedPingRecordsEntry(hours: number, maxCount?: number, uuid?: string): () => void {
   const entry = getSharedPingRecordsEntry(hours, maxCount, uuid)
+  const wasInactive = entry.subscribers === 0
   entry.subscribers += 1
-  startSharedPingRecordsRefresh(entry, hours, maxCount, uuid)
+  if (wasInactive) {
+    entry.lastFetchedAt = 0
+    const targetUUID = uuid?.trim()
+    entry.unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+      if (event.kind === 'ping')
+        appendPingRecord(entry, event, targetUUID, maxCount)
+    })
+  }
 
   let released = false
   return () => {
@@ -276,7 +287,8 @@ function retainSharedPingRecordsEntry(hours: number, maxCount?: number, uuid?: s
     released = true
     entry.subscribers = Math.max(0, entry.subscribers - 1)
     if (entry.subscribers === 0) {
-      stopSharedPingRecordsRefresh(entry)
+      entry.unsubscribeRealtime?.()
+      entry.unsubscribeRealtime = null
       abortPingRecords(hours, maxCount, uuid)
     }
   }
@@ -464,7 +476,7 @@ export function useNodePingStats(
     syncSharedRecordsSubscription(null)
   })
 
-  // stats 由共享 getRecords 结果派生；共享记录每分钟刷新一次后会自动重算。
+  // stats 由共享记录结果派生；收到对应 Ping 结果事件后只更新当前节点。
   const stats = computed<NodePingStatsState>(() => {
     const { uuid: nodeUuid, hours, maxCount, enabled } = resolved.value
     if (!enabled || !nodeUuid.trim())
@@ -500,8 +512,7 @@ export function useNodePingStats(
 
       syncSharedRecordsSubscription(hours, maxCount, nodeUuid)
       const entry = getSharedPingRecordsEntry(hours, maxCount, nodeUuid)
-      const shouldLoadRecords = !entry.data.value
-        || Date.now() - entry.lastFetchedAt >= PING_RECORD_REFRESH_INTERVAL_MS
+      const shouldLoadRecords = !entry.data.value || entry.lastFetchedAt === 0
 
       if (!shouldLoadRecords) {
         loading.value = false

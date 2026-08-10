@@ -8,7 +8,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/accounts"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	"github.com/monitor-monitor/monitor/protocol/report"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 )
 
@@ -52,12 +52,12 @@ func GetClients(c *gin.Context) {
 	// 请求
 	for {
 		var resp struct {
-			Online []string             `json:"online"` // 已建立连接的客户端uuid列表
-			Data   map[string]v1.Report `json:"data"`   // 最后上报的数据
+			Online []string                 `json:"online"` // 已建立连接的客户端uuid列表
+			Data   map[string]report.Report `json:"data"`   // 最后上报的数据
 		}
 
 		resp.Online = []string{}
-		resp.Data = map[string]v1.Report{}
+		resp.Data = map[string]report.Report{}
 
 		_, data, err := conn.ReadMessage()
 		if err != nil {

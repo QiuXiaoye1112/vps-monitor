@@ -317,6 +317,9 @@ func GetDBInstance() *gorm.DB {
 		if err != nil {
 			log.Printf("Failed to create records_long_term table, it may already exist: %v", err)
 		}
+		if err := migrations.BackfillClientLastReportAt(instance); err != nil {
+			log.Fatalf("Failed to migrate client last report time: %v", err)
+		}
 		if err := instance.Table("history_records").AutoMigrate(&models.Record{}); err != nil {
 			log.Fatalf("Failed to create history_records table: %v", err)
 		}

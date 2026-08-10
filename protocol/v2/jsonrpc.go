@@ -1,6 +1,6 @@
 package v2
 
-import v1 "github.com/monitor-monitor/monitor/protocol/v1"
+import report "github.com/monitor-monitor/monitor/protocol/report"
 
 const (
 	Version                          = "2.0"
@@ -50,8 +50,8 @@ type RPCError struct {
 }
 
 type ReportParams struct {
-	Report      v1.Report `json:"report"`
-	AckEventIDs []string  `json:"ack_event_ids,omitempty"`
+	Report      report.Report `json:"report"`
+	AckEventIDs []string      `json:"ack_event_ids,omitempty"`
 }
 
 type BasicInfoParams struct {

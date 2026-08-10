@@ -7,6 +7,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
+	"github.com/monitor-monitor/monitor/web/realtime"
 )
 
 // client.go
@@ -62,6 +63,13 @@ func clientUploadPingResult(ctx context.Context, req *rpc.JsonRpcRequest) (any, 
 	if err := tasks.SavePingRecord(record); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to save ping result: "+err.Error(), nil)
 	}
+	realtime.Publish(realtime.Event{
+		Kind:   realtime.KindPing,
+		UUID:   uuid,
+		TaskID: params.TaskID,
+		Time:   params.FinishedAt.Format(time.RFC3339Nano),
+		Value:  params.Value,
+	})
 	return map[string]any{"status": "success"}, nil
 }
 

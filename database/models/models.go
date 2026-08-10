@@ -52,6 +52,7 @@ type Client struct {
 	PingTaskOrder       UintArray `json:"ping_task_order" gorm:"type:longtext"`
 	CreatedAt           LocalTime `json:"created_at"`
 	UpdatedAt           LocalTime `json:"updated_at"`
+	LastReportAt        LocalTime `json:"last_report_at,omitempty"`
 }
 
 // User represents an authenticated user

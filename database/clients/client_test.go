@@ -99,3 +99,21 @@ func TestSaveClientStoresLocalTimeUpdatesInConfiguredFormat(t *testing.T) {
 	require.Equal(t, expected, updatedAt)
 	require.Equal(t, expected, resetAt)
 }
+
+func TestUpdateLastReportAtPersistsAcrossClientReload(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Client{}))
+
+	updatedAt := models.FromTime(time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC))
+	client := models.Client{UUID: "node-last-report", Token: "token-last-report", UpdatedAt: updatedAt}
+	require.NoError(t, db.Create(&client).Error)
+
+	reportedAt := time.Date(2026, time.August, 10, 6, 54, 49, 0, time.UTC)
+	require.NoError(t, updateLastReportAt(db, client.UUID, reportedAt))
+
+	var reloaded models.Client
+	require.NoError(t, db.First(&reloaded, "uuid = ?", client.UUID).Error)
+	require.True(t, reloaded.LastReportAt.ToTime().Equal(reportedAt))
+	require.True(t, reloaded.UpdatedAt.ToTime().Equal(updatedAt.ToTime()))
+}

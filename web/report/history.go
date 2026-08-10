@@ -8,7 +8,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/records"
-	v1 "github.com/monitor-monitor/monitor/protocol/v1"
+	reportmodel "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/monitor-monitor/monitor/utils"
 )
 
@@ -18,7 +18,7 @@ var (
 	pendingHistory []models.Record
 )
 
-func AppendHistoryReport(uuid string, report v1.Report) error {
+func AppendHistoryReport(uuid string, report reportmodel.Report) error {
 	if uuid == "" {
 		return fmt.Errorf("invalid client UUID")
 	}
@@ -27,7 +27,7 @@ func AppendHistoryReport(uuid string, report v1.Report) error {
 	if err := clients.ReportVerify(report); err != nil {
 		return err
 	}
-	record := utils.AverageReport(uuid, report.UpdatedAt, []v1.Report{report}, 0)
+	record := utils.AverageReport(uuid, report.UpdatedAt, []reportmodel.Report{report}, 0)
 
 	historyMu.Lock()
 	pendingHistory = append(pendingHistory, record)

@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	report "github.com/monitor-monitor/monitor/protocol/report"
 )
 
 // AverageReport 根据 topPercentage 参数计算报告的平均值。
 // 如果 topPercentage 为 0，则计算所有记录的平均值。
 // 如果 topPercentage 大于 0 且小于等于 1，则计算从大到小排序后的前 topPercentage 记录的平均值。
-func AverageReport(uuid string, time time.Time, records []v1.Report, topPercentage float64) models.Record {
+func AverageReport(uuid string, time time.Time, records []report.Report, topPercentage float64) models.Record {
 	count := len(records)
 	if count == 0 {
 		return models.Record{}
@@ -29,7 +29,7 @@ func AverageReport(uuid string, time time.Time, records []v1.Report, topPercenta
 	latestTotalUp, latestTotalDown := latestNetworkTotals(records)
 
 	// 定义一个辅助函数，用于排序和求和
-	sumAndSort := func(getFloat32Value func(v1.Report) float32, getInt64Value func(v1.Report) int64, isFloat bool) (float32, int64) {
+	sumAndSort := func(getFloat32Value func(report.Report) float32, getInt64Value func(report.Report) int64, isFloat bool) (float32, int64) {
 		if isFloat {
 			sort.Slice(records, func(i, j int) bool {
 				return getFloat32Value(records[i]) > getFloat32Value(records[j])
@@ -56,25 +56,25 @@ func AverageReport(uuid string, time time.Time, records []v1.Report, topPercenta
 	var sumPROCESS, sumConnections, sumConnectionsUDP int
 
 	if topPercentage > 0 && topPercentage <= 1 {
-		sumCPU, _ = sumAndSort(func(r v1.Report) float32 { return float32(r.CPU.Usage) }, nil, true)
-		sumLOAD, _ = sumAndSort(func(r v1.Report) float32 { return float32(r.Load.Load1) }, nil, true)
+		sumCPU, _ = sumAndSort(func(r report.Report) float32 { return float32(r.CPU.Usage) }, nil, true)
+		sumLOAD, _ = sumAndSort(func(r report.Report) float32 { return float32(r.Load.Load1) }, nil, true)
 
-		_, sumRAM = sumAndSort(nil, func(r v1.Report) int64 { return r.Ram.Used }, false)
-		//_, sumRAMTotal = sumAndSort(nil, nil, func(r v1.Report) int64 { return r.Ram.Total }, false)
-		_, sumSWAP = sumAndSort(nil, func(r v1.Report) int64 { return r.Swap.Used }, false)
-		//_, sumSWAPTotal = sumAndSort(nil, nil, func(r v1.Report) int64 { return r.Swap.Total }, false)
-		_, sumDISK = sumAndSort(nil, func(r v1.Report) int64 { return r.Disk.Used }, false)
-		//_, sumDISKTotal = sumAndSort(nil, nil, func(r v1.Report) int64 { return r.Disk.Total }, false)
-		_, sumNETIn = sumAndSort(nil, func(r v1.Report) int64 { return r.Network.Down }, false)
-		_, sumNETOut = sumAndSort(nil, func(r v1.Report) int64 { return r.Network.Up }, false)
-		_, sumNETTotalUp = sumAndSort(nil, func(r v1.Report) int64 { return r.Network.TotalUp }, false)
-		_, sumNETTotalDown = sumAndSort(nil, func(r v1.Report) int64 { return r.Network.TotalDown }, false)
+		_, sumRAM = sumAndSort(nil, func(r report.Report) int64 { return r.Ram.Used }, false)
+		//_, sumRAMTotal = sumAndSort(nil, nil, func(r report.Report) int64 { return r.Ram.Total }, false)
+		_, sumSWAP = sumAndSort(nil, func(r report.Report) int64 { return r.Swap.Used }, false)
+		//_, sumSWAPTotal = sumAndSort(nil, nil, func(r report.Report) int64 { return r.Swap.Total }, false)
+		_, sumDISK = sumAndSort(nil, func(r report.Report) int64 { return r.Disk.Used }, false)
+		//_, sumDISKTotal = sumAndSort(nil, nil, func(r report.Report) int64 { return r.Disk.Total }, false)
+		_, sumNETIn = sumAndSort(nil, func(r report.Report) int64 { return r.Network.Down }, false)
+		_, sumNETOut = sumAndSort(nil, func(r report.Report) int64 { return r.Network.Up }, false)
+		_, sumNETTotalUp = sumAndSort(nil, func(r report.Report) int64 { return r.Network.TotalUp }, false)
+		_, sumNETTotalDown = sumAndSort(nil, func(r report.Report) int64 { return r.Network.TotalDown }, false)
 
-		_, sumInt := sumAndSort(nil, func(r v1.Report) int64 { return int64(r.Process) }, false)
+		_, sumInt := sumAndSort(nil, func(r report.Report) int64 { return int64(r.Process) }, false)
 		sumPROCESS = int(sumInt)
-		_, sumInt = sumAndSort(nil, func(r v1.Report) int64 { return int64(r.Connections.TCP) }, false)
+		_, sumInt = sumAndSort(nil, func(r report.Report) int64 { return int64(r.Connections.TCP) }, false)
 		sumConnections = int(sumInt)
-		_, sumInt = sumAndSort(nil, func(r v1.Report) int64 { return int64(r.Connections.UDP) }, false)
+		_, sumInt = sumAndSort(nil, func(r report.Report) int64 { return int64(r.Connections.UDP) }, false)
 		sumConnectionsUDP = int(sumInt)
 
 	} else { // 计算所有记录的平均值
@@ -121,7 +121,7 @@ func AverageReport(uuid string, time time.Time, records []v1.Report, topPercenta
 	return newRecord
 }
 
-func latestNetworkTotals(records []v1.Report) (int64, int64) {
+func latestNetworkTotals(records []report.Report) (int64, int64) {
 	if len(records) == 0 {
 		return 0, 0
 	}

@@ -48,6 +48,7 @@ export interface NodeData {
   ping_task_order: number[]
   created_at: string
   updated_at: string
+  last_report_at?: string
   // Status 信息
   online: boolean
   time: string
@@ -214,6 +215,7 @@ const useNodesStore = defineStore('nodes', () => {
       ping_task_order: Array.isArray(client.ping_task_order) ? [...client.ping_task_order] : [],
       created_at: client.created_at,
       updated_at: client.updated_at,
+      last_report_at: client.last_report_at ?? undefined,
       // Status 默认值
       online: false,
       time: '',
@@ -251,6 +253,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.online = status.online
     if (node.time !== status.time)
       node.time = status.time
+    if (status.time && node.last_report_at !== status.time)
+      node.last_report_at = status.time
     if (node.cpu !== status.cpu)
       node.cpu = status.cpu
     if (node.ram !== status.ram)
@@ -388,6 +392,9 @@ const useNodesStore = defineStore('nodes', () => {
       node.created_at = client.created_at
     if (node.updated_at !== client.updated_at)
       node.updated_at = client.updated_at
+    const nextLastReportAt = client.last_report_at ?? undefined
+    if (node.last_report_at !== nextLastReportAt)
+      node.last_report_at = nextLastReportAt
     return weightChanged
   }
 

@@ -53,16 +53,10 @@ func RequestFileManager(c *gin.Context) {
 		return
 	}
 
-	dispatched := false
-	if agentRuntime.IsV2Client(uuid) {
-		dispatched = agentRuntime.DispatchV2Event(uuid, v2.MethodAgentFile, v2.FileRequestParams{RequestID: id})
-	}
-	if !dispatched {
-		if err := agentConn.WriteJSON(gin.H{"message": "file", "request_id": id}); err != nil {
-			_ = browser.WriteJSON(gin.H{"type": "system", "ok": false, "error": "无法通知 Agent"})
-			closeFileSession(id, session)
-			return
-		}
+	if !agentRuntime.IsV2Client(uuid) || !agentRuntime.DispatchV2Event(uuid, v2.MethodAgentFile, v2.FileRequestParams{RequestID: id}) {
+		_ = browser.WriteJSON(gin.H{"type": "system", "ok": false, "error": "节点不支持 v2 通道"})
+		closeFileSession(id, session)
+		return
 	}
 	_ = browser.WriteJSON(gin.H{"type": "system", "ok": true, "status": "waiting"})
 	waitForAgent(browser, session, id)

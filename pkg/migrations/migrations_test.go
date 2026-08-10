@@ -363,6 +363,41 @@ func TestRunExpandsLegacyPingAllClientsTasks(t *testing.T) {
 	}
 }
 
+func TestBackfillClientLastReportAtUsesNewestRetainedRecord(t *testing.T) {
+	db := openTestDB(t, "migrations_last_report_at")
+	if err := db.AutoMigrate(&models.Client{}, &models.Record{}); err != nil {
+		t.Fatalf("migrate client and records: %v", err)
+	}
+	if err := db.Table("records_long_term").AutoMigrate(&models.Record{}); err != nil {
+		t.Fatalf("migrate long-term records: %v", err)
+	}
+
+	client := models.Client{UUID: "client-last-report", Token: "token-last-report"}
+	if err := db.Create(&client).Error; err != nil {
+		t.Fatalf("create client: %v", err)
+	}
+	earlier := models.FromTime(time.Date(2026, time.August, 10, 5, 0, 0, 0, time.UTC))
+	later := models.FromTime(time.Date(2026, time.August, 10, 6, 54, 49, 0, time.UTC))
+	if err := db.Create(&models.Record{Client: client.UUID, Time: earlier}).Error; err != nil {
+		t.Fatalf("create recent record: %v", err)
+	}
+	if err := db.Table("records_long_term").Create(&models.Record{Client: client.UUID, Time: later}).Error; err != nil {
+		t.Fatalf("create long-term record: %v", err)
+	}
+
+	if err := BackfillClientLastReportAt(db); err != nil {
+		t.Fatalf("backfill last report time: %v", err)
+	}
+
+	var reloaded models.Client
+	if err := db.First(&reloaded, "uuid = ?", client.UUID).Error; err != nil {
+		t.Fatalf("reload client: %v", err)
+	}
+	if got, want := reloaded.LastReportAt.ToTime(), later.ToTime(); !got.Equal(want) {
+		t.Fatalf("last report time = %s, want %s", got, want)
+	}
+}
+
 func TestBackfillClientPingTaskOrderPreservesLegacyAssignments(t *testing.T) {
 	db := openTestDB(t, "client_ping_task_order")
 	if err := db.Exec("CREATE TABLE clients (uuid varchar(36) PRIMARY KEY, token varchar(255) NOT NULL UNIQUE, name varchar(100), weight integer, created_at timestamp, updated_at timestamp)").Error; err != nil {

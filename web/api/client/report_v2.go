@@ -110,7 +110,9 @@ func handleV2RPC(uuid string, req v2.Request, allowWait bool) v2.Response {
 				finishedAt = t
 			}
 		}
-		ingestPingResult(uuid, params.TaskID, params.Value, finishedAt)
+		if err := ingestPingResult(uuid, params.TaskID, params.Value, finishedAt); err != nil {
+			return v2.Error(req.ID, -32000, "failed to save ping result", err.Error())
+		}
 		return v2.Success(req.ID, gin.H{"status": "success"})
 	case v2.MethodAgentTrafficSnapshotResult:
 		var params v2.TrafficSnapshotResultParams

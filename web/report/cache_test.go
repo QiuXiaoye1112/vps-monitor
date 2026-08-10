@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	reportmodel "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -89,20 +89,20 @@ func TestAppendClientReportSerializesCacheMutation(t *testing.T) {
 	clientUUID := "client-append-helper"
 	now := time.Date(2026, 6, 13, 12, 0, 0, 0, time.UTC)
 
-	first, err := AppendClientReport(clientUUID, v1.Report{
+	first, err := AppendClientReport(clientUUID, reportmodel.Report{
 		UpdatedAt: now.Add(-10 * time.Second),
-		Network:   v1.NetworkReport{TotalUp: 100, TotalDown: 200},
+		Network:   reportmodel.NetworkReport{TotalUp: 100, TotalDown: 200},
 	})
 	require.NoError(t, err)
-	second, err := AppendClientReport(clientUUID, v1.Report{
+	second, err := AppendClientReport(clientUUID, reportmodel.Report{
 		UpdatedAt: now.Add(-5 * time.Second),
-		Network:   v1.NetworkReport{TotalUp: 150, TotalDown: 260},
+		Network:   reportmodel.NetworkReport{TotalUp: 150, TotalDown: 260},
 	})
 	require.NoError(t, err)
 
 	cached, ok := Records.Get(clientUUID)
 	require.True(t, ok)
-	reports, ok := cached.([]v1.Report)
+	reports, ok := cached.([]reportmodel.Report)
 	require.True(t, ok)
 	require.Len(t, reports, 2)
 	assert.Equal(t, int64(100), reports[0].Network.TotalUp)
@@ -118,7 +118,7 @@ func TestAppendClientReportRejectsCorruptedCacheValue(t *testing.T) {
 
 	Records.Set("client-bad-cache", "not reports", cache.DefaultExpiration)
 
-	_, err := AppendClientReport("client-bad-cache", v1.Report{})
+	_, err := AppendClientReport("client-bad-cache", reportmodel.Report{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid report type")
 }
@@ -136,14 +136,14 @@ func TestSaveClientReportToDBStoresCachedTrafficDelta(t *testing.T) {
 		NetTotalDown: 200,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-30 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 130, TotalDown: 260},
+			Network:   reportmodel.NetworkReport{TotalUp: 130, TotalDown: 260},
 		},
 		{
 			UpdatedAt: now.Add(-10 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 175, TotalDown: 320},
+			Network:   reportmodel.NetworkReport{TotalUp: 175, TotalDown: 320},
 		},
 	}, cache.DefaultExpiration)
 
@@ -170,14 +170,14 @@ func TestSaveClientReportToDBStoresCachedTrafficDeltaAfterCounterReset(t *testin
 		NetTotalDown: 700,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-20 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 30, TotalDown: 45},
+			Network:   reportmodel.NetworkReport{TotalUp: 30, TotalDown: 45},
 		},
 		{
 			UpdatedAt: now.Add(-5 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 40, TotalDown: 55},
+			Network:   reportmodel.NetworkReport{TotalUp: 40, TotalDown: 55},
 		},
 	}, cache.DefaultExpiration)
 
@@ -197,18 +197,18 @@ func TestSaveClientReportToDBSumsCachedTrafficWithoutPersistedBaseline(t *testin
 
 	clientUUID := "client-cached-no-baseline"
 	now := time.Date(2026, 6, 13, 12, 0, 0, 0, time.UTC)
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-40 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 100, TotalDown: 200},
+			Network:   reportmodel.NetworkReport{TotalUp: 100, TotalDown: 200},
 		},
 		{
 			UpdatedAt: now.Add(-20 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 130, TotalDown: 250},
+			Network:   reportmodel.NetworkReport{TotalUp: 130, TotalDown: 250},
 		},
 		{
 			UpdatedAt: now.Add(-5 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 155, TotalDown: 280},
+			Network:   reportmodel.NetworkReport{TotalUp: 155, TotalDown: 280},
 		},
 	}, cache.DefaultExpiration)
 
@@ -235,18 +235,18 @@ func TestSaveClientReportToDBSumsCachedTrafficAcrossIntraMinuteReset(t *testing.
 		NetTotalDown: 700,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-45 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 540, TotalDown: 760},
+			Network:   reportmodel.NetworkReport{TotalUp: 540, TotalDown: 760},
 		},
 		{
 			UpdatedAt: now.Add(-25 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 10, TotalDown: 20},
+			Network:   reportmodel.NetworkReport{TotalUp: 10, TotalDown: 20},
 		},
 		{
 			UpdatedAt: now.Add(-5 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 25, TotalDown: 35},
+			Network:   reportmodel.NetworkReport{TotalUp: 25, TotalDown: 35},
 		},
 	}, cache.DefaultExpiration)
 
@@ -273,24 +273,24 @@ func TestSaveClientReportToDBRejectsTransientHistoricalTrafficSpike(t *testing.T
 		NetTotalDown: 98_493_419,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-40 * time.Second),
-			Network: v1.NetworkReport{
+			Network: reportmodel.NetworkReport{
 				Up: 1_000_000, Down: 1_000_000,
 				TotalUp: 31_000_000, TotalDown: 98_600_000,
 			},
 		},
 		{
 			UpdatedAt: now.Add(-20 * time.Second),
-			Network: v1.NetworkReport{
+			Network: reportmodel.NetworkReport{
 				Up: 1_000_000, Down: 1_000_000,
 				TotalUp: 115_649_673_671, TotalDown: 120_646_297_075,
 			},
 		},
 		{
 			UpdatedAt: now.Add(-5 * time.Second),
-			Network: v1.NetworkReport{
+			Network: reportmodel.NetworkReport{
 				Up: 1_000_000, Down: 1_000_000,
 				TotalUp: 44_194_763, TotalDown: 99_276_909,
 			},
@@ -320,9 +320,9 @@ func TestSaveClientReportToDBAcceptsHighTrafficWhenSpeedMatches(t *testing.T) {
 		NetTotalDown: 20 << 30,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{{
+	Records.Set(clientUUID, []reportmodel.Report{{
 		UpdatedAt: now.Add(-5 * time.Second),
-		Network: v1.NetworkReport{
+		Network: reportmodel.NetworkReport{
 			Up:        64 << 20,
 			Down:      64 << 20,
 			TotalUp:   11 << 30,
@@ -352,19 +352,19 @@ func TestSaveClientReportToDBDoesNotRecountRetainedCachePoints(t *testing.T) {
 		NetTotalDown: 200,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{{
+	Records.Set(clientUUID, []reportmodel.Report{{
 		UpdatedAt: firstFlush.Add(-10 * time.Second),
-		Network:   v1.NetworkReport{TotalUp: 175, TotalDown: 320},
+		Network:   reportmodel.NetworkReport{TotalUp: 175, TotalDown: 320},
 	}}, cache.DefaultExpiration)
 
 	require.NoError(t, saveClientReportToDB(db, firstFlush))
 
 	reports, ok := Records.Get(clientUUID)
 	require.True(t, ok)
-	retained := reports.([]v1.Report)
-	retained = append(retained, v1.Report{
+	retained := reports.([]reportmodel.Report)
+	retained = append(retained, reportmodel.Report{
 		UpdatedAt: secondFlush.Add(-5 * time.Second),
-		Network:   v1.NetworkReport{TotalUp: 190, TotalDown: 360},
+		Network:   reportmodel.NetworkReport{TotalUp: 190, TotalDown: 360},
 	})
 	Records.Set(clientUUID, retained, cache.DefaultExpiration)
 
@@ -392,14 +392,14 @@ func TestSaveClientReportToDBSkipsInvalidCachedReports(t *testing.T) {
 		NetTotalDown: 200,
 	}).Error)
 
-	Records.Set(clientUUID, []v1.Report{
+	Records.Set(clientUUID, []reportmodel.Report{
 		{
 			UpdatedAt: now.Add(-30 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: -1, TotalDown: 260},
+			Network:   reportmodel.NetworkReport{TotalUp: -1, TotalDown: 260},
 		},
 		{
 			UpdatedAt: now.Add(-10 * time.Second),
-			Network:   v1.NetworkReport{TotalUp: 175, TotalDown: 320},
+			Network:   reportmodel.NetworkReport{TotalUp: 175, TotalDown: 320},
 		},
 	}, cache.DefaultExpiration)
 

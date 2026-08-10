@@ -68,19 +68,8 @@ func RequestTerminal(c *gin.Context) {
 		return
 	}
 
-	if agent_runtime.IsV2Client(uuid) {
-		if agent_runtime.DispatchV2Event(uuid, v2.MethodAgentTerminal, v2.TerminalRequestParams{RequestID: id}) {
-			conn.WriteMessage(1, []byte("等待被控端连接 waiting for agent...\n"))
-			waitForAgentConnection(conn, session, id)
-			return
-		}
-	}
-
-	err = agentConn.WriteJSON(gin.H{
-		"message":    "terminal",
-		"request_id": id,
-	})
-	if err != nil {
+	if !agent_runtime.IsV2Client(uuid) || !agent_runtime.DispatchV2Event(uuid, v2.MethodAgentTerminal, v2.TerminalRequestParams{RequestID: id}) {
+		conn.WriteMessage(1, []byte("节点不支持 v2 通道\nClient does not support v2\n"))
 		conn.Close()
 		deleteTerminalSession(id)
 		return

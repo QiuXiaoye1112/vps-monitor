@@ -291,7 +291,14 @@ func GetEnabledPingTasks() ([]models.PingTask, error) {
 }
 
 func UpdatePingTaskOrder(order map[uint]int) error {
-	db := dbcore.GetDBInstance()
+	err := updatePingTaskOrder(dbcore.GetDBInstance(), order)
+	if err != nil {
+		return err
+	}
+	return ReloadPingSchedule()
+}
+
+func updatePingTaskOrder(db *gorm.DB, order map[uint]int) error {
 	err := db.Transaction(func(tx *gorm.DB) error {
 		for id, weight := range order {
 			result := tx.Model(&models.PingTask{}).Where("id = ?", id).Update("weight", weight)
@@ -307,7 +314,6 @@ func UpdatePingTaskOrder(order map[uint]int) error {
 	if err != nil {
 		return err
 	}
-	ReloadPingSchedule()
 	return nil
 }
 
@@ -342,7 +348,7 @@ func DeleteAllPingRecords() error {
 func ReloadPingSchedule() error {
 	db := dbcore.GetDBInstance()
 	var pingTasks []models.PingTask
-	if err := db.Where("enabled = ?", true).Find(&pingTasks).Error; err != nil {
+	if err := db.Where("enabled = ?", true).Order("weight ASC").Order("id ASC").Find(&pingTasks).Error; err != nil {
 		return err
 	}
 	return utils.ReloadPingSchedule(pingTasks)

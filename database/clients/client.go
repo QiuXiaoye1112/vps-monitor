@@ -332,6 +332,33 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 	return clients, nil
 }
 
+// UpdateLastReportAt records the last time an agent report was accepted.
+// This timestamp intentionally lives on the client row instead of in the
+// rolling records tables, so it survives report-history cleanup and restarts.
+func UpdateLastReportAt(clientUUID string, reportedAt time.Time) error {
+	return updateLastReportAt(dbcore.GetDBInstance(), clientUUID, reportedAt)
+}
+
+func updateLastReportAt(db *gorm.DB, clientUUID string, reportedAt time.Time) error {
+	if strings.TrimSpace(clientUUID) == "" {
+		return fmt.Errorf("invalid client UUID")
+	}
+	if reportedAt.IsZero() {
+		return fmt.Errorf("invalid report time")
+	}
+
+	result := db.Model(&models.Client{}).
+		Where("uuid = ?", clientUUID).
+		UpdateColumn("last_report_at", models.FromTime(reportedAt))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 // ResetTrafficAccounting starts a fresh cumulative traffic ledger at an exact
 // agent-side counter snapshot without deleting monitoring history.
 func ResetTrafficAccounting(uuid string, clearedAt time.Time, baselineUp, baselineDown int64) error {

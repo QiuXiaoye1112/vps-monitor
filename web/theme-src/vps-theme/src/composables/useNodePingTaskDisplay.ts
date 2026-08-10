@@ -4,6 +4,7 @@ import { computed, onScopeDispose, ref, shallowRef, toValue, watch } from 'vue'
 import { loadPingRecordsWithTasks } from '@/services/history.service'
 import { useAppStore } from '@/stores/app'
 import { formatDateTime } from '@/utils/helper'
+import { subscribeRealtimeEvents } from '@/utils/realtime'
 
 export interface PingTaskBar {
   key: string
@@ -35,12 +36,11 @@ interface SharedPingTaskState {
 interface SharedPingTaskEntry {
   data: ReturnType<typeof shallowRef<SharedPingTaskState | null>>
   promise: Promise<void> | null
-  refreshTimer: ReturnType<typeof setInterval> | null
+  unsubscribeRealtime: (() => void) | null
   subscribers: number
   lastFetchedAt: number
 }
 
-const REFRESH_INTERVAL_MS = 5_000
 const MAX_BAR_COUNT = 20
 const TASK_COLORS = ['#fb7185', '#60a5fa', '#34d399', '#a78bfa', '#f59e0b', '#22d3ee']
 const sharedEntries = new Map<number, SharedPingTaskEntry>()
@@ -53,7 +53,7 @@ function getEntry(hours: number): SharedPingTaskEntry {
   const entry: SharedPingTaskEntry = {
     data: shallowRef(null),
     promise: null,
-    refreshTimer: null,
+    unsubscribeRealtime: null,
     subscribers: 0,
     lastFetchedAt: 0,
   }
@@ -95,13 +95,43 @@ async function refreshEntry(entry: SharedPingTaskEntry, hours: number): Promise<
   return entry.promise
 }
 
+function appendPingRecord(entry: SharedPingTaskEntry, hours: number, event: { uuid: string, task_id?: number, time?: string, value?: number }): void {
+  if (!entry.data.value || typeof event.task_id !== 'number' || typeof event.value !== 'number' || !event.time)
+    return
+
+  const record: PingRecord = {
+    client: event.uuid,
+    task_id: event.task_id,
+    time: event.time,
+    value: event.value,
+  }
+  const cutoff = Date.now() - hours * 60 * 60 * 1000
+  const nextRecords = [
+    ...(entry.data.value.recordsByClient.get(event.uuid) ?? []),
+    record,
+  ].filter((item) => {
+    const timestamp = new Date(item.time).getTime()
+    return !Number.isFinite(timestamp) || timestamp >= cutoff
+  })
+  nextRecords.sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime())
+
+  const recordsByClient = new Map(entry.data.value.recordsByClient)
+  recordsByClient.set(event.uuid, nextRecords)
+  entry.data.value = { ...entry.data.value, recordsByClient }
+  entry.lastFetchedAt = Date.now()
+}
+
 function retainEntry(hours: number): () => void {
   const entry = getEntry(hours)
+  const wasInactive = entry.subscribers === 0
   entry.subscribers += 1
-  if (!entry.refreshTimer) {
-    entry.refreshTimer = setInterval(() => {
-      void refreshEntry(entry, hours).catch(() => {})
-    }, REFRESH_INTERVAL_MS)
+
+  if (wasInactive) {
+    entry.lastFetchedAt = 0
+    entry.unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+      if (event.kind === 'ping')
+        appendPingRecord(entry, hours, event)
+    })
   }
 
   let released = false
@@ -110,9 +140,9 @@ function retainEntry(hours: number): () => void {
       return
     released = true
     entry.subscribers = Math.max(0, entry.subscribers - 1)
-    if (entry.subscribers === 0 && entry.refreshTimer) {
-      clearInterval(entry.refreshTimer)
-      entry.refreshTimer = null
+    if (entry.subscribers === 0) {
+      entry.unsubscribeRealtime?.()
+      entry.unsubscribeRealtime = null
     }
   }
 }
@@ -316,7 +346,7 @@ export function useNodePingTaskDisplay(
 
     syncSubscription(hours)
     const entry = getEntry(hours)
-    if (entry.data.value && Date.now() - entry.lastFetchedAt < REFRESH_INTERVAL_MS) {
+    if (entry.data.value && entry.lastFetchedAt > 0) {
       loading.value = false
       return
     }

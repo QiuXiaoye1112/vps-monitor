@@ -2,14 +2,12 @@ package jsonrpc
 
 import (
 	"context"
-	"encoding/json"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/auditlog"
 	"github.com/monitor-monitor/monitor/database/dbcore"
@@ -134,7 +132,7 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 
 	var onlineClients, queuedClients, offlineClients []string
 	for _, uuid := range params.Clients {
-		if client := agent_runtime.GetConnectedClients()[uuid]; client != nil {
+		if client := agent_runtime.GetConnectedClients()[uuid]; client != nil && agent_runtime.IsV2Client(uuid) {
 			onlineClients = append(onlineClients, uuid)
 		} else if agent_runtime.IsAgentOnline(uuid) && agent_runtime.IsV2Client(uuid) {
 			queuedClients = append(queuedClients, uuid)
@@ -152,24 +150,8 @@ func adminExec(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcE
 		return nil, rpc.MakeError(rpc.InternalError, "Failed to create task: "+err.Error(), nil)
 	}
 	for _, uuid := range onlineClients {
-		legacy := struct {
-			Message string `json:"message"`
-			Command string `json:"command"`
-			TaskId  string `json:"task_id"`
-		}{Message: "exec", Command: params.Command, TaskId: taskId}
-		payload, _ := json.Marshal(legacy)
-		if agent_runtime.IsV2Client(uuid) {
-			if !agent_runtime.DispatchV2Event(uuid, v2.MethodAgentExec, v2.ExecParams{TaskID: taskId, Command: params.Command}) {
-				return nil, rpc.MakeError(rpc.InvalidParams, "Client does not support v2 events: "+uuid, nil)
-			}
-			continue
-		}
-		client := agent_runtime.GetConnectedClients()[uuid]
-		if client == nil {
-			return nil, rpc.MakeError(rpc.InvalidParams, "Client connection is null: "+uuid, nil)
-		}
-		if err := client.WriteMessage(websocket.TextMessage, payload); err != nil {
-			return nil, rpc.MakeError(rpc.InvalidParams, "Client connection is broke: "+uuid, nil)
+		if !agent_runtime.DispatchV2Event(uuid, v2.MethodAgentExec, v2.ExecParams{TaskID: taskId, Command: params.Command}) {
+			return nil, rpc.MakeError(rpc.InvalidParams, "Client does not support v2 events: "+uuid, nil)
 		}
 	}
 	for _, uuid := range queuedClients {

@@ -38,6 +38,53 @@ type legacyModelConfig struct {
 	UpdatedAt              models.LocalTime
 }
 
+// BackfillClientLastReportAt restores the new persistent last-report marker
+// from the newest retained monitoring row. It only fills empty client fields,
+// so a later agent report is never overwritten by startup backfill.
+func BackfillClientLastReportAt(db *gorm.DB) error {
+	if db == nil || !db.Migrator().HasTable(&models.Client{}) {
+		return nil
+	}
+
+	type clientReportTime struct {
+		Client       string           `gorm:"column:client"`
+		LastReportAt models.LocalTime `gorm:"column:last_report_at"`
+	}
+	latestByClient := make(map[string]time.Time)
+	for _, table := range []string{"records", "records_long_term"} {
+		if !db.Migrator().HasTable(table) {
+			continue
+		}
+
+		var rows []clientReportTime
+		if err := db.Table(table).
+			Select("client, MAX(time) AS last_report_at").
+			Where("client IS NOT NULL AND client <> ''").
+			Group("client").
+			Scan(&rows).Error; err != nil {
+			return fmt.Errorf("backfill last report time from %s: %w", table, err)
+		}
+		for _, row := range rows {
+			candidate := row.LastReportAt.ToTime()
+			if candidate.IsZero() {
+				continue
+			}
+			if previous, ok := latestByClient[row.Client]; !ok || candidate.After(previous) {
+				latestByClient[row.Client] = candidate
+			}
+		}
+	}
+
+	for clientUUID, lastReportAt := range latestByClient {
+		if err := db.Model(&models.Client{}).
+			Where("uuid = ? AND last_report_at IS NULL", clientUUID).
+			UpdateColumn("last_report_at", models.FromTime(lastReportAt)).Error; err != nil {
+			return fmt.Errorf("backfill last report time for %s: %w", clientUUID, err)
+		}
+	}
+	return nil
+}
+
 func (legacyModelConfig) TableName() string {
 	return "configs"
 }

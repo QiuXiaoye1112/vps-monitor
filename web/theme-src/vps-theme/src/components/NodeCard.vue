@@ -33,7 +33,7 @@ const nodeCardMetricBoxClass = computed(() => appStore.nodeCardSize === 'compact
 
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
-const offlineTime = computed(() => formatDateTime(props.node.time))
+const offlineTime = computed(() => formatDateTime(props.node.last_report_at))
 
 const cpuStatus = computed(() => getStatus(props.node.cpu ?? 0))
 const memPercentage = computed(() => getMemoryPercentage(props.node))

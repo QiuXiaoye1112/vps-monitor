@@ -47,14 +47,14 @@ func DispatchV2Event(uuid, method string, params any) bool {
 	return true
 }
 
-func DispatchPing(uuid string, legacy any, params v2.PingParams) bool {
+func DispatchPing(uuid string, params v2.PingParams) bool {
 	if conn := GetConnectedClients()[uuid]; conn != nil {
-		if IsV2Client(uuid) {
-			event := EnqueueV2Event(uuid, v2.MethodAgentPing, params)
-			_ = conn.WriteJSON(v2EventRequest(event))
-			return true
+		if !IsV2Client(uuid) {
+			return false
 		}
-		return conn.WriteJSON(legacy) == nil
+		event := EnqueueV2Event(uuid, v2.MethodAgentPing, params)
+		_ = conn.WriteJSON(v2EventRequest(event))
+		return true
 	}
 	if !IsV2Client(uuid) {
 		return false

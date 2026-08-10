@@ -153,6 +153,44 @@ func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Reco
 	return records, nil
 }
 
+// GetLatestRecordByClient returns the newest retained record for a client
+// across the raw, compacted, and dedicated Agent history tables.
+func GetLatestRecordByClient(uuid string) (*models.Record, error) {
+	return getLatestRecordByClient(dbcore.GetDBInstance(), uuid)
+}
+
+func getLatestRecordByClient(db *gorm.DB, uuid string) (*models.Record, error) {
+	if db == nil || uuid == "" {
+		return nil, nil
+	}
+
+	var latest *models.Record
+	for _, table := range []string{"records", "records_long_term", HistoryTable} {
+		if !db.Migrator().HasTable(table) {
+			continue
+		}
+
+		var rows []models.Record
+		if err := db.Table(table).
+			Where("client = ?", uuid).
+			Order("time DESC").
+			Limit(1).
+			Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			continue
+		}
+
+		row := rows[0]
+		if latest == nil || row.Time.ToTime().After(latest.Time.ToTime()) {
+			latest = &row
+		}
+	}
+
+	return latest, nil
+}
+
 // GetRecordsByTime 获取所有客户端在时间范围内的记录
 func GetRecordsByTime(start, end time.Time) ([]models.Record, error) {
 	db := dbcore.GetDBInstance()

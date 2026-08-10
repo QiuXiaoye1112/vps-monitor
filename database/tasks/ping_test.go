@@ -24,6 +24,29 @@ func TestOrderPingTasksUsesClientSelectionAndOrder(t *testing.T) {
 	}
 }
 
+func TestUpdatePingTaskOrderPersistsGlobalDisplayOrder(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PingTask{}))
+
+	tasks := []models.PingTask{
+		{Name: "first", Target: "one", Type: "tcp", Interval: 60, Weight: 0},
+		{Name: "second", Target: "two", Type: "tcp", Interval: 60, Weight: 1},
+		{Name: "third", Target: "three", Type: "tcp", Interval: 60, Weight: 2},
+	}
+	require.NoError(t, db.Create(&tasks).Error)
+
+	require.NoError(t, updatePingTaskOrder(db, map[uint]int{
+		tasks[2].Id: 0,
+		tasks[0].Id: 1,
+		tasks[1].Id: 2,
+	}))
+
+	var ordered []models.PingTask
+	require.NoError(t, db.Order("weight ASC").Order("id ASC").Find(&ordered).Error)
+	require.Equal(t, []uint{tasks[2].Id, tasks[0].Id, tasks[1].Id}, []uint{ordered[0].Id, ordered[1].Id, ordered[2].Id})
+}
+
 func TestDeletePingTaskKeepsHistoricalRecords(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)

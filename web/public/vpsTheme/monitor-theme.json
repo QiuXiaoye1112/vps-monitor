@@ -10,7 +10,6 @@
     "name": "主题自定义",
     "data": [
       { "name": "基础设置", "type": "title" },
-      { "key": "dataUpdateInterval", "name": "数据更新间隔", "type": "number", "default": 1, "help": "实时数据刷新间隔，单位：秒。" },
       { "key": "nodeCardSize", "name": "节点卡片尺寸", "type": "select", "default": "compact", "options": "compact,comfortable,large", "help": "首页节点卡片尺寸。" },
 
       { "name": "首页模块设置", "type": "title" },

@@ -17,7 +17,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/config"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
-	"github.com/monitor-monitor/monitor/protocol/v1"
+	reportmodel "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/monitor-monitor/monitor/utils"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 	report_cache "github.com/monitor-monitor/monitor/web/report"
@@ -333,7 +333,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	req.BindParams(&params)
 
 	meta := rpc.MetaFromContext(ctx)
-	latest := agent_runtime.GetLatestReport() // map[string]*v1.Report (copy)
+	latest := agent_runtime.GetLatestReport() // map[string]*reportmodel.Report (copy)
 	onlineUUIDs := agent_runtime.GetAllOnlineUUIDs()
 	onlineSet := make(map[string]bool, len(onlineUUIDs))
 	for _, uuid := range onlineUUIDs {
@@ -410,7 +410,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	// 预取所有 ping 任务
 	pingTasks, _ := tasks.GetEnabledPingTasks()
 
-	appendOne := func(uuid string, rep *v1.Report) {
+	appendOne := func(uuid string, rep *reportmodel.Report) {
 		if rep == nil {
 			return
 		}
@@ -598,7 +598,7 @@ func getNodeRecentStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rp
 	}
 
 	raw, _ := report_cache.Records.Get(params.UUID)
-	reports, _ := raw.([]v1.Report)
+	reports, _ := raw.([]reportmodel.Report)
 
 	// 扁平化为 { count, records: [] }
 	type flatRecord struct {

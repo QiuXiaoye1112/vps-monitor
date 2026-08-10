@@ -240,7 +240,7 @@ function getRowTransitionStyle(index: number): Record<string, string> {
 }
 
 function formatOfflineTime(node: NodeData): string {
-  return formatDateTime(node.time)
+  return formatDateTime(node.last_report_at)
 }
 
 function getNodeMessage(node: NodeData): string {

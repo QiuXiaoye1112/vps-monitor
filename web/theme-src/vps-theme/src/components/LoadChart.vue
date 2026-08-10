@@ -3,9 +3,8 @@ import type { ChartDashboardCardKey } from '@/stores/app'
 import type { RecordFormat } from '@/utils/recordHelper'
 import type { StatusRecord } from '@/utils/rpc'
 import { Icon } from '@iconify/vue'
-import { useIntervalFn } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { computed, onMounted, reactive, ref, shallowRef, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import MetricChartHeader from '@/components/MetricChartHeader.vue'
 import MetricSeriesChartCard from '@/components/MetricSeriesChartCard.vue'
@@ -22,6 +21,7 @@ import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { getLoadChartPalette } from '@/utils/chartPalette'
 import { formatBytes, formatBytesSplit } from '@/utils/helper'
+import { subscribeRealtimeEvents } from '@/utils/realtime'
 import { getSharedRpc } from '@/utils/rpc'
 import '@/utils/echarts' // 共享 ECharts 配置
 
@@ -35,10 +35,6 @@ const nodesStore = useNodesStore()
 // 从 publicSettings 获取记录保留时间
 const maxRecordPreserveTime = computed(() => Math.min(appStore.publicSettings?.record_preserve_time || 168, 168))
 
-const observedReportIntervalSeconds = ref<number | null>(null)
-const dataUpdateInterval = computed(() =>
-  Math.max(1, observedReportIntervalSeconds.value ?? appStore.dataUpdateInterval) * 1000,
-)
 const detailLoadStatsHours = computed(() => maxRecordPreserveTime.value)
 
 // 使用 store 中的 isDark computed
@@ -264,23 +260,6 @@ function statusToRecordFormat(records: StatusRecord[]): RecordFormat[] {
   }))
 }
 
-function updateObservedReportInterval(records: StatusRecord[]): void {
-  const timestamps = records
-    .map(record => dayjs(record.time).valueOf())
-    .filter(Number.isFinite)
-    .sort((a, b) => a - b)
-  const gaps: number[] = []
-  for (let index = 1; index < timestamps.length; index++) {
-    const gap = (timestamps[index]! - timestamps[index - 1]!) / 1000
-    if (gap >= 0.5 && gap <= 60)
-      gaps.push(gap)
-  }
-  if (!gaps.length)
-    return
-  gaps.sort((a, b) => a - b)
-  observedReportIntervalSeconds.value = Math.min(60, Math.max(1, Math.round(gaps[Math.floor(gaps.length / 2)]!)))
-}
-
 function metricValue(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
@@ -340,7 +319,6 @@ async function fetchHistoryData(silent = false) {
       : { uuid: props.uuid, hours, maxCount: LOAD_RECORD_MAX_COUNT }
     const historyResult = await rpc.getLoadRecordsRange(loadParams)
     remoteData.value = normalizeStatusRecordsPayload(historyResult.records)
-    updateObservedReportInterval(remoteData.value)
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
@@ -1035,22 +1013,11 @@ function ensureDefaultCustomRange() {
 
 // ==================== 实时更新 ====================
 
-// 使用 VueUse 的 useIntervalFn 自动管理定时器
-const { pause: pauseRealtimeUpdate, resume: resumeRealtimeUpdate } = useIntervalFn(
-  () => fetchData(true),
-  dataUpdateInterval,
-  { immediate: false },
-)
-
-// 小卡片保持最近一小时自动更新；展开历史图后停止轮询，避免长区间重复查询。
-watch([expandedChart, selectedView], ([expanded, view]) => {
-  if (expanded === null && view === '1 小时') {
-    resumeRealtimeUpdate()
-  }
-  else {
-    pauseRealtimeUpdate()
-  }
-}, { immediate: true })
+// 历史图表只在服务端收到新的历史采样后更新，不按固定间隔重复查询。
+const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+  if (event.kind === 'history' && event.uuid === props.uuid && isRealtime.value)
+    void fetchData(true)
+})
 
 // 生命周期 ====================
 
@@ -1064,13 +1031,16 @@ watch(selectedView, () => {
 
 watch(() => props.uuid, () => {
   remoteData.value = []
-  observedReportIntervalSeconds.value = null
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
 })
 
 onMounted(() => {
   fetchData()
+})
+
+onBeforeUnmount(() => {
+  unsubscribeRealtime()
 })
 </script>
 

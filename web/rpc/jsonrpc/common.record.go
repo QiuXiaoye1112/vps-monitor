@@ -68,6 +68,8 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 	}
 	// parse time window
 	var startTime, endTime time.Time
+	relativeWindow := params.Start == "" && params.End == ""
+	relativeHours := 1
 	if params.Start != "" || params.End != "" {
 		// allow partial: missing end means now
 		var err error
@@ -94,6 +96,7 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 		if hours <= 0 {
 			hours = 1 // default 1 hour
 		}
+		relativeHours = hours
 		endTime = time.Now()
 		startTime = endTime.Add(-time.Duration(hours) * time.Hour)
 	}
@@ -118,6 +121,16 @@ func getRecords(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpc
 
 	switch params.Type {
 	case "load":
+		if params.UUID != "" && relativeWindow {
+			latest, err := recordsdb.GetLatestRecordByClient(params.UUID)
+			if err != nil {
+				return nil, rpc.MakeError(rpc.InternalError, "Failed to fetch latest record", err.Error())
+			}
+			if latest != nil {
+				endTime = latest.Time.ToTime()
+				startTime = endTime.Add(-time.Duration(relativeHours) * time.Hour)
+			}
+		}
 		startTime, endTime = clampLoadRecordRange(startTime, endTime)
 		maxCount := params.MaxCount
 		if maxCount == 0 {

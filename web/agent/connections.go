@@ -4,14 +4,15 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/monitor-monitor/monitor/protocol/v1"
+	report "github.com/monitor-monitor/monitor/protocol/report"
 	"github.com/monitor-monitor/monitor/web/connection"
+	"github.com/monitor-monitor/monitor/web/realtime"
 )
 
 var (
 	connectedClients  = make(map[string]*connection.SafeConn)
 	connectedClientV2 = make(map[string]bool)
-	latestReport      = make(map[string]*v1.Report)
+	latestReport      = make(map[string]*report.Report)
 	// presenceOnly stores online state for non-WebSocket agents (e.g., Nezha gRPC)
 	// value keeps connectionID and a soft expiration to avoid flicker
 	presenceOnly = make(map[string]struct {
@@ -51,20 +52,23 @@ func IsV2Client(uuid string) bool {
 
 func DeleteClientConditionally(uuid string, connToRemove *connection.SafeConn) {
 	mu.Lock()
-	defer mu.Unlock()
-
 	// 检查当前 map 里的 conn 是否就是要删除的这一个
 	if currentConn, exists := connectedClients[uuid]; exists && currentConn == connToRemove {
 		delete(connectedClients, uuid)
 		delete(connectedClientV2, uuid)
+		mu.Unlock()
+		realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
+		return
 	}
+	mu.Unlock()
 }
 func DeleteConnectedClients(uuid string) {
 	mu.Lock()
-	defer mu.Unlock()
 	// 只从 map 中删除，不再负责关闭连接
 	delete(connectedClients, uuid)
 	delete(connectedClientV2, uuid)
+	mu.Unlock()
+	realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
 }
 
 // SetPresence sets or clears presence for non-WebSocket agents.
@@ -84,17 +88,22 @@ var defaultPresenceTTL = 20 * time.Second
 // SetPresence keeps compatibility with existing callers.
 func SetPresence(uuid string, connectionID int64, present bool) {
 	mu.Lock()
-	defer mu.Unlock()
 	if present {
 		presenceOnly[uuid] = struct {
 			id     int64
 			expire time.Time
 		}{id: connectionID, expire: time.Now().Add(defaultPresenceTTL)}
+		mu.Unlock()
+		realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
 		return
 	}
 	if cur, ok := presenceOnly[uuid]; ok && cur.id == connectionID {
 		delete(presenceOnly, uuid)
+		mu.Unlock()
+		realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
+		return
 	}
+	mu.Unlock()
 }
 
 // GetAllOnlineUUIDs returns a de-duplicated list of online UUIDs from both WebSocket and non-WebSocket agents.
@@ -117,16 +126,16 @@ func GetAllOnlineUUIDs() []string {
 	}
 	return res
 }
-func GetLatestReport() map[string]*v1.Report {
+func GetLatestReport() map[string]*report.Report {
 	mu.RLock()
 	defer mu.RUnlock()
-	reportCopy := make(map[string]*v1.Report)
+	reportCopy := make(map[string]*report.Report)
 	for k, v := range latestReport {
 		reportCopy[k] = v
 	}
 	return reportCopy
 }
-func SetLatestReport(uuid string, report *v1.Report) {
+func SetLatestReport(uuid string, report *report.Report) {
 	mu.Lock()
 	defer mu.Unlock()
 	latestReport[uuid] = report
