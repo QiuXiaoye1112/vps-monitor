@@ -2,7 +2,7 @@
 import type { GeneralCardKey } from '@/stores/app'
 import type { NodeData } from '@/stores/nodes'
 import { Icon } from '@iconify/vue'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import NodeEarthGlobe from '@/components/NodeEarthGlobe.vue'
 import { CardX } from '@/components/ui/card-x'
 import { useAppStore } from '@/stores/app'
@@ -39,6 +39,23 @@ const totalSpeed = computed(() => onlineNodes.value.reduce(
   { up: 0, down: 0 },
 ))
 
+// 多个节点的 status 事件并不会同时到达。总览卡不直接消费每个事件，
+// 而是每秒采样一次所有节点的最新速度，避免节点分批上报时总览数字连续跳动。
+const displayedTotalSpeed = ref({ ...totalSpeed.value })
+let totalSpeedRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  totalSpeedRefreshTimer = window.setInterval(() => {
+    displayedTotalSpeed.value = { ...totalSpeed.value }
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (totalSpeedRefreshTimer)
+    clearInterval(totalSpeedRefreshTimer)
+  totalSpeedRefreshTimer = null
+})
+
 const totalTraffic = computed(() => summaryNodes.value.reduce(
   (result, node) => {
     result.up += node.net_total_up || 0
@@ -52,8 +69,8 @@ const formattedTraffic = computed(() => formatBytesSplit(
   totalTraffic.value.up + totalTraffic.value.down,
   appStore.byteDecimals,
 ))
-const formattedSpeedUp = computed(() => formatBytesPerSecondSplit(totalSpeed.value.up, appStore.byteDecimals))
-const formattedSpeedDown = computed(() => formatBytesPerSecondSplit(totalSpeed.value.down, appStore.byteDecimals))
+const formattedSpeedUp = computed(() => formatBytesPerSecondSplit(displayedTotalSpeed.value.up, appStore.byteDecimals))
+const formattedSpeedDown = computed(() => formatBytesPerSecondSplit(displayedTotalSpeed.value.down, appStore.byteDecimals))
 
 function formatCount(value: number): string {
   return Math.round(value).toLocaleString('zh-CN')
