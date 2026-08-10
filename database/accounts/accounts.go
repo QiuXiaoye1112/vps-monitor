@@ -10,6 +10,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/utils"
+	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 )
@@ -171,8 +172,12 @@ func UpdateUser(uuid string, name, password, sso_type *string) error {
 	if sso_type != nil {
 		updates["sso_type"] = *sso_type
 	}
-	updates["updated_at"] = time.Now()
-	err := db.Model(&models.User{}).Where("uuid = ?", uuid).Updates(updates).Error
+	updatedAt, err := models.FromTime(time.Now()).Value()
+	if err != nil {
+		return err
+	}
+	updates["updated_at"] = gorm.Expr("?", updatedAt)
+	err = db.Model(&models.User{}).Where("uuid = ?", uuid).Updates(updates).Error
 	if err != nil {
 		return err
 	}
