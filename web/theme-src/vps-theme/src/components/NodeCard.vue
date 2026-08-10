@@ -153,7 +153,10 @@ function activateCard() {
     <template #default>
       <div class="flex flex-col relative" :class="nodeCardContentClass">
         <div class="relative z-20 flex items-center gap-1.5 -mt-1 h-[19px] overflow-hidden">
-          <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-slate-500/10 text-muted-foreground leading-tight">
+          <span
+            v-if="props.node.online"
+            class="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-slate-500/10 text-muted-foreground leading-tight"
+          >
             {{ uptimeDaysText }}
           </span>
         </div>
