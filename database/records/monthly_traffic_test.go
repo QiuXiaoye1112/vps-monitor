@@ -74,6 +74,49 @@ func TestSumLegacyTrafficDeltasUsesAllRawRowsWithoutArchive(t *testing.T) {
 	require.Equal(t, int64(120), down)
 }
 
+func TestSumLegacyTrafficDeltasConvertsShanghaiResetForUTCStorage(t *testing.T) {
+	db := newTrafficTestDB(t)
+	client := "bdb80ffe-bfdd-4e51-9409-4d3354b2787b"
+	loc := trafficLocation()
+	appLoc := models.GetAppLocation()
+	reset := time.Date(2026, 8, 10, 3, 45, 0, 0, time.UTC)
+	start := reset.In(loc)
+	end := time.Date(2026, 8, 10, 5, 7, 37, 0, time.UTC).In(loc)
+	storageTime := func(instant time.Time) string {
+		return instant.In(appLoc).Format("2006-01-02 15:04:05.0000000")
+	}
+
+	// With TZ=UTC these are exactly 03:44, 03:45 and 05:00 UTC in SQLite.
+	// Under another app timezone, storageTime still models LocalTime.Value().
+	require.NoError(t, db.Exec("INSERT INTO records_long_term (client, time, traffic_up, traffic_down) VALUES (?, ?, ?, ?)",
+		client, storageTime(reset.Add(-time.Minute)), 1, 2).Error)
+	require.NoError(t, db.Exec("INSERT INTO records_long_term (client, time, traffic_up, traffic_down) VALUES (?, ?, ?, ?)",
+		client, storageTime(reset), 100, 200).Error)
+	require.NoError(t, db.Exec("INSERT INTO records (client, time, traffic_up, traffic_down) VALUES (?, ?, ?, ?)",
+		client, storageTime(time.Date(2026, 8, 10, 5, 0, 0, 0, time.UTC)), 300, 400).Error)
+
+	up, down, err := sumLegacyTrafficDeltas(db, client, start, end)
+	require.NoError(t, err)
+	require.Equal(t, int64(400), up)
+	require.Equal(t, int64(600), down)
+}
+
+func TestSumLegacyTrafficDeltasLeavesDisabledResetUnbounded(t *testing.T) {
+	db := newTrafficTestDB(t)
+	client := "disabled-reset"
+	beforeEnd := time.Date(2026, 8, 10, 5, 7, 37, 0, time.UTC)
+
+	require.NoError(t, db.Create(&models.Record{
+		Client: client, Time: models.FromTime(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)),
+		TrafficUp: 123, TrafficDown: 456,
+	}).Error)
+
+	up, down, err := sumLegacyTrafficDeltas(db, client, time.Time{}, beforeEnd)
+	require.NoError(t, err)
+	require.Equal(t, int64(123), up)
+	require.Equal(t, int64(456), down)
+}
+
 func TestTrafficAccountingStartUsesLatestManualClear(t *testing.T) {
 	windowStart := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	clearedAt := windowStart.Add(10 * 24 * time.Hour)

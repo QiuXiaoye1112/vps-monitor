@@ -6,6 +6,7 @@ import (
 
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
+	"gorm.io/gorm"
 )
 
 func Log(ip, uuid, message, msgType string) {
@@ -27,9 +28,12 @@ func EventLog(eventType, message string) {
 
 // Delete logs older than 30 days
 func RemoveOldLogs() {
-	db := dbcore.GetDBInstance()
-	threshold := time.Now().AddDate(0, 0, -30)
-	if err := db.Where("time < ?", threshold).Delete(&models.Log{}).Error; err != nil {
+	if err := removeOldLogs(dbcore.GetDBInstance(), time.Now()); err != nil {
 		log.Println("Failed to remove old logs:", err)
 	}
+}
+
+func removeOldLogs(db *gorm.DB, now time.Time) error {
+	threshold := now.AddDate(0, 0, -30)
+	return db.Where("time < ?", models.FromTime(threshold)).Delete(&models.Log{}).Error
 }

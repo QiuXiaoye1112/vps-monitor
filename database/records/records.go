@@ -36,7 +36,7 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		// Raw records are only the high-resolution history. Traffic that is old
 		// enough to reach this cutoff has already been rolled up by CompactRecord.
-		if err := tx.Table("records").Where("time < ?", before).Delete(&models.Record{}).Error; err != nil {
+		if err := tx.Table("records").Where("time < ?", models.FromTime(before)).Delete(&models.Record{}).Error; err != nil {
 			return err
 		}
 
@@ -67,9 +67,9 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 			}
 			foldQuery := tx.Table("records_long_term").
 				Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-				Where("client = ? AND time < ?", client.UUID, before)
+				Where("client = ? AND time < ?", client.UUID, models.FromTime(before))
 			if !foldStart.IsZero() {
-				foldQuery = foldQuery.Where("time >= ?", foldStart)
+				foldQuery = foldQuery.Where("time >= ?", models.FromTime(foldStart))
 			}
 			if err := foldQuery.Scan(&folded).Error; err != nil {
 				return err
@@ -84,14 +84,14 @@ func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
 				}
 			}
 			if err := tx.Table("records_long_term").
-				Where("client = ? AND time < ?", client.UUID, before).
+				Where("client = ? AND time < ?", client.UUID, models.FromTime(before)).
 				Delete(&models.Record{}).Error; err != nil {
 				return err
 			}
 		}
 
 		// Records belonging to deleted nodes no longer contribute to any total.
-		orphanQuery := tx.Table("records_long_term").Where("time < ?", before)
+		orphanQuery := tx.Table("records_long_term").Where("time < ?", models.FromTime(before))
 		if len(clientUUIDs) > 0 {
 			orphanQuery = orphanQuery.Where("client NOT IN ?", clientUUIDs)
 		}
@@ -111,7 +111,8 @@ func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Reco
 		if recentStart.Before(fourHoursAgo) {
 			recentStart = fourHoursAgo
 		}
-		err := db.Where("client = ? AND time >= ? AND time <= ?", uuid, recentStart, end).Order("time ASC").Find(&recentRecords).Error
+		err := applyLocalTimeRange(db.Where("client = ?", uuid), recentStart, end).
+			Order("time ASC").Find(&recentRecords).Error
 		if err != nil {
 			log.Printf("Error fetching recent records for client %s between %s and %s: %v", uuid, recentStart, end, err)
 			return nil, err
@@ -119,7 +120,8 @@ func GetRecordsByClientAndTime(uuid string, start, end time.Time) ([]models.Reco
 	}
 
 	var long_term []models.Record
-	err := db.Table("records_long_term").Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).Order("time ASC").Find(&long_term).Error
+	err := applyLocalTimeRange(db.Table("records_long_term").Where("client = ?", uuid), start, end).
+		Order("time ASC").Find(&long_term).Error
 	if err != nil {
 		log.Printf("Error fetching long-term records for client %s between %s and %s: %v", uuid, start, end, err)
 		return recentRecords, nil
@@ -162,11 +164,13 @@ func GetRecordsByTime(start, end time.Time) ([]models.Record, error) {
 		if recentStart.Before(fourHoursAgo) {
 			recentStart = fourHoursAgo
 		}
-		_ = db.Table("records").Where("time >= ? AND time <= ?", recentStart, end).Order("time ASC").Find(&recent).Error
+		_ = applyLocalTimeRange(db.Table("records"), recentStart, end).
+			Order("time ASC").Find(&recent).Error
 	}
 
 	var longTerm []models.Record
-	_ = db.Table("records_long_term").Where("time >= ? AND time <= ?", start, end).Order("time ASC").Find(&longTerm).Error
+	_ = applyLocalTimeRange(db.Table("records_long_term"), start, end).
+		Order("time ASC").Find(&longTerm).Error
 
 	if len(longTerm) == 0 {
 		return recent, nil
@@ -222,7 +226,7 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 
 	// 查询 records 表中超过 4 小时的记录
 	var records []models.Record
-	if err := db.Table("records").Where("time < ?", cutoff).Find(&records).Error; err != nil {
+	if err := db.Table("records").Where("time < ?", models.FromTime(cutoff)).Find(&records).Error; err != nil {
 		return err
 	}
 
@@ -411,7 +415,7 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		}
 
 		// 删除 records 表中的旧数据
-		if err := tx.Table("records").Where("time < ?", cutoff.Add(-1*time.Hour)).Delete(&models.Record{}).Error; err != nil {
+		if err := tx.Table("records").Where("time < ?", models.FromTime(cutoff.Add(-1*time.Hour))).Delete(&models.Record{}).Error; err != nil {
 			return err
 		}
 

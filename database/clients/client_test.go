@@ -3,10 +3,14 @@ package clients
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestCreateClientWithNameAndGroupPersistsGroup(t *testing.T) {
@@ -69,4 +73,29 @@ func TestCreateClientPrependsNewNodes(t *testing.T) {
 	if len(ordered) == 0 || ordered[0].UUID != newUUID {
 		t.Fatalf("new client was not first: %+v", ordered)
 	}
+}
+
+func TestSaveClientStoresLocalTimeUpdatesInConfiguredFormat(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Client{}))
+	require.NoError(t, db.Create(&models.Client{
+		UUID:                "node-1",
+		Token:               "token-1",
+		TrafficComp:         1,
+		TrafficResetEnabled: true,
+	}).Error)
+
+	now := time.Date(2026, time.August, 10, 3, 45, 0, 0, time.UTC)
+	require.NoError(t, saveClient(db, map[string]interface{}{
+		"uuid":                 "node-1",
+		"traffic_compensation": 2,
+	}, now))
+
+	var updatedAt, resetAt string
+	require.NoError(t, db.Table("clients").Select("CAST(updated_at AS TEXT), CAST(traffic_compensation_reset_at AS TEXT)").Where("uuid = ?", "node-1").Row().Scan(&updatedAt, &resetAt))
+	expected, err := models.FromTime(now).Value()
+	require.NoError(t, err)
+	require.Equal(t, expected, updatedAt)
+	require.Equal(t, expected, resetAt)
 }

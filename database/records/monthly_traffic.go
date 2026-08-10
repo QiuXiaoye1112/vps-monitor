@@ -143,6 +143,23 @@ func sumTrafficDeltas(uuid string, start, end time.Time) (int64, int64, error) {
 	return sumLegacyTrafficDeltas(dbcore.GetDBInstance(), uuid, start, end)
 }
 
+// applyLocalTimeRange converts Go time values to the same timezone-less string
+// representation used by models.LocalTime.Value before binding them to
+// SQLite. A zero bound means that side of the range is unbounded.
+func applyLocalTimeRange(query *gorm.DB, start, end time.Time) *gorm.DB {
+	if !start.IsZero() {
+		query = query.Where("time >= ?", models.FromTime(start))
+	}
+	if !end.IsZero() {
+		query = query.Where("time <= ?", models.FromTime(end))
+	}
+	return query
+}
+
+func applyTrafficTimeRange(query *gorm.DB, uuid string, start, end time.Time) *gorm.DB {
+	return applyLocalTimeRange(query.Where("client = ?", uuid), start, end)
+}
+
 // sumLegacyTrafficDeltas joins the compacted and raw record streams at the
 // actual last compacted slot. A wall-clock cutoff is not safe here: compaction
 // runs periodically, so its newest slot can lag the nominal four-hour cutoff
@@ -159,18 +176,16 @@ func sumLegacyTrafficDeltas(db *gorm.DB, uuid string, start, end time.Time) (int
 	}
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Table("records_long_term").
-			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-			Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
+		if err := applyTrafficTimeRange(tx.Table("records_long_term").
+			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down"), uuid, start, end).
 			Scan(&archived).Error; err != nil {
 			return err
 		}
 
 		recentStart := start
 		var latestArchived models.Record
-		result := tx.Table("records_long_term").
-			Select("time").
-			Where("client = ? AND time >= ? AND time <= ?", uuid, start, end).
+		result := applyTrafficTimeRange(tx.Table("records_long_term").
+			Select("time"), uuid, start, end).
 			Order("time DESC").
 			Limit(1).
 			Take(&latestArchived)
@@ -189,9 +204,8 @@ func sumLegacyTrafficDeltas(db *gorm.DB, uuid string, start, end time.Time) (int
 		if recentStart.After(end) {
 			return nil
 		}
-		return tx.Table("records").
-			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-			Where("client = ? AND time >= ? AND time <= ?", uuid, recentStart, end).
+		return applyTrafficTimeRange(tx.Table("records").
+			Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down"), uuid, recentStart, end).
 			Scan(&recent).Error
 	})
 	if err != nil {

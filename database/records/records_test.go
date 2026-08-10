@@ -441,6 +441,36 @@ func TestTrafficWindowEdgeCases(t *testing.T) {
 	assert.True(t, end2.Equal(time.Date(2026, 4, 30, 0, 0, 0, 0, loc)), "end2 was %v", end2)
 }
 
+func TestApplyLocalTimeRangeUsesStoredTimeFormat(t *testing.T) {
+	db := newTrafficTestDB(t)
+	client := "records-range-node"
+	appLoc := models.GetAppLocation()
+	reset := time.Date(2026, 8, 10, 3, 45, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 10, 5, 7, 37, 0, time.UTC)
+	storageTime := func(instant time.Time) string {
+		return instant.In(appLoc).Format("2006-01-02 15:04:05.0000000")
+	}
+
+	for _, row := range []struct {
+		stamp string
+		value int
+	}{
+		{storageTime(reset.Add(-time.Minute)), 1},
+		{storageTime(reset), 2},
+		{storageTime(time.Date(2026, 8, 10, 5, 0, 0, 0, time.UTC)), 3},
+	} {
+		require.NoError(t, db.Exec("INSERT INTO records (client, time, process) VALUES (?, ?, ?)",
+			client, row.stamp, row.value).Error)
+	}
+
+	var records []models.Record
+	require.NoError(t, applyLocalTimeRange(db.Table("records"), reset, end).
+		Order("time ASC").Find(&records).Error)
+	require.Len(t, records, 2)
+	require.Equal(t, 2, records[0].Process)
+	require.Equal(t, 3, records[1].Process)
+}
+
 func TestTrafficResetSwitch(t *testing.T) {
 	loc := trafficLocation()
 

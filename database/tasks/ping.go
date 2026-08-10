@@ -318,7 +318,7 @@ func SavePingRecord(record models.PingRecord) error {
 
 func DeletePingRecordsBefore(time time.Time) error {
 	db := dbcore.GetDBInstance()
-	err := db.Where("time < ?", time).Delete(&models.PingRecord{}).Error
+	err := db.Where("time < ?", models.FromTime(time)).Delete(&models.PingRecord{}).Error
 	return err
 }
 
@@ -350,6 +350,10 @@ func ReloadPingSchedule() error {
 
 func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
 	db := dbcore.GetDBInstance()
+	return getPingRecords(db, uuid, taskId, start, end)
+}
+
+func getPingRecords(db *gorm.DB, uuid string, taskId int, start, end time.Time) ([]models.PingRecord, error) {
 	var records []models.PingRecord
 	dbQuery := db.Model(&models.PingRecord{})
 	if uuid != "" {
@@ -358,8 +362,18 @@ func GetPingRecords(uuid string, taskId int, start, end time.Time) ([]models.Pin
 	if taskId >= 0 {
 		dbQuery = dbQuery.Where("task_id = ?", uint(taskId))
 	}
-	if err := dbQuery.Where("time >= ? AND time <= ?", start, end).Order("time DESC").Find(&records).Error; err != nil {
+	if err := applyPingTimeRange(dbQuery, start, end).Order("time DESC").Find(&records).Error; err != nil {
 		return nil, err
 	}
 	return records, nil
+}
+
+func applyPingTimeRange(query *gorm.DB, start, end time.Time) *gorm.DB {
+	if !start.IsZero() {
+		query = query.Where("time >= ?", models.FromTime(start))
+	}
+	if !end.IsZero() {
+		query = query.Where("time <= ?", models.FromTime(end))
+	}
+	return query
 }

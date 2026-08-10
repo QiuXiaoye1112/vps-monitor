@@ -92,3 +92,30 @@ func TestTaskResultUniqueIndexMigratesExistingTable(t *testing.T) {
 		CreatedAt: models.FromTime(time.Now()),
 	}).Error)
 }
+
+func TestClearTaskResultsByTimeBeforeUsesStoredLocalTimeFormat(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.TaskResult{}))
+
+	before := time.Date(2026, time.August, 10, 3, 45, 0, 0, time.UTC)
+	oldCreatedAt := models.FromTime(before.Add(-time.Minute))
+	keptCreatedAt := models.FromTime(before.Add(time.Minute))
+	require.NoError(t, db.Create(&models.TaskResult{
+		TaskId:    "old-task",
+		Client:    "node-old",
+		CreatedAt: oldCreatedAt,
+	}).Error)
+	require.NoError(t, db.Create(&models.TaskResult{
+		TaskId:    "kept-task",
+		Client:    "node-kept",
+		CreatedAt: keptCreatedAt,
+	}).Error)
+
+	require.NoError(t, clearTaskResultsByTimeBefore(db, before))
+
+	var remaining []models.TaskResult
+	require.NoError(t, db.Order("task_id ASC").Find(&remaining).Error)
+	require.Len(t, remaining, 1)
+	require.Equal(t, "kept-task", remaining[0].TaskId)
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/utils"
+	"gorm.io/gorm"
 )
 
 // GetAllSessions 获取所有会话
@@ -89,8 +90,15 @@ func DeleteAllSessions() error {
 }
 
 func UpdateLatestOnline(session string) error {
-	db := dbcore.GetDBInstance()
-	return db.Model(&models.Session{}).Where("session = ?", session).Update("latest_online", time.Now()).Error
+	return updateLatestOnline(dbcore.GetDBInstance(), session, time.Now())
+}
+
+func updateLatestOnline(db *gorm.DB, session string, now time.Time) error {
+	latestOnline, err := models.FromTime(now).Value()
+	if err != nil {
+		return err
+	}
+	return db.Model(&models.Session{}).Where("session = ?", session).UpdateColumn("latest_online", gorm.Expr("?", latestOnline)).Error
 }
 
 func UpdateLatestUserAgent(session, userAgent string) error {
@@ -103,19 +111,29 @@ func UpdateLatestIp(session, ip string) error {
 }
 
 func UpdateLatest(session, useragent, ip string) error {
-	db := dbcore.GetDBInstance()
+	return updateLatest(dbcore.GetDBInstance(), session, useragent, ip, time.Now())
+}
+
+func updateLatest(db *gorm.DB, session, useragent, ip string, now time.Time) error {
+	latestOnline, err := models.FromTime(now).Value()
+	if err != nil {
+		return err
+	}
 	return db.Model(&models.Session{}).Where("session = ?", session).Updates(map[string]interface{}{
-		"latest_online":     time.Now(),
+		"latest_online":     gorm.Expr("?", latestOnline),
 		"latest_user_agent": useragent,
 		"latest_ip":         ip,
 	}).Error
 }
 
 func RemoveExpiredSessions() error {
-	db := dbcore.GetDBInstance()
-	result := db.Where("expires < ?", time.Now()).Delete(&models.Session{})
+	result := removeExpiredSessions(dbcore.GetDBInstance(), time.Now())
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
+}
+
+func removeExpiredSessions(db *gorm.DB, now time.Time) *gorm.DB {
+	return db.Where("expires < ?", models.FromTime(now)).Delete(&models.Session{})
 }

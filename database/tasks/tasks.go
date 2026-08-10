@@ -90,6 +90,10 @@ func SaveTaskResult(taskId, clientId, result string, exitCode int, timestamp mod
 }
 
 func saveTaskResult(db *gorm.DB, taskId, clientId, result string, exitCode int, timestamp models.LocalTime) error {
+	finishedAt, err := timestamp.Value()
+	if err != nil {
+		return err
+	}
 	record := models.TaskResult{
 		TaskId:     taskId,
 		Client:     clientId,
@@ -106,11 +110,15 @@ func saveTaskResult(db *gorm.DB, taskId, clientId, result string, exitCode int, 
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"result":      result,
 			"exit_code":   exitCode,
-			"finished_at": timestamp,
+			"finished_at": gorm.Expr("?", finishedAt),
 		}),
 	}).Create(&record).Error
 }
 
 func ClearTaskResultsByTimeBefore(before time.Time) error {
-	return dbcore.GetDBInstance().Where("created_at < ?", before.Format(time.RFC3339)).Delete(&models.TaskResult{}).Error
+	return clearTaskResultsByTimeBefore(dbcore.GetDBInstance(), before)
+}
+
+func clearTaskResultsByTimeBefore(db *gorm.DB, before time.Time) error {
+	return db.Where("created_at < ?", models.FromTime(before)).Delete(&models.TaskResult{}).Error
 }

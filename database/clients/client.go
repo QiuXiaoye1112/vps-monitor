@@ -114,7 +114,11 @@ func SaveClientInfo(update map[string]interface{}) error {
 		return fmt.Errorf("no fields to update")
 	}
 
-	update["updated_at"] = time.Now()
+	updatedAt, err := models.FromTime(time.Now()).Value()
+	if err != nil {
+		return err
+	}
+	update["updated_at"] = gorm.Expr("?", updatedAt)
 
 	toFloat64 := func(value interface{}) (float64, bool) {
 		switch typed := value.(type) {
@@ -192,7 +196,7 @@ func SaveClientInfo(update map[string]interface{}) error {
 		return err
 	}
 
-	err := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(update).Error
+	err = db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(update).Error
 	if err != nil {
 		return err
 	}
@@ -582,11 +586,19 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 			delete(updates, "traffic_compensation")
 		} else {
 			updates["traffic_compensation"] = normalized
-			updates["traffic_compensation_reset_at"] = now
+			resetAt, err := models.FromTime(now).Value()
+			if err != nil {
+				return err
+			}
+			updates["traffic_compensation_reset_at"] = gorm.Expr("?", resetAt)
 		}
 	}
 
-	updates["updated_at"] = now
+	updatedAt, err := models.FromTime(now).Value()
+	if err != nil {
+		return err
+	}
+	updates["updated_at"] = gorm.Expr("?", updatedAt)
 
 	result := db.Model(&models.Client{}).Where("uuid = ?", clientUUID).Updates(updates)
 	if result.Error != nil {

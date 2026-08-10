@@ -48,3 +48,33 @@ func TestDeletePingTaskKeepsHistoricalRecords(t *testing.T) {
 	require.Zero(t, taskCount)
 	require.Equal(t, int64(1), recordCount)
 }
+
+func TestGetPingRecordsUsesStoredTimeFormat(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Client{}, &models.PingTask{}, &models.PingRecord{}))
+
+	appLoc := models.GetAppLocation()
+	reset := time.Date(2026, 8, 10, 3, 45, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 10, 5, 7, 37, 0, time.UTC)
+	storageTime := func(instant time.Time) string {
+		return instant.In(appLoc).Format("2006-01-02 15:04:05.0000000")
+	}
+	for _, row := range []struct {
+		stamp string
+		value int
+	}{
+		{storageTime(reset.Add(-time.Minute)), 1},
+		{storageTime(reset), 2},
+		{storageTime(time.Date(2026, 8, 10, 5, 0, 0, 0, time.UTC)), 3},
+	} {
+		require.NoError(t, db.Exec("INSERT INTO ping_records (client, task_id, time, value) VALUES (?, ?, ?, ?)",
+			"ping-node", 7, row.stamp, row.value).Error)
+	}
+
+	records, err := getPingRecords(db, "ping-node", -1, reset, end)
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	require.Equal(t, 3, records[0].Value)
+	require.Equal(t, 2, records[1].Value)
+}
