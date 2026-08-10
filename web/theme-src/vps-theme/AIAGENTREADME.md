@@ -17,15 +17,15 @@
 
 ## 1. 项目是什么
 
-**Komari Glassmorphism** 是一个 Komari Monitor 主题，使用 Vue 3 + Vite 构建。它的发布产物是 Komari 可以导入的 zip 包，不是普通 Web App 部署包。
+**VPS Monitor Glassmorphism** 是一个 VPS Monitor Monitor 主题，使用 Vue 3 + Vite 构建。它的发布产物是 VPS Monitor 可以导入的 zip 包，不是普通 Web App 部署包。
 
 关键事实：
 
-- 主题清单：[komari-theme.json](komari-theme.json)。这是发布输入，不是可选元数据。
-- 版本唯一来源：[komari-theme.json](komari-theme.json) 的 `version`。
+- 主题清单：[vps-monitor-theme.json](vps-monitor-theme.json)。这是发布输入，不是可选元数据。
+- 版本唯一来源：[vps-monitor-theme.json](vps-monitor-theme.json) 的 `version`。
 - 不要在 [package.json](package.json) 重新添加顶层 `version`。
-- 打包产物：`komari-theme-Glassmorphism-build-<short-sha>.zip`。
-- zip 内固定包含：`komari-theme.json`、`preview.png`、`dist/`。
+- 打包产物：`vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`。
+- zip 内固定包含：`vps-monitor-theme.json`、`preview.png`、`dist/`。
 - `preview.png` 来自 [docs/preview.png](docs/preview.png)，打包时重命名。
 
 ## 2. 技术栈
@@ -77,7 +77,7 @@ bun run build
 ├── CLAUDE.md                 # Claude Code 入口指令，指向本文件
 ├── AGENTS.md                 # 根作用域 agent 指令
 ├── src/AGENTS.md             # src 子树作用域 agent 指令
-├── komari-theme.json         # 主题清单、版本和托管配置 schema
+├── vps-monitor-theme.json         # 主题清单、版本和托管配置 schema
 ├── vite.config.ts            # Vite、manual chunks、zip packaging
 ├── package.json              # Bun scripts 与依赖
 ├── docs/                     # 架构、认证、缓存、数据流、迁移、里程碑文档
@@ -87,31 +87,31 @@ bun run build
 
 ## 5. 发布与打包契约
 
-`bun run build` 必须保留 [vite.config.ts](vite.config.ts) 里的 Komari zip 插件流程。
+`bun run build` 必须保留 [vite.config.ts](vite.config.ts) 里的 VPS Monitor zip 插件流程。
 
 成功后根目录应有：
 
 - `dist/`
-- `komari-theme-Glassmorphism-build-<short-sha>.zip`
+- `vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`
 
 zip 固定结构：
 
 ```text
-komari-theme.json
+vps-monitor-theme.json
 preview.png
 dist/
 ```
 
 Vite 注入的全局常量：
 
-- `__BUILD_VERSION__`：来自 [komari-theme.json](komari-theme.json)
+- `__BUILD_VERSION__`：来自 [vps-monitor-theme.json](vps-monitor-theme.json)
 - `__BUILD_GIT_HASH__`：来自 git short hash
 
 类型声明在 [src/types/global.d.ts](src/types/global.d.ts)。
 
 发布注意：
 
-- GitHub Release 自动化必须读取 `komari-theme.json.version`。
+- GitHub Release 自动化必须读取 `vps-monitor-theme.json.version`。
 - 改 release workflow 或 bump 版本后，不要只信本地 build，要检查 GitHub Actions 和 Release assets。
 - 如果已发布构建坏了，应该 bump patch version 后发布新 Release，不要静默依赖旧失败 tag。
 
@@ -125,7 +125,7 @@ Vue Component
   -> Service
   -> RequestManager / CacheService
   -> API / RPC
-  -> Komari backend
+  -> VPS Monitor backend
 ```
 
 职责边界：
@@ -136,7 +136,7 @@ Vue Component
 | Composable    | `src/composables/`                       | Vue 响应式状态、生命周期、watch、订阅清理      | 不放跨业务服务逻辑                                    |
 | Service       | `src/services/`                          | 认证、缓存、请求、历史、预测、快照、厂商元数据 | 不直接渲染 UI                                         |
 | Request/Cache | `request.service.ts`, `cache.service.ts` | 去重、并发、超时、重试、TTL、引用计数          | 不感知具体组件                                        |
-| API/RPC       | `src/utils/api.ts`, `src/utils/rpc.ts`   | Komari HTTP/RPC 低层客户端                     | 不放业务规则                                          |
+| API/RPC       | `src/utils/api.ts`, `src/utils/rpc.ts`   | VPS Monitor HTTP/RPC 低层客户端                | 不放业务规则                                          |
 | Utils         | `src/utils/`                             | 纯 helper，如格式化、CSV、record transform     | 不新增业务工作流                                      |
 | Constants     | `src/constants/`                         | 共享限制、时间、缓存、安全、UI 参数            | 不散落 magic number                                   |
 
@@ -180,7 +180,7 @@ Vue Component
 规则：
 
 - `publicSettings.theme_settings` 必须防御性解析。
-- schema 与默认值在 [komari-theme.json](komari-theme.json) 的 `configuration.data`。
+- schema 与默认值在 [vps-monitor-theme.json](vps-monitor-theme.json) 的 `configuration.data`。
 - 组件只消费 app store 暴露的归一化字段。
 
 ### 8.2 nodes store
@@ -339,7 +339,7 @@ window.$message?.warning('请先登录')
 ### 12.1 新增普通 UI 功能
 
 1. 在 app store 中确认是否已有设置或状态。
-2. 若需要配置，先改 [komari-theme.json](komari-theme.json) schema，再在 [src/stores/app.ts](src/stores/app.ts) 做防御性解析。
+2. 若需要配置，先改 [vps-monitor-theme.json](vps-monitor-theme.json) schema，再在 [src/stores/app.ts](src/stores/app.ts) 做防御性解析。
 3. 视图只做编排，组件只做展示。
 4. 优先复用 `src/components/ui/`。
 5. 跑 `bun run lint` 和 `bun run build`。
@@ -391,7 +391,7 @@ HomeView tool button
 
 ### 12.5 改发布逻辑或版本
 
-1. 只改 [komari-theme.json](komari-theme.json) 的 `version`。
+1. 只改 [vps-monitor-theme.json](vps-monitor-theme.json) 的 `version`。
 2. 不要给 [package.json](package.json) 加顶层 version。
 3. 本地跑 `bun run build`。
 4. 推送后查 GitHub Actions。

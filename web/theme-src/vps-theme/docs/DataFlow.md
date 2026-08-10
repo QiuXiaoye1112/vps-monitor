@@ -3,7 +3,7 @@
 ## Node data
 
 ```text
-Komari RPC / API
+VPS Monitor RPC / API
   -> init manager
   -> nodes store
   -> visible node computed state

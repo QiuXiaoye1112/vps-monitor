@@ -20,12 +20,12 @@ interface ThemeManifest {
   version?: unknown
 }
 
-const themeJsonPath = resolve(__dirname, 'komari-theme.json')
+const themeJsonPath = resolve(__dirname, 'vps-monitor-theme.json')
 const devApiTarget = process.env.VITE_API_TARGET || 'http://127.0.0.1:25774'
 
 function readThemeManifest(): ThemeManifest {
   if (!existsSync(themeJsonPath))
-    throw new Error('komari-theme.json not found')
+    throw new Error('vps-monitor-theme.json not found')
 
   return JSON.parse(readFileSync(themeJsonPath, 'utf-8')) as ThemeManifest
 }
@@ -34,7 +34,7 @@ function getThemeVersion(): string {
   const version = readThemeManifest().version
 
   if (typeof version !== 'string' || !version.trim())
-    throw new TypeError('komari-theme.json does not contain a top-level string version field')
+    throw new TypeError('vps-monitor-theme.json does not contain a top-level string version field')
 
   return version.trim()
 }
@@ -49,19 +49,19 @@ function getCommitHash(): string {
 }
 
 /**
- * Vite 插件：构建后打包 Komari 主题 Zip
+ * Vite 插件：构建后打包 VPS Monitor 主题 Zip
  * theme.zip
- * ├── komari-theme.json
+ * ├── vps-monitor-theme.json
  * ├── preview.png
  * └── dist/
  */
-function komariThemeZip(): Plugin {
+function vpsMonitorThemeZip(): Plugin {
   return {
-    name: 'komari-theme-zip',
+    name: 'vps-monitor-theme-zip',
     apply: 'build',
     closeBundle: async () => {
       const commitHash = getCommitHash()
-      const zipFileName = `komari-theme-Glassmorphism-build-${commitHash}.zip`
+      const zipFileName = `vps-monitor-theme-Glassmorphism-build-${commitHash}.zip`
       const distDir = resolve(__dirname, 'dist')
       const previewPath = resolve(__dirname, 'docs/preview.png')
       const outputPath = resolve(__dirname, zipFileName)
@@ -71,7 +71,7 @@ function komariThemeZip(): Plugin {
         : 'preview.png'
 
       if (!existsSync(distDir)) {
-        console.log('[komari-theme-zip] dist directory not found, skipping zip creation')
+        console.log('[vps-monitor-theme-zip] dist directory not found, skipping zip creation')
         return
       }
 
@@ -81,18 +81,18 @@ function komariThemeZip(): Plugin {
       return new Promise((resolve, reject) => {
         output.on('close', () => {
           const sizeMB = (archive.pointer() / 1024 / 1024).toFixed(2)
-          console.log(`[komari-theme-zip] Created ${zipFileName} (${sizeMB} MB)`)
+          console.log(`[vps-monitor-theme-zip] Created ${zipFileName} (${sizeMB} MB)`)
           resolve(undefined)
         })
 
         archive.on('error', (err: Error) => {
-          console.error('[komari-theme-zip] Error:', err)
+          console.error('[vps-monitor-theme-zip] Error:', err)
           reject(err)
         })
 
         archive.pipe(output)
 
-        archive.file(themeJsonPath, { name: 'komari-theme.json' })
+        archive.file(themeJsonPath, { name: 'vps-monitor-theme.json' })
 
         if (existsSync(previewPath)) {
           archive.file(previewPath, { name: 'preview.png' })
@@ -118,7 +118,7 @@ export default defineConfig({
     vue(),
     process.env.VPS_EMBED_BUILD === '1' ? null : vueDevTools(),
     tailwindcss(),
-    process.env.VPS_EMBED_BUILD === '1' ? null : komariThemeZip(),
+    process.env.VPS_EMBED_BUILD === '1' ? null : vpsMonitorThemeZip(),
   ].filter(Boolean) as Plugin[],
   resolve: {
     alias: {

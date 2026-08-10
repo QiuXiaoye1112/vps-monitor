@@ -14,6 +14,6 @@ VPS_EMBED_BUILD=1 bun run build-only
 
 rsync -a --delete "$SOURCE_DIR/dist/" "$PUBLIC_DIR/dist/"
 install -m 0644 "$SCRIPT_DIR/admin/admin.html" "$PUBLIC_DIR/dist/admin.html"
-install -m 0644 "$SOURCE_DIR/komari-theme.json" "$PUBLIC_DIR/monitor-theme.json"
+install -m 0644 "$SOURCE_DIR/vps-monitor-theme.json" "$PUBLIC_DIR/monitor-theme.json"
 
 printf 'VPS theme rebuilt from source: %s\n' "$SOURCE_DIR"

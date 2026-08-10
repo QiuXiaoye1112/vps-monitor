@@ -1,6 +1,6 @@
-# Komari Glassmorphism v2.3.0：高密度 mini 卡片、离线置底和更完整的主题设置说明
+# VPS Monitor Glassmorphism v2.3.0：高密度 mini 卡片、离线置底和更完整的主题设置说明
 
-Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主题。这次 v2.3.0 主要补上了高密度节点展示、离线节点排序优化，也重新整理了 README，把很多之前藏在主题设置里的功能和亮点写出来，方便新用户知道它到底能调什么。
+VPS Monitor Glassmorphism 是一款给 **VPS Monitor Monitor** 使用的毛玻璃风格主题。这次 v2.3.0 主要补上了高密度节点展示、离线节点排序优化，也重新整理了 README，把很多之前藏在主题设置里的功能和亮点写出来，方便新用户知道它到底能调什么。
 
 ## 这次更新重点
 
@@ -13,7 +13,7 @@ Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主
 - 延迟和丢包面板也同步压缩；
 - 原有 `compact`、`comfortable`、`large` 都保留，不会影响已有布局。
 
-可以在 Komari 后台主题设置里选择：
+可以在 VPS Monitor 后台主题设置里选择：
 
 ```text
 节点卡片尺寸：mini / compact / comfortable / large
@@ -29,7 +29,7 @@ Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主
 
 ### 3. 登录后可查看 hidden 节点
 
-未登录公开首页仍然过滤 Komari hidden 节点；登录后则可以看到 hidden 节点，方便管理员自己检查隐藏机器状态。
+未登录公开首页仍然过滤 VPS Monitor hidden 节点；登录后则可以看到 hidden 节点，方便管理员自己检查隐藏机器状态。
 
 ### 4. 加载阶段显示更稳定
 
@@ -45,7 +45,7 @@ Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主
 }
 ```
 
-也就是 `komari-theme.json` 顶层的 `version` 字段。构建时页面底部显示的版本号会自动读取这里，不需要再同时改多个文件。
+也就是 `vps-monitor-theme.json` 顶层的 `version` 字段。构建时页面底部显示的版本号会自动读取这里，不需要再同时改多个文件。
 
 ## 很多人可能不知道的功能
 
@@ -123,8 +123,8 @@ Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主
 ## 安装方式
 
 1. 打开项目 Releases 页面；
-2. 下载最新的 `komari-theme-Glassmorphism-build-*.zip`；
-3. 进入 Komari 后台主题管理；
+2. 下载最新的 `vps-monitor-theme-Glassmorphism-build-*.zip`；
+3. 进入 VPS Monitor 后台主题管理；
 4. 上传 zip 主题包；
 5. 在主题设置里按需调整卡片尺寸、地球样式、总览卡片、快捷控制和背景。
 
@@ -132,6 +132,6 @@ Komari Glassmorphism 是一款给 **Komari Monitor** 使用的毛玻璃风格主
 
 ## 项目地址
 
-GitHub：<https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism>
+GitHub：<https://github.com/sanrokamlan-prog/vps-monitor-theme-Glassmorphism>
 
-如果你正在用 Komari，想要一个更现代、可配置项更多、适合公开展示的毛玻璃主题，可以试试这个版本。
+如果你正在用 VPS Monitor，想要一个更现代、可配置项更多、适合公开展示的毛玻璃主题，可以试试这个版本。

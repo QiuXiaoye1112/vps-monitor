@@ -1,9 +1,9 @@
 import { NETWORK_CONFIG } from '@/constants/network'
 
 /**
- * Komari API 客户端 SDK
- * 基于 REST API 的 Komari 客户端
- * @see https://www.komari.wiki/dev/api.html
+ * VPS Monitor API 客户端 SDK
+ * 基于 REST API 的 VPS Monitor 客户端
+ * @see https://www.vps-monitor.wiki/dev/api.html
  */
 
 const HTTP_PROTOCOL_REGEX = /^http/
@@ -206,7 +206,7 @@ export class ApiError extends Error {
 
 // ==================== API 客户端 ====================
 
-/** Komari API 客户端 */
+/** VPS Monitor API 客户端 */
 function isApiResponse<T>(value: unknown): value is ApiResponse<T> {
   if (!value || typeof value !== 'object')
     return false
@@ -237,7 +237,7 @@ function linkAbortSignal(controller: AbortController, signal?: AbortSignal): () 
   return () => signal.removeEventListener('abort', abort)
 }
 
-export class KomariApi {
+export class VpsMonitorApi {
   private baseUrl: string
   private timeout: number
 
@@ -598,14 +598,14 @@ export class RealtimeWebSocket {
 
 // ==================== 单例实例 ====================
 
-let sharedApiInstance: KomariApi | null = null
+let sharedApiInstance: VpsMonitorApi | null = null
 
 /**
- * 获取共享的 KomariApi 实例
+ * 获取共享的 VpsMonitorApi 实例
  */
-export function getSharedApi(options?: ApiClientOptions): KomariApi {
+export function getSharedApi(options?: ApiClientOptions): VpsMonitorApi {
   if (!sharedApiInstance) {
-    sharedApiInstance = new KomariApi(options)
+    sharedApiInstance = new VpsMonitorApi(options)
   }
   return sharedApiInstance
 }
@@ -618,4 +618,4 @@ export function resetSharedApi(): void {
 }
 
 // 默认导出
-export default KomariApi
+export default VpsMonitorApi

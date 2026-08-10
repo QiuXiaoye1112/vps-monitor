@@ -1,19 +1,19 @@
 <div align="center">
 
-# 🌌 Komari Glassmorphism
+# 🌌 VPS Monitor Glassmorphism
 
-## 给 Komari Monitor 的一套「玻璃拟态 · 运维驾驶舱」主题
+## 给 VPS Monitor Monitor 的一套「玻璃拟态 · 运维驾驶舱」主题
 
-从好看的监控首页，逐步成长为好用、可配置、适合长期运行的 Komari 主题。
+从好看的监控首页，逐步成长为好用、可配置、适合长期运行的 VPS Monitor 主题。
 
-![Version](https://img.shields.io/github/v/release/sanrokamlan-prog/komari-theme-Glassmorphism?style=for-the-badge&label=release&color=10b981)
+![Version](https://img.shields.io/github/v/release/sanrokamlan-prog/vps-monitor-theme-Glassmorphism?style=for-the-badge&label=release&color=10b981)
 ![Vue](https://img.shields.io/badge/Vue-3-42b883?style=for-the-badge&logo=vue.js)
 ![Vite](https://img.shields.io/badge/Vite-7-646cff?style=for-the-badge&logo=vite)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38bdf8?style=for-the-badge&logo=tailwindcss)
 ![Bun](https://img.shields.io/badge/Bun-%3E%3D1.2-000000?style=for-the-badge&logo=bun)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 
-**[📥 下载 Release](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism/releases)** ·
+**[📥 下载 Release](https://github.com/sanrokamlan-prog/vps-monitor-theme-Glassmorphism/releases)** ·
 **[🚀 安装](#-安装--升级)** ·
 **[✨ 功能](#-节点详情页全面升级)** ·
 **[⚙️ 设置](#️-主题设置)** ·
@@ -27,7 +27,7 @@
 
 <div align="center">
 
-<img src="docs/preview.png" width="80%" alt="Komari Glassmorphism 可配置能力概览" />
+<img src="docs/preview.png" width="80%" alt="VPS Monitor Glassmorphism 可配置能力概览" />
 
 </div>
 
@@ -35,14 +35,14 @@
 
 ## 🚀 项目定位
 
-| 项目     | 说明                                                        |
-| :------- | :---------------------------------------------------------- |
-| 当前版本 | **v3.2.0**                                                  |
-| 主题定位 | Komari Monitor 可导入 zip 主题，不是普通 Web App 部署包     |
-| 视觉风格 | 毛玻璃卡片、动态背景、手动浅色 / 深色模式                   |
-| 数据能力 | 直接读取中心 SQLite 历史记录与 Ping 记录，兼容 Komari 1.2.x |
-| 高级工具 | 拓扑、性价比、健康摘要、快照导出、访客安全审计              |
-| 发布产物 | `komari-theme-Glassmorphism-build-<short-sha>.zip`          |
+| 项目     | 说明                                                             |
+| :------- | :--------------------------------------------------------------- |
+| 当前版本 | **v3.2.0**                                                       |
+| 主题定位 | VPS Monitor Monitor 可导入 zip 主题，不是普通 Web App 部署包     |
+| 视觉风格 | 毛玻璃卡片、动态背景、手动浅色 / 深色模式                        |
+| 数据能力 | 直接读取中心 SQLite 历史记录与 Ping 记录，兼容 VPS Monitor 1.2.x |
+| 高级工具 | 拓扑、性价比、健康摘要、快照导出、访客安全审计                   |
+| 发布产物 | `vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`          |
 
 > 好看只是外壳。v3 真正的重点，是把负载、Ping、流量、费用、健康分析和运维工具整合成日常真的会打开来看的监控面板。
 
@@ -59,7 +59,7 @@
 
 ## 🧩 v3.1.9 上游核心兼容与后台整合
 
-- 内嵌管理端切回官方 `komari-web` `radix` 分支，不再依赖未合并的 Komari #604 / komari-web #82 计费字段
+- 内嵌管理端切回官方 `vps-monitor-web` `radix` 分支，不再依赖未合并的 VPS Monitor #604 / vps-monitor-web #82 计费字段
 - 新增主题内“按量费用估算器”：按节点本地保存流量单价、手工小时、一次性附加费与计价币种，明确使用探针累计流量快照和 `1 TiB = 1024⁴ bytes`
 - `/admin`、`/terminal`、`/manage/*` 保留完整官方功能，并修复子路径部署下旗帜与系统图标破图、主题管理 404 和后台样式缓存
 - 后台毛玻璃样式加强，但将高成本模糊限制在导航、侧栏、表格和弹窗，避免密集节点页渲染开销放大
@@ -86,20 +86,20 @@
 - 修复“完整”头部卡片方案仍只显示 6 张的问题；完整模式现在展示全部可用总览指标
 - 实时费用的首次开机费只在后端确认真实 Agent 首次上报后计入，旧节点推定锚点不会提前收费
 - 费率、计费锚点、累计流量与开机费状态可随节点元数据轮询实时刷新，无需整页刷新
-- 内嵌管理端更新到 komari-web PR #82 最新提交，显示流量、运行时间、首次开机费与总估算明细
+- 内嵌管理端更新到 vps-monitor-web PR #82 最新提交，显示流量、运行时间、首次开机费与总估算明细
 - 主题管理菜单缩短为“主题设置”，并重做可配置能力概念封面
 
 ---
 
 ## 🧩 v3.1.6 默认主题后台与费用明细
 
-- `/admin`、`/terminal`、`/manage/*` 复用完整官方 komari-web，并增加 Glassmorphism 亮暗色覆盖与可重复同步脚本
+- `/admin`、`/terminal`、`/manage/*` 复用完整官方 vps-monitor-web，并增加 Glassmorphism 亮暗色覆盖与可重复同步脚本
 - 首页节点延迟、丢包格可直接打开完整监测图；“剩余价值”可查看逐节点数据、切换显示币种并覆盖汇率
-- 提前适配 [Komari PR #604](https://github.com/komari-monitor/komari/pull/604) 与 [komari-web PR #82](https://github.com/komari-monitor/komari-web/pull/82) 的流量单价、小时单价、首次开机费和首次 Agent 上报锚点；空费率按 0，旧核心不会收到未知字段
+- 提前适配 [VPS Monitor PR #604](https://github.com/vps-monitor/vps-monitor/pull/604) 与 [vps-monitor-web PR #82](https://github.com/vps-monitor/vps-monitor-web/pull/82) 的流量单价、小时单价、首次开机费和首次 Agent 上报锚点；空费率按 0，旧核心不会收到未知字段
 - 访客审计增加采集开关、UTF-8 安全截断，并继续支持当前筛选结果的完整 JSON / CSV 导出
 - 默认背景改为原创青蓝、淡紫、薄荷网格图，与 `docs/preview.png` 的主题配色一致
 
-> 实时费用字段需要升级到包含 Komari PR #604 的核心后才会出现；当前主题和嵌入管理端会通过返回字段自动检测能力。
+> 实时费用字段需要升级到包含 VPS Monitor PR #604 的核心后才会出现；当前主题和嵌入管理端会通过返回字段自动检测能力。
 
 ---
 
@@ -107,7 +107,7 @@
 
 主题设置新增“色觉辅助配色”。色觉友好模式使用蓝、蓝绿、橙、朱红和紫红安全色，并通过明度、图表虚实线、Ping 纹理、文字和图标共同区分状态，不再只依赖红绿颜色。
 
-访客安全审计已提前适配 [Komari PR #602](https://github.com/komari-monitor/komari/pull/602)：
+访客安全审计已提前适配 [VPS Monitor PR #602](https://github.com/vps-monitor/vps-monitor/pull/602)：
 
 - 核心负责可信记录来源 IP、User-Agent、登录用户 UUID 和时间
 - 主题记录页面、节点、分组、筛选、视图、工具和导出等受限操作摘要
@@ -115,7 +115,7 @@
 - 审计面板支持服务端访客筛选、结构化查看，并全量导出当前筛选的 JSON / CSV
 - 不上传密码、Cookie、Token、查询值、搜索词、WebSSH 命令、剪贴板、原始 ICE candidate 或原始局域网地址
 
-> PR #602 已合并但尚未进入当前 Komari 正式版。升级到包含该 PR 的核心并开启 `visitor_audit_enabled` 后，主题会通过能力字段自动启用上报和访客筛选；旧核心不会收到未知 RPC 请求。
+> PR #602 已合并但尚未进入当前 VPS Monitor 正式版。升级到包含该 PR 的核心并开启 `visitor_audit_enabled` 后，主题会通过能力字段自动启用上报和访客筛选；旧核心不会收到未知 RPC 请求。
 
 ---
 
@@ -157,13 +157,13 @@
 | 错误提示     | 首页和 `/instance/:id` 等所有公开路由统一显示             |
 | 手动恢复     | 全局提示提供重试按钮，并防止重复创建连接与定时器          |
 
-> 这不是 Komari 1.2.5 / 1.2.6 的专属兼容补丁。新版后端响应变慢可能提高触发概率，但根因是前端启动链过度串行，现已从设计上修复。
+> 这不是 VPS Monitor 1.2.5 / 1.2.6 的专属兼容补丁。新版后端响应变慢可能提高触发概率，但根因是前端启动链过度串行，现已从设计上修复。
 
 ---
 
 ## ✨ 节点详情页全面升级
 
-主题已适配新版 Komari / komari-web Metric 能力，并将官方指标重新整理成适合监控场景的图表族。
+主题已适配新版 VPS Monitor / vps-monitor-web Metric 能力，并将官方指标重新整理成适合监控场景的图表族。
 
 | 分类        | 支持指标                                       |
 | :---------- | :--------------------------------------------- |
@@ -329,7 +329,7 @@ API / RPC
 
 ## ⚙️ 主题设置
 
-全部设置由 [`komari-theme.json`](komari-theme.json) 托管到 Komari 后台，无需修改代码。
+全部设置由 [`vps-monitor-theme.json`](vps-monitor-theme.json) 托管到 VPS Monitor 后台，无需修改代码。
 
 | 分类           | 代表设置                                            |
 | :------------- | :-------------------------------------------------- |
@@ -348,17 +348,17 @@ API / RPC
 
 ### 方式一：使用 GitHub 仓库地址
 
-Komari 后台支持直接填写仓库地址并拉取最新 Release：
+VPS Monitor 后台支持直接填写仓库地址并拉取最新 Release：
 
 ```text
-https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism
+https://github.com/sanrokamlan-prog/vps-monitor-theme-Glassmorphism
 ```
 
 ### 方式二：手动安装 Release
 
-1. 打开 [Releases](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism/releases)
-2. 下载最新的 `komari-theme-Glassmorphism-build-*.zip`
-3. 登录 Komari Monitor 后台，进入 **设置 → 主题管理**
+1. 打开 [Releases](https://github.com/sanrokamlan-prog/vps-monitor-theme-Glassmorphism/releases)
+2. 下载最新的 `vps-monitor-theme-Glassmorphism-build-*.zip`
+3. 登录 VPS Monitor Monitor 后台，进入 **设置 → 主题管理**
 4. 上传 zip 并启用主题
 5. 在主题设置中调整视觉、卡片、快捷控制和高级工具
 
@@ -381,17 +381,17 @@ bun run preview
 构建成功后会生成：
 
 - `dist/`
-- `komari-theme-Glassmorphism-build-<short-sha>.zip`
+- `vps-monitor-theme-Glassmorphism-build-<short-sha>.zip`
 
 发布包固定包含：
 
 ```text
-komari-theme.json
+vps-monitor-theme.json
 preview.png
 dist/
 ```
 
-> 发布版本只改 [`komari-theme.json`](komari-theme.json) 顶层 `version`，不要给 `package.json` 添加顶层 `version`。
+> 发布版本只改 [`vps-monitor-theme.json`](vps-monitor-theme.json) 顶层 `version`，不要给 `package.json` 添加顶层 `version`。
 
 ---
 
@@ -433,7 +433,7 @@ dist/
 - “完整”首页总览方案改为展示全部可用卡片，不再等同于固定 6 张精选卡
 - 首次开机费改为以后端真实上报状态为准，兼容旧节点推定锚点
 - 新增计费字段的节点元数据就地刷新，管理员修改后无需整页重载
-- 内嵌管理端同步到 komari-web `0fee1f1`，补齐实时费用明细与开机费语义
+- 内嵌管理端同步到 vps-monitor-web `0fee1f1`，补齐实时费用明细与开机费语义
 - 主题菜单改名为“主题设置”，更新主题可配置能力概念封面
 
 </details>
@@ -443,7 +443,7 @@ dist/
 
 - 内置完整官方管理端与终端路由，增加 Glassmorphism 配色和可重复同步流程
 - 延迟 / 丢包支持弹窗监测；剩余价值支持逐节点明细、显示币种与汇率覆盖
-- 提前适配实时费用估算字段，并保持旧 Komari 核心账单表单兼容
+- 提前适配实时费用估算字段，并保持旧 VPS Monitor 核心账单表单兼容
 - 访客审计增加采集开关、UTF-8 安全截断与完整 JSON / CSV 导出
 - 使用与项目主预览同色系的原创默认背景
 
@@ -502,14 +502,14 @@ dist/
 <details>
 <summary><strong>v3.1.0 · 节点详情 Metric 驾驶舱</strong></summary>
 
-- 对齐 Komari 1.2.6 的常用 Metric definition，归并为稳定图表族
+- 对齐 VPS Monitor 1.2.6 的常用 Metric definition，归并为稳定图表族
 - 新增累计 / 周期流量、系统温度和 Ping 图表
 - 增加详情概览 / 图表预设、自定义时间范围和多行 keys 配置
 - 修复 Metric null、100% 丢包任务和多任务汇总问题
 
 </details>
 
-更多历史版本请查看 [Releases](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism/releases)。
+更多历史版本请查看 [Releases](https://github.com/sanrokamlan-prog/vps-monitor-theme-Glassmorphism/releases)。
 
 ---
 
@@ -520,7 +520,7 @@ dist/
 - ⭐ Star 本项目
 - 🍴 Fork 并贡献代码
 - 💬 提交 Issue 或 Feature Request
-- 📢 分享给更多 Komari 用户
+- 📢 分享给更多 VPS Monitor 用户
 
 你的每一个 Star，都是继续维护更新的动力。
 
@@ -536,7 +536,7 @@ dist/
 
 ## 🙏 致谢
 
-感谢原始主题作者 **Tokinx**，感谢 [Komari](https://github.com/komari-monitor/komari)、[Komari Naive](https://github.com/tonyliuzj/komari-naive)、Vue、Vite、reka-ui、Tailwind CSS，以及所有反馈 Issue、提交 PR 和分享建议的朋友。
+感谢原始主题作者 **Tokinx**，感谢 [VPS Monitor](https://github.com/vps-monitor/vps-monitor)、[VPS Monitor Naive](https://github.com/tonyliuzj/vps-monitor-naive)、Vue、Vite、reka-ui、Tailwind CSS，以及所有反馈 Issue、提交 PR 和分享建议的朋友。
 
 ## 📄 License
 

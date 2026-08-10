@@ -155,10 +155,10 @@
             var officialRoute = location.pathname + location.search + location.hash
             var adminEntry = '/admin-app/index.html'
             try {
-              sessionStorage.setItem('komariOfficialAppRoute', officialRoute)
+              sessionStorage.setItem('vpsMonitorOfficialAppRoute', officialRoute)
               location.replace(adminEntry)
             } catch {
-              location.replace(adminEntry + '?__komari_route=' + encodeURIComponent(officialRoute))
+              location.replace(adminEntry + '?__vps_monitor_route=' + encodeURIComponent(officialRoute))
             }
             return
           }

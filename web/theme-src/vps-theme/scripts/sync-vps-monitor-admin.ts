@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 
 const projectRoot = resolve(import.meta.dirname, '..')
-const sourceRoot = resolve(process.argv[2] || process.env.KOMARI_WEB_DIR || resolve(projectRoot, '..', 'komari-web'))
+const sourceRoot = resolve(process.argv[2] || process.env.VPS_MONITOR_WEB_DIR || resolve(projectRoot, '..', 'vps-monitor-web'))
 const sourceDist = resolve(sourceRoot, 'dist')
 const targetDir = resolve(projectRoot, 'public', 'admin-app')
 const overrideCss = resolve(projectRoot, 'scripts', 'assets', 'glass-admin.css')
@@ -75,7 +75,7 @@ function countRuntimeAssetReferences(directory: string): number {
 }
 
 if (!existsSync(resolve(sourceRoot, 'package.json')))
-  throw new Error(`komari-web source not found: ${sourceRoot}`)
+  throw new Error(`vps-monitor-web source not found: ${sourceRoot}`)
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 execFileSync(npmCommand, ['run', 'build', '--', '--base=/admin-app/'], {
@@ -89,14 +89,14 @@ cpSync(sourceDist, targetDir, { recursive: true })
 const rewrittenRuntimeAssetPaths = rewriteRuntimeAssetPaths(targetDir)
 const runtimeAssetReferences = countRuntimeAssetReferences(targetDir)
 if (runtimeAssetReferences === 0)
-  throw new Error('komari-web build output no longer contains runtime flag or OS logo asset references')
+  throw new Error('vps-monitor-web build output no longer contains runtime flag or OS logo asset references')
 
 const indexPath = resolve(targetDir, 'index.html')
 let html = readFileSync(indexPath, 'utf8')
 if (!html.includes(charsetMarker))
-  throw new Error('komari-web index.html no longer contains the expected charset marker')
+  throw new Error('vps-monitor-web index.html no longer contains the expected charset marker')
 
-const bridge = `<script>;(()=>{let t='';try{t=sessionStorage.getItem('komariOfficialAppRoute')||'';if(t)sessionStorage.removeItem('komariOfficialAppRoute')}catch(e){console.warn('[Glassmorphism] Session storage is unavailable.',e)}if(!t){try{t=new URL(location.href).searchParams.get('__komari_route')||''}catch{}}if(t&&/^\\/(admin|terminal|manage)(\\/|\\?|#|$)/.test(t))history.replaceState(null,'',t)})();</script><link rel="stylesheet" href="/admin-app/glass-admin.css?v=${adminCssVersion}">`
+const bridge = `<script>;(()=>{let t='';try{t=sessionStorage.getItem('vpsMonitorOfficialAppRoute')||'';if(t)sessionStorage.removeItem('vpsMonitorOfficialAppRoute')}catch(e){console.warn('[Glassmorphism] Session storage is unavailable.',e)}if(!t){try{t=new URL(location.href).searchParams.get('__vps_monitor_route')||''}catch{}}if(t&&/^\\/(admin|terminal|manage)(\\/|\\?|#|$)/.test(t))history.replaceState(null,'',t)})();</script><link rel="stylesheet" href="/admin-app/glass-admin.css?v=${adminCssVersion}">`
 html = html.replace(charsetMarker, `${charsetMarker}${bridge}`)
 
 // The official PWA only controls /admin-app/, while the bridge restores /admin and
@@ -109,7 +109,7 @@ for (const filename of readdirSync(targetDir).filter(filename => workboxFilename
   rmSync(resolve(targetDir, filename), { force: true })
 
 if (!html.includes(`/admin-app/glass-admin.css?v=${adminCssVersion}`) || !html.includes('/admin-app/assets/'))
-  throw new Error('komari-web build output is missing the admin bridge stylesheet or /admin-app/ asset base')
+  throw new Error('vps-monitor-web build output is missing the admin bridge stylesheet or /admin-app/ asset base')
 
 writeFileSync(indexPath, `${html.replace(/\r\n?/g, '\n').replace(/[ \t]+$/gm, '').trimEnd()}\n`)
 cpSync(overrideCss, resolve(targetDir, 'glass-admin.css'))
@@ -123,10 +123,10 @@ try {
 }
 catch {}
 
-writeFileSync(resolve(targetDir, 'komari-admin-source.json'), `${JSON.stringify({
-  repository: 'https://github.com/komari-monitor/komari-web',
+writeFileSync(resolve(targetDir, 'vps-monitor-admin-source.json'), `${JSON.stringify({
+  repository: 'https://github.com/vps-monitor/vps-monitor-web',
   commit,
   synced_at: new Date().toISOString(),
 }, null, 2)}\n`)
 
-console.log(`[sync-komari-admin] Synced complete admin app from ${sourceRoot} (${runtimeAssetReferences} runtime asset paths found, ${rewrittenRuntimeAssetPaths} rewritten)`)
+console.log(`[sync-vps-monitor-admin] Synced complete admin app from ${sourceRoot} (${runtimeAssetReferences} runtime asset paths found, ${rewrittenRuntimeAssetPaths} rewritten)`)
