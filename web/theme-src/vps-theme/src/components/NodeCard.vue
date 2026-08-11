@@ -242,7 +242,8 @@ function activateCard() {
             :key="metric"
             class="group/panel relative flex flex-col gap-2 min-w-0 overflow-hidden"
             :class="!props.node.online ? 'blur-xs opacity-50' : ''"
-            :title="metric === 'latency' ? '各 Ping 任务延迟' : '各 Ping 任务丢包'"
+            role="group"
+            :aria-label="metric === 'latency' ? '各 Ping 任务延迟' : '各 Ping 任务丢包'"
             @click.stop="emit('pingClick')"
           >
             <div class="flex items-center justify-between px-0.5 text-xs leading-none">
