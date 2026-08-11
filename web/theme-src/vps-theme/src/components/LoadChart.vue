@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ComputedRef } from 'vue'
 import type { ChartDashboardCardKey } from '@/stores/app'
 import type { RecordFormat } from '@/utils/recordHelper'
 import type { StatusRecord } from '@/utils/rpc'
@@ -187,13 +188,18 @@ const customRangeError = computed(() => {
 })
 const effectiveHistoryHours = computed(() => isCustomRange.value ? customRange.value?.hours ?? 1 : selectedHours.value ?? 1)
 
-// 数据状态
+// 数据状态：小卡片固定使用最近 1 小时，详情弹窗使用独立的时间范围。
+const cardRemoteData = shallowRef<StatusRecord[]>([])
 const remoteData = shallowRef<StatusRecord[]>([])
+const cardLoading = ref(false)
+const cardError = ref<string | null>(null)
 const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
 let fetchInFlight = false
 let pendingVisibleFetch = false
+let cardFetchInFlight = false
+let pendingCardFetch = false
 
 // 节点信息
 const nodeInfo = computed(() => nodesStore.nodesByUuid.get(props.uuid))
@@ -330,6 +336,43 @@ async function fetchHistoryData(silent = false) {
   }
 }
 
+async function fetchCardData(silent = false) {
+  if (!props.uuid)
+    return
+  if (cardFetchInFlight) {
+    pendingCardFetch = true
+    return
+  }
+
+  cardFetchInFlight = true
+  if (!silent)
+    cardLoading.value = true
+  cardError.value = null
+
+  try {
+    const historyResult = await rpc.getLoadRecordsRange({
+      uuid: props.uuid,
+      hours: 1,
+      maxCount: LOAD_RECORD_MAX_COUNT,
+    })
+    cardRemoteData.value = normalizeStatusRecordsPayload(historyResult.records)
+  }
+  catch (err) {
+    cardError.value = err instanceof Error ? err.message : '获取数据失败'
+    if (cardRemoteData.value.length === 0)
+      cardRemoteData.value = []
+  }
+  finally {
+    cardFetchInFlight = false
+    if (!silent)
+      cardLoading.value = false
+    if (pendingCardFetch) {
+      pendingCardFetch = false
+      void fetchCardData(true)
+    }
+  }
+}
+
 async function fetchData(silent = false) {
   if (fetchInFlight) {
     if (!silent)
@@ -356,453 +399,617 @@ async function fetchData(silent = false) {
 
 // ==================== 数据处理 ====================
 
+const cardChartData = computed(() => {
+  return statusToRecordFormat(cardRemoteData.value)
+})
+
 const chartData = computed(() => {
   return statusToRecordFormat(remoteData.value)
 })
 
-function seriesHasData(series: MetricChartSeriesData): boolean {
-  return series.data.some(([, value]) => value !== null && Number.isFinite(value))
-}
+const cardHistoryHours = computed(() => 1)
 
-function recordMetricSeries(
-  name: string,
-  color: string,
-  kind: MetricChartSeriesData['kind'],
-  getter: (record: RecordFormat) => number | null | undefined,
-  dashed = false,
-): MetricChartSeriesData {
-  return {
-    name,
-    color,
-    kind,
-    dashed,
-    data: chartData.value.map(record => [record.time, metricValue(getter(record))]),
+function createChartOptions(
+  chartData: ComputedRef<RecordFormat[]>,
+  effectiveHistoryHours: ComputedRef<number>,
+) {
+  function seriesHasData(series: MetricChartSeriesData): boolean {
+    return series.data.some(([, value]) => value !== null && Number.isFinite(value))
   }
-}
 
-const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
-  recordMetricSeries('累计下载', chartColors.quinary, 'bytes', record => record.net_total_down),
-  recordMetricSeries('累计上传', chartColors.quaternary, 'bytes', record => record.net_total_up),
-  recordMetricSeries('周期下载', chartColors.tertiary, 'bytes', record => record.traffic_down, true),
-  recordMetricSeries('周期上传', chartColors.secondary, 'bytes', record => record.traffic_up, true),
-].filter(seriesHasData))
-
-const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => [
-  recordMetricSeries('系统温度', chartColors.secondary, 'temperature', record => record.temp),
-].filter(seriesHasData))
-
-const hasTrafficData = computed(() => trafficChartSeries.value.length > 0)
-const hasTemperatureData = computed(() => temperatureChartSeries.value.length > 0)
-
-// ==================== 工具函数 ====================
-
-function formatTime(time: string, showDate: boolean): string {
-  const date = dayjs(time)
-  if (showDate) {
-    return date.format('M/D HH:mm')
+  function recordMetricSeries(
+    name: string,
+    color: string,
+    kind: MetricChartSeriesData['kind'],
+    getter: (record: RecordFormat) => number | null | undefined,
+    dashed = false,
+  ): MetricChartSeriesData {
+    return {
+      name,
+      color,
+      kind,
+      dashed,
+      data: chartData.value.map(record => [record.time, metricValue(getter(record))]),
+    }
   }
-  return date.format('HH:mm')
-}
 
-function formatTimeForTooltip(time: string, hours: number): string {
-  const date = dayjs(time)
-  if (hours < 24) {
-    return date.format('HH:mm:ss')
+  const trafficChartSeries = computed<MetricChartSeriesData[]>(() => [
+    recordMetricSeries('累计下载', chartColors.quinary, 'bytes', record => record.net_total_down),
+    recordMetricSeries('累计上传', chartColors.quaternary, 'bytes', record => record.net_total_up),
+    recordMetricSeries('周期下载', chartColors.tertiary, 'bytes', record => record.traffic_down, true),
+    recordMetricSeries('周期上传', chartColors.secondary, 'bytes', record => record.traffic_up, true),
+  ].filter(seriesHasData))
+
+  const temperatureChartSeries = computed<MetricChartSeriesData[]>(() => [
+    recordMetricSeries('系统温度', chartColors.secondary, 'temperature', record => record.temp),
+  ].filter(seriesHasData))
+
+  const hasTrafficData = computed(() => trafficChartSeries.value.length > 0)
+  const hasTemperatureData = computed(() => temperatureChartSeries.value.length > 0)
+
+  // ==================== 工具函数 ====================
+
+  function formatTime(time: string, showDate: boolean): string {
+    const date = dayjs(time)
+    if (showDate) {
+      return date.format('M/D HH:mm')
+    }
+    return date.format('HH:mm')
   }
-  return date.format('MM/DD HH:mm')
-}
 
-const showDateInAxis = computed(() => (effectiveHistoryHours.value) >= 24)
+  function formatTimeForTooltip(time: string, hours: number): string {
+    const date = dayjs(time)
+    if (hours < 24) {
+      return date.format('HH:mm:ss')
+    }
+    return date.format('MM/DD HH:mm')
+  }
 
-// 通用 X 轴配置
-const baseXAxisConfig = computed(() => ({
-  type: 'category' as const,
-  data: chartData.value.map(r => formatTime(r.time, showDateInAxis.value)),
-  axisLabel: {
-    fontSize: 11,
-    color: chartThemeColors.value.textSecondary,
-    margin: 12,
-  },
-  axisLine: {
-    show: true,
-    lineStyle: { color: chartThemeColors.value.borderColor, width: 1 },
-  },
-  axisTick: { show: false },
-  boundaryGap: false,
-}))
+  const showDateInAxis = computed(() => (effectiveHistoryHours.value) >= 24)
 
-// 通用 Y 轴配置
-const baseYAxisConfig = computed(() => ({
-  type: 'value' as const,
-  axisLabel: {
-    fontSize: 11,
-    color: chartThemeColors.value.textSecondary,
-  },
-  axisLine: { show: false },
-  axisTick: { show: false },
-  splitLine: {
-    lineStyle: {
-      color: chartThemeColors.value.splitLineColor,
-      type: 'dashed' as const,
+  // 通用 X 轴配置
+  const baseXAxisConfig = computed(() => ({
+    type: 'category' as const,
+    data: chartData.value.map(r => formatTime(r.time, showDateInAxis.value)),
+    axisLabel: {
+      fontSize: 11,
+      color: chartThemeColors.value.textSecondary,
+      margin: 12,
     },
-  },
-}))
-
-// ==================== 图表配置 ====================
-
-// CPU 图表
-const cpuChartOption = computed(() => ({
-  animation: false,
-  // 全局颜色配置（确保 Tooltip 圆点颜色与线条一致）
-  color: [chartColors.primary, chartColors.secondary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        if (item.seriesName === 'CPU') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>CPU</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(1) ?? '-'}%</span></div>`
-        }
-        else if (item.seriesName === '负载') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>系统负载</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(2) ?? '-'}</span></div>`
-        }
-      }
-      html += '</div>'
-      return html
+    axisLine: {
+      show: true,
+      lineStyle: { color: chartThemeColors.value.borderColor, width: 1 },
     },
-  },
-  grid: chartMargin,
-  xAxis: baseXAxisConfig.value,
-  yAxis: [
-    {
+    axisTick: { show: false },
+    boundaryGap: false,
+  }))
+
+  // 通用 Y 轴配置
+  const baseYAxisConfig = computed(() => ({
+    type: 'value' as const,
+    axisLabel: {
+      fontSize: 11,
+      color: chartThemeColors.value.textSecondary,
+    },
+    axisLine: { show: false },
+    axisTick: { show: false },
+    splitLine: {
+      lineStyle: {
+        color: chartThemeColors.value.splitLineColor,
+        type: 'dashed' as const,
+      },
+    },
+  }))
+
+  // ==================== 图表配置 ====================
+
+  // CPU 图表
+  const cpuChartOption = computed(() => ({
+    animation: false,
+    // 全局颜色配置（确保 Tooltip 圆点颜色与线条一致）
+    color: [chartColors.primary, chartColors.secondary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+
+        for (const item of p) {
+          const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
+          if (item.seriesName === 'CPU') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>CPU</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(1) ?? '-'}%</span></div>`
+          }
+          else if (item.seriesName === '负载') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>系统负载</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${item.value?.toFixed(2) ?? '-'}</span></div>`
+          }
+        }
+        html += '</div>'
+        return html
+      },
+    },
+    grid: chartMargin,
+    xAxis: baseXAxisConfig.value,
+    yAxis: [
+      {
+        ...baseYAxisConfig.value,
+        name: 'CPU %',
+        nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
+        min: 0,
+        max: 100,
+        axisLabel: { ...baseYAxisConfig.value.axisLabel, formatter: '{value}%' },
+      },
+      {
+        ...baseYAxisConfig.value,
+        name: '负载',
+        nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 0, 0, 40] },
+        min: 0,
+        splitLine: { show: false },
+      },
+    ],
+    series: [
+      {
+        name: 'CPU',
+        type: 'line',
+        data: chartData.value.map(r => r.cpu),
+
+        showSymbol: false,
+        yAxisIndex: 0,
+        lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: chartColors.primaryAreaStrong },
+              { offset: 1, color: chartColors.primaryAreaFaint },
+            ],
+          },
+        },
+      },
+      {
+        name: '负载',
+        type: 'line',
+        data: chartData.value.map(r => r.load),
+
+        showSymbol: false,
+        yAxisIndex: 1,
+        lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
+      },
+    ],
+  }))
+
+  // 内存图表
+  const memoryChartOption = computed(() => ({
+    animation: false,
+    color: [chartColors.primary, chartColors.quinary, chartColors.secondary, chartColors.quaternary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const ramUsed = record.ram ?? 0
+        const ramTotal = record.ram_total ?? nodeInfo.value?.mem_total ?? 0
+        const swapUsed = record.swap ?? 0
+        const swapTotal = record.swap_total ?? nodeInfo.value?.swap_total ?? 0
+        const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : '0'
+        const swapPercent = swapTotal > 0 ? ((swapUsed / swapTotal) * 100).toFixed(1) : '0'
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+
+        for (const item of p) {
+          const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
+          if (item.seriesName === 'RAM') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramUsed)} (${ramPercent}%)</span></div>`
+          }
+          else if (item.seriesName === 'Swap') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapUsed)} (${swapPercent}%)</span></div>`
+          }
+          else if (item.seriesName === 'RAM 总量') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramTotal)}</span></div>`
+          }
+          else if (item.seriesName === 'Swap 总量') {
+            html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapTotal)}</span></div>`
+          }
+        }
+        html += '</div>'
+        return html
+      },
+    },
+    legend: {
+      data: ['RAM', 'RAM 总量', 'Swap', 'Swap 总量'],
+      bottom: 4,
+      itemWidth: 10,
+      itemHeight: 8,
+      textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
+    },
+    grid: chartMarginWithLegend,
+    xAxis: baseXAxisConfig.value,
+    yAxis: {
       ...baseYAxisConfig.value,
-      name: 'CPU %',
+      name: '内存',
+      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
+      axisLabel: {
+        ...baseYAxisConfig.value.axisLabel,
+        formatter: (val: number) => formatBytes(val),
+      },
+    },
+    series: [
+      {
+        name: 'RAM',
+        type: 'line',
+        data: chartData.value.map(r => r.ram),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: chartColors.primaryAreaStrong },
+              { offset: 1, color: chartColors.primaryAreaFaint },
+            ],
+          },
+        },
+      },
+      {
+        name: 'RAM 总量',
+        type: 'line',
+        data: chartData.value.map(r => r.ram_total ?? nodeInfo.value?.mem_total ?? null),
+        showSymbol: false,
+        lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
+      },
+      {
+        name: 'Swap',
+        type: 'line',
+        data: chartData.value.map(r => r.swap),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
+      },
+      {
+        name: 'Swap 总量',
+        type: 'line',
+        data: chartData.value.map(r => r.swap_total ?? nodeInfo.value?.swap_total ?? null),
+        showSymbol: false,
+        lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quaternary, cap: 'round' as const },
+      },
+    ],
+  }))
+
+  // 磁盘图表
+  const diskChartOption = computed(() => ({
+    animation: false,
+    color: [chartColors.tertiary, chartColors.quinary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const diskUsed = record.disk ?? 0
+        const diskTotal = record.disk_total ?? nodeInfo.value?.disk_total ?? 0
+        const diskPercent = diskTotal > 0 ? ((diskUsed / diskTotal) * 100).toFixed(1) : '0'
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+        for (const item of p) {
+          const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
+          const text = item.seriesName === '磁盘总量' ? formatBytes(diskTotal) : `${formatBytes(diskUsed)} (${diskPercent}%)`
+          html += `<div style="display:flex;align-items:center">${colorDot}<span>${item.seriesName}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${text}</span></div>`
+        }
+        html += '</div>'
+        return html
+      },
+    },
+    legend: {
+      data: ['磁盘已用', '磁盘总量'],
+      bottom: 4,
+      itemWidth: 10,
+      itemHeight: 8,
+      textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
+    },
+    grid: chartMarginWithLegend,
+    xAxis: baseXAxisConfig.value,
+    yAxis: {
+      ...baseYAxisConfig.value,
+      name: '磁盘',
+      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
+      axisLabel: {
+        ...baseYAxisConfig.value.axisLabel,
+        formatter: (val: number) => formatBytes(val),
+      },
+    },
+    series: [
+      {
+        name: '磁盘已用',
+        type: 'line',
+        data: chartData.value.map(r => r.disk),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: chartColors.tertiaryAreaStrong },
+              { offset: 1, color: chartColors.tertiaryAreaFaint },
+            ],
+          },
+        },
+      },
+      {
+        name: '磁盘总量',
+        type: 'line',
+        data: chartData.value.map(r => r.disk_total ?? nodeInfo.value?.disk_total ?? null),
+        showSymbol: false,
+        lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
+      },
+    ],
+  }))
+
+  // 网络图表
+  const networkChartOption = computed(() => ({
+    animation: false,
+    color: [chartColors.quinary, chartColors.quaternary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+
+        for (const item of p) {
+          const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
+          const label = item.seriesName === '下载' ? '↓ 下载' : '↑ 上传'
+          html += `<div style="display:flex;align-items:center">${colorDot}<span>${label}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(item.value)}/s</span></div>`
+        }
+        html += '</div>'
+        return html
+      },
+    },
+    legend: {
+      data: ['下载', '上传'],
+      bottom: 4,
+      itemWidth: 12,
+      itemHeight: 12,
+      itemGap: 20,
+      icon: 'roundRect',
+      textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
+    },
+    grid: chartMarginWithLegend,
+    xAxis: baseXAxisConfig.value,
+    yAxis: {
+      ...baseYAxisConfig.value,
+      name: '速度',
+      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
+      axisLabel: {
+        ...baseYAxisConfig.value.axisLabel,
+        formatter: (val: number) => formatBytes(val),
+      },
+    },
+    series: [
+      {
+        name: '下载',
+        type: 'line',
+        data: chartData.value.map(r => r.net_in ?? 0),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.quinary, cap: 'round' as const },
+      },
+      {
+        name: '上传',
+        type: 'line',
+        data: chartData.value.map(r => r.net_out ?? 0),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
+      },
+    ],
+  }))
+
+  // 连接数图表
+  const connectionsChartOption = computed(() => ({
+    animation: false,
+    color: [chartColors.primary, chartColors.tertiary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+
+        for (const item of p) {
+          const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
+          const displayValue = item.value != null ? Math.round(item.value) : '-'
+          html += `<div style="display:flex;align-items:center">${colorDot}<span>${item.seriesName}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
+        }
+        html += '</div>'
+        return html
+      },
+    },
+    legend: {
+      data: ['TCP', 'UDP'],
+      bottom: 4,
+      itemWidth: 12,
+      itemHeight: 12,
+      itemGap: 20,
+      icon: 'roundRect',
+      textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
+    },
+    grid: chartMarginWithLegend,
+    xAxis: baseXAxisConfig.value,
+    yAxis: {
+      ...baseYAxisConfig.value,
+      name: '连接数',
       nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
       min: 0,
-      max: 100,
-      axisLabel: { ...baseYAxisConfig.value.axisLabel, formatter: '{value}%' },
+      axisLabel: {
+        ...baseYAxisConfig.value.axisLabel,
+        formatter: (val: number) => Math.round(val).toString(),
+      },
     },
-    {
+    series: [
+      {
+        name: 'TCP',
+        type: 'line',
+        data: chartData.value.map(r => r.connections ?? 0),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
+      },
+      {
+        name: 'UDP',
+        type: 'line',
+        data: chartData.value.map(r => r.connections_udp ?? 0),
+
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
+      },
+    ],
+  }))
+
+  // 进程数图表
+  const processChartOption = computed(() => ({
+    animation: false,
+    color: [chartColors.quaternary],
+    tooltip: {
+      ...baseTooltipConfig.value,
+      formatter: (params: unknown) => {
+        const p = params as Array<{ dataIndex: number, value: number, color: string }>
+        if (!p.length)
+          return ''
+        const firstParam = p[0]
+        if (!firstParam)
+          return ''
+        const record = chartData.value[firstParam.dataIndex]
+        if (!record)
+          return ''
+
+        const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
+        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${firstParam.color};margin-right:8px;flex-shrink:0"></span>`
+        const displayValue = firstParam.value != null ? Math.round(firstParam.value) : '-'
+
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
+        html += '<div style="display:flex;flex-direction:column;gap:4px">'
+        html += `<div style="display:flex;align-items:center">${colorDot}<span>进程数</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
+        html += '</div>'
+        return html
+      },
+    },
+    grid: chartMargin,
+    xAxis: baseXAxisConfig.value,
+    yAxis: {
       ...baseYAxisConfig.value,
-      name: '负载',
-      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 0, 0, 40] },
+      name: '进程',
+      nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
       min: 0,
-      splitLine: { show: false },
-    },
-  ],
-  series: [
-    {
-      name: 'CPU',
-      type: 'line',
-      data: chartData.value.map(r => r.cpu),
-
-      showSymbol: false,
-      yAxisIndex: 0,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.primaryAreaStrong },
-            { offset: 1, color: chartColors.primaryAreaFaint },
-          ],
-        },
+      axisLabel: {
+        ...baseYAxisConfig.value.axisLabel,
+        formatter: (val: number) => Math.round(val).toString(),
       },
     },
-    {
-      name: '负载',
-      type: 'line',
-      data: chartData.value.map(r => r.load),
+    series: [
+      {
+        name: '进程数',
+        type: 'line',
+        data: chartData.value.map(r => r.process ?? 0),
 
-      showSymbol: false,
-      yAxisIndex: 1,
-      lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 内存图表
-const memoryChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.primary, chartColors.quinary, chartColors.secondary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const ramUsed = record.ram ?? 0
-      const ramTotal = record.ram_total ?? nodeInfo.value?.mem_total ?? 0
-      const swapUsed = record.swap ?? 0
-      const swapTotal = record.swap_total ?? nodeInfo.value?.swap_total ?? 0
-      const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : '0'
-      const swapPercent = swapTotal > 0 ? ((swapUsed / swapTotal) * 100).toFixed(1) : '0'
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        if (item.seriesName === 'RAM') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramUsed)} (${ramPercent}%)</span></div>`
-        }
-        else if (item.seriesName === 'Swap') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapUsed)} (${swapPercent}%)</span></div>`
-        }
-        else if (item.seriesName === 'RAM 总量') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramTotal)}</span></div>`
-        }
-        else if (item.seriesName === 'Swap 总量') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap 总量</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapTotal)}</span></div>`
-        }
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['RAM', 'RAM 总量', 'Swap', 'Swap 总量'],
-    bottom: 4,
-    itemWidth: 10,
-    itemHeight: 8,
-    textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '内存',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: 'RAM',
-      type: 'line',
-      data: chartData.value.map(r => r.ram),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.primaryAreaStrong },
-            { offset: 1, color: chartColors.primaryAreaFaint },
-          ],
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(167, 139, 250, 0.25)' },
+              { offset: 1, color: 'rgba(167, 139, 250, 0.02)' },
+            ],
+          },
         },
       },
-    },
-    {
-      name: 'RAM 总量',
-      type: 'line',
-      data: chartData.value.map(r => r.ram_total ?? nodeInfo.value?.mem_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
-    },
-    {
-      name: 'Swap',
-      type: 'line',
-      data: chartData.value.map(r => r.swap),
+    ],
+  }))
 
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
-    },
-    {
-      name: 'Swap 总量',
-      type: 'line',
-      data: chartData.value.map(r => r.swap_total ?? nodeInfo.value?.swap_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quaternary, cap: 'round' as const },
-    },
-  ],
-}))
+  return {
+    chartData,
+    trafficChartSeries,
+    temperatureChartSeries,
+    hasTrafficData,
+    hasTemperatureData,
+    cpuChartOption,
+    memoryChartOption,
+    diskChartOption,
+    networkChartOption,
+    connectionsChartOption,
+    processChartOption,
+  }
+}
 
-// 磁盘图表
-const diskChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.tertiary, chartColors.quinary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const diskUsed = record.disk ?? 0
-      const diskTotal = record.disk_total ?? nodeInfo.value?.disk_total ?? 0
-      const diskPercent = diskTotal > 0 ? ((diskUsed / diskTotal) * 100).toFixed(1) : '0'
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const text = item.seriesName === '磁盘总量' ? formatBytes(diskTotal) : `${formatBytes(diskUsed)} (${diskPercent}%)`
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${item.seriesName}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${text}</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['磁盘已用', '磁盘总量'],
-    bottom: 4,
-    itemWidth: 10,
-    itemHeight: 8,
-    textStyle: { fontSize: 10, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '磁盘',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: '磁盘已用',
-      type: 'line',
-      data: chartData.value.map(r => r.disk),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: chartColors.tertiaryAreaStrong },
-            { offset: 1, color: chartColors.tertiaryAreaFaint },
-          ],
-        },
-      },
-    },
-    {
-      name: '磁盘总量',
-      type: 'line',
-      data: chartData.value.map(r => r.disk_total ?? nodeInfo.value?.disk_total ?? null),
-      showSymbol: false,
-      lineStyle: { width: 1.2, type: 'dashed' as const, color: chartColors.quinary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 网络图表
-const networkChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.quinary, chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const label = item.seriesName === '下载' ? '↓ 下载' : '↑ 上传'
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${label}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(item.value)}/s</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['下载', '上传'],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '速度',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => formatBytes(val),
-    },
-  },
-  series: [
-    {
-      name: '下载',
-      type: 'line',
-      data: chartData.value.map(r => r.net_in ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quinary, cap: 'round' as const },
-    },
-    {
-      name: '上传',
-      type: 'line',
-      data: chartData.value.map(r => r.net_out ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-    },
-  ],
-}))
+const cardCharts = reactive(createChartOptions(cardChartData, cardHistoryHours))
+const detailCharts = createChartOptions(chartData, effectiveHistoryHours)
 
 const chartDashboardCards = computed(() => appStore.chartDashboardTemplate.cards)
 
@@ -812,9 +1019,9 @@ function isChartCardEnabled(key: ChartDashboardCardKey): boolean {
 
   switch (key) {
     case 'traffic':
-      return hasTrafficData.value
+      return cardCharts.hasTrafficData
     case 'temperature':
-      return hasTemperatureData.value
+      return cardCharts.hasTemperatureData
     default:
       return true
   }
@@ -829,142 +1036,6 @@ function getChartCardStyle(key: ChartDashboardCardKey): Record<string, string> {
   return { order: String(getChartCardOrder(key)) }
 }
 
-// 连接数图表
-const connectionsChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.primary, chartColors.tertiary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, seriesName: string, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-
-      for (const item of p) {
-        const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:8px;flex-shrink:0"></span>`
-        const displayValue = item.value != null ? Math.round(item.value) : '-'
-        html += `<div style="display:flex;align-items:center">${colorDot}<span>${item.seriesName}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
-      }
-      html += '</div>'
-      return html
-    },
-  },
-  legend: {
-    data: ['TCP', 'UDP'],
-    bottom: 4,
-    itemWidth: 12,
-    itemHeight: 12,
-    itemGap: 20,
-    icon: 'roundRect',
-    textStyle: { fontSize: 11, color: chartThemeColors.value.textSecondary },
-  },
-  grid: chartMarginWithLegend,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '连接数',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => Math.round(val).toString(),
-    },
-  },
-  series: [
-    {
-      name: 'TCP',
-      type: 'line',
-      data: chartData.value.map(r => r.connections ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.primary, cap: 'round' as const },
-    },
-    {
-      name: 'UDP',
-      type: 'line',
-      data: chartData.value.map(r => r.connections_udp ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.tertiary, cap: 'round' as const },
-    },
-  ],
-}))
-
-// 进程数图表
-const processChartOption = computed(() => ({
-  animation: false,
-  color: [chartColors.quaternary],
-  tooltip: {
-    ...baseTooltipConfig.value,
-    formatter: (params: unknown) => {
-      const p = params as Array<{ dataIndex: number, value: number, color: string }>
-      if (!p.length)
-        return ''
-      const firstParam = p[0]
-      if (!firstParam)
-        return ''
-      const record = chartData.value[firstParam.dataIndex]
-      if (!record)
-        return ''
-
-      const timeStr = formatTimeForTooltip(record.time, effectiveHistoryHours.value)
-      const colorDot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${firstParam.color};margin-right:8px;flex-shrink:0"></span>`
-      const displayValue = firstParam.value != null ? Math.round(firstParam.value) : '-'
-
-      let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
-      html += '<div style="display:flex;flex-direction:column;gap:4px">'
-      html += `<div style="display:flex;align-items:center">${colorDot}<span>进程数</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${displayValue}</span></div>`
-      html += '</div>'
-      return html
-    },
-  },
-  grid: chartMargin,
-  xAxis: baseXAxisConfig.value,
-  yAxis: {
-    ...baseYAxisConfig.value,
-    name: '进程',
-    nameTextStyle: { color: chartThemeColors.value.textSecondary, padding: [0, 40, 0, 0] },
-    min: 0,
-    axisLabel: {
-      ...baseYAxisConfig.value.axisLabel,
-      formatter: (val: number) => Math.round(val).toString(),
-    },
-  },
-  series: [
-    {
-      name: '进程数',
-      type: 'line',
-      data: chartData.value.map(r => r.process ?? 0),
-
-      showSymbol: false,
-      lineStyle: { width: 1.5, color: chartColors.quaternary, cap: 'round' as const },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(167, 139, 250, 0.25)' },
-            { offset: 1, color: 'rgba(167, 139, 250, 0.02)' },
-          ],
-        },
-      },
-    },
-  ],
-}))
-
 type ExpandableChartKey = 'cpu' | 'memory' | 'disk' | 'network' | 'connections' | 'process'
 
 const expandedChart = ref<ExpandableChartKey | null>(null)
@@ -978,12 +1049,12 @@ const expandedChartMeta: Record<ExpandableChartKey, { title: string, description
 }
 const expandedChartOption = computed(() => {
   switch (expandedChart.value) {
-    case 'cpu': return cpuChartOption.value
-    case 'memory': return memoryChartOption.value
-    case 'disk': return diskChartOption.value
-    case 'network': return networkChartOption.value
-    case 'connections': return connectionsChartOption.value
-    case 'process': return processChartOption.value
+    case 'cpu': return detailCharts.cpuChartOption.value
+    case 'memory': return detailCharts.memoryChartOption.value
+    case 'disk': return detailCharts.diskChartOption.value
+    case 'network': return detailCharts.networkChartOption.value
+    case 'connections': return detailCharts.connectionsChartOption.value
+    case 'process': return detailCharts.processChartOption.value
     default: return {}
   }
 })
@@ -1015,8 +1086,10 @@ function ensureDefaultCustomRange() {
 
 // 历史图表只在服务端收到新的历史采样后更新，不按固定间隔重复查询。
 const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
-  if (event.kind === 'history' && event.uuid === props.uuid)
+  if (event.kind === 'history' && event.uuid === props.uuid) {
     void fetchData(true)
+    void fetchCardData(true)
+  }
 })
 
 // 生命周期 ====================
@@ -1030,13 +1103,17 @@ watch(selectedView, () => {
 })
 
 watch(() => props.uuid, () => {
+  cardRemoteData.value = []
   remoteData.value = []
+  cardError.value = null
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
+  fetchCardData()
 })
 
 onMounted(() => {
   fetchData()
+  fetchCardData()
 })
 
 onBeforeUnmount(() => {
@@ -1048,10 +1125,10 @@ onBeforeUnmount(() => {
   <div class="flex flex-col gap-4">
     <!-- 内容区域 -->
     <div :aria-busy="loading">
-      <div v-if="error" class="text-red-500 py-8 text-center">
-        {{ error }}
+      <div v-if="cardError" class="text-red-500 py-8 text-center">
+        {{ cardError }}
       </div>
-      <div v-else-if="chartData.length === 0 && !loading" class="py-8">
+      <div v-else-if="cardCharts.chartData.length === 0 && !cardLoading" class="py-8">
         <Empty description="暂无负载数据" />
       </div>
 
@@ -1069,7 +1146,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="cpuChartOption" autoresize />
+            <VChart :option="cardCharts.cpuChartOption" autoresize />
           </div>
         </CardX>
 
@@ -1094,7 +1171,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="memoryChartOption" autoresize />
+            <VChart :option="cardCharts.memoryChartOption" autoresize />
           </div>
         </CardX>
 
@@ -1118,7 +1195,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="diskChartOption" autoresize />
+            <VChart :option="cardCharts.diskChartOption" autoresize />
           </div>
         </CardX>
 
@@ -1147,7 +1224,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="networkChartOption" autoresize />
+            <VChart :option="cardCharts.networkChartOption" autoresize />
           </div>
         </CardX>
 
@@ -1156,7 +1233,7 @@ onBeforeUnmount(() => {
           title="累计与周期流量"
           icon="tabler:arrows-transfer-up-down"
           tone="sky"
-          :series="trafficChartSeries"
+          :series="cardCharts.trafficChartSeries"
           :order="getChartCardOrder('traffic')"
         />
 
@@ -1165,7 +1242,7 @@ onBeforeUnmount(() => {
           title="温度"
           icon="tabler:temperature"
           tone="orange"
-          :series="temperatureChartSeries"
+          :series="cardCharts.temperatureChartSeries"
           :order="getChartCardOrder('temperature')"
         />
 
@@ -1181,7 +1258,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="connectionsChartOption" autoresize />
+            <VChart :option="cardCharts.connectionsChartOption" autoresize />
           </div>
         </CardX>
 
@@ -1195,7 +1272,7 @@ onBeforeUnmount(() => {
             </MetricChartHeader>
           </template>
           <div class="h-48">
-            <VChart :option="processChartOption" autoresize />
+            <VChart :option="cardCharts.processChartOption" autoresize />
           </div>
         </CardX>
       </div>
