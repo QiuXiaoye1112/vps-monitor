@@ -186,11 +186,12 @@ const customRangeError = computed(() => {
     return '请选择开始和结束时间'
   return customRange.value ? '' : '只能查看最近 7 天内的数据，且结束时间必须晚于开始时间'
 })
-const effectiveHistoryHours = computed(() => isCustomRange.value ? customRange.value?.hours ?? 1 : selectedHours.value ?? 1)
+// 请求中的范围只用于生成查询参数；图表时间轴使用已成功加载的数据范围，避免切换时先变格式、后变数据。
+const requestedHistoryHours = computed(() => isCustomRange.value ? customRange.value?.hours ?? 1 : selectedHours.value ?? 1)
 
 // 数据状态：小卡片固定使用最近 1 小时，详情弹窗使用独立的时间范围。
 const cardRemoteData = shallowRef<StatusRecord[]>([])
-const remoteData = shallowRef<StatusRecord[]>([])
+const detailChartState = shallowRef<{ records: StatusRecord[], hours: number }>({ records: [], hours: 1 })
 const cardLoading = ref(false)
 const cardError = ref<string | null>(null)
 const loading = ref(false)
@@ -285,11 +286,11 @@ async function fetchRecentData() {
     const records = result?.records || []
     records.sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf())
     const maxLength = 150
-    remoteData.value = records.slice(-maxLength)
+    detailChartState.value = { records: records.slice(-maxLength), hours: detailChartState.value.hours }
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
-    remoteData.value = []
+    detailChartState.value = { records: [], hours: detailChartState.value.hours }
   }
   finally {
     loading.value = false
@@ -302,20 +303,21 @@ async function fetchHistoryData(silent = false) {
     return
 
   if (isCustomRange.value && !customRange.value) {
-    remoteData.value = []
+    detailChartState.value = { records: [], hours: detailChartState.value.hours }
     error.value = customRangeError.value || '请选择有效的自定义时间范围'
     return
   }
 
+  const requestedCustomRange = isCustomRange.value
   const range = customRange.value
-  const hours = effectiveHistoryHours.value
+  const hours = requestedHistoryHours.value
 
   if (!silent)
     loading.value = true
   error.value = null
 
   try {
-    const loadParams = isCustomRange.value && range
+    const loadParams = requestedCustomRange && range
       ? {
           uuid: props.uuid,
           start: range.start.toDate().toISOString(),
@@ -324,11 +326,14 @@ async function fetchHistoryData(silent = false) {
         }
       : { uuid: props.uuid, hours, maxCount: LOAD_RECORD_MAX_COUNT }
     const historyResult = await rpc.getLoadRecordsRange(loadParams)
-    remoteData.value = normalizeStatusRecordsPayload(historyResult.records)
+    detailChartState.value = {
+      records: normalizeStatusRecordsPayload(historyResult.records),
+      hours: requestedCustomRange && range ? range.hours : hours,
+    }
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : '获取数据失败'
-    remoteData.value = []
+    detailChartState.value = { records: [], hours: detailChartState.value.hours }
   }
   finally {
     if (!silent)
@@ -404,7 +409,7 @@ const cardChartData = computed(() => {
 })
 
 const chartData = computed(() => {
-  return statusToRecordFormat(remoteData.value)
+  return statusToRecordFormat(detailChartState.value.records)
 })
 
 const cardHistoryHours = computed(() => 1)
@@ -1009,7 +1014,8 @@ function createChartOptions(
 }
 
 const cardCharts = reactive(createChartOptions(cardChartData, cardHistoryHours))
-const detailCharts = createChartOptions(chartData, effectiveHistoryHours)
+const detailHistoryHours = computed(() => detailChartState.value.hours)
+const detailCharts = createChartOptions(chartData, detailHistoryHours)
 
 const chartDashboardCards = computed(() => appStore.chartDashboardTemplate.cards)
 
@@ -1104,7 +1110,7 @@ watch(selectedView, () => {
 
 watch(() => props.uuid, () => {
   cardRemoteData.value = []
-  remoteData.value = []
+  detailChartState.value = { records: [], hours: 1 }
   cardError.value = null
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
