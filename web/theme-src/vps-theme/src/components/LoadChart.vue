@@ -1015,7 +1015,7 @@ function ensureDefaultCustomRange() {
 
 // 历史图表只在服务端收到新的历史采样后更新，不按固定间隔重复查询。
 const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
-  if (event.kind === 'history' && event.uuid === props.uuid && isRealtime.value)
+  if (event.kind === 'history' && event.uuid === props.uuid)
     void fetchData(true)
 })
 
