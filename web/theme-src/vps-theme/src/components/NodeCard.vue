@@ -240,7 +240,7 @@ function activateCard() {
           <div
             v-for="metric in (['latency', 'loss'] as const)"
             :key="metric"
-            class="group/panel relative flex flex-col gap-2 min-w-0 overflow-hidden"
+            class="group/panel relative flex flex-col gap-2 min-w-0 overflow-visible"
             :class="!props.node.online ? 'blur-xs opacity-50' : ''"
             role="group"
             :aria-label="metric === 'latency' ? '各 Ping 任务延迟' : '各 Ping 任务丢包'"
@@ -300,6 +300,6 @@ function activateCard() {
 <style scoped>
 .node-card {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 </style>

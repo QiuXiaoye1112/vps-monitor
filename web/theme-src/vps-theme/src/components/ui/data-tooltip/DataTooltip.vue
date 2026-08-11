@@ -55,7 +55,7 @@ const sizeStyle = computed(() => {
       v-if="content || $slots.content"
       role="tooltip"
       :class="cn(
-        'pointer-events-none absolute z-20 hidden rounded bg-foreground/80 p-1 text-[10px] leading-none text-background shadow-lg group-hover/data-tooltip:block group-focus-within/data-tooltip:block whitespace-normal break-words',
+        'pointer-events-none absolute z-20 hidden w-max rounded bg-foreground/80 p-1 text-[10px] leading-none text-background shadow-lg group-hover/data-tooltip:block group-focus-within/data-tooltip:block whitespace-pre',
         placementClass[placement],
         props.contentClass,
       )"
