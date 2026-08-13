@@ -182,13 +182,28 @@
     };
   }
 
-  function connectFiles() {
-    if (!uuid) return;
+  function rejectPendingFileRequests() {
+    pendingRequests.forEach(function (pending) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error('文件管理连接已断开'));
+    });
+    pendingRequests.clear();
+  }
+
+  function connectFiles(options) {
+    options = options || {};
+    if (!uuid) return null;
+    if (fileWS && !options.force && (fileWS.readyState === WebSocket.OPEN || fileWS.readyState === WebSocket.CONNECTING)) {
+      return fileWS;
+    }
+    var reconnectPath = options.restorePath || fileState.path || fileState.home;
     if (fileWS) {
       try { fileWS.close(); } catch (_) {}
+      rejectPendingFileRequests();
     }
-    setFileStatus('连接中');
+    setFileStatus(options.reconnecting ? '重新连接中' : '连接中');
     var connection = new WebSocket(filesURL());
+    var initialDirectoryLoaded = false;
     fileWS = connection;
     connection.onopen = function () { if (fileWS === connection) setFileStatus('等待 Agent'); };
     connection.onmessage = function (event) {
@@ -206,7 +221,15 @@
           if (message.data && message.data.home) {
             fileState.home = message.data.home;
             setFileStatus('已连接', 'ok');
-            loadDirectory(message.data.home, 0);
+            if (!initialDirectoryLoaded) {
+              initialDirectoryLoaded = true;
+              var initialPath = reconnectPath || message.data.home;
+              loadDirectory(initialPath, 0, { silentError: initialPath !== message.data.home }).then(function (loaded) {
+                if (!loaded && initialPath !== message.data.home && fileWS === connection) {
+                  loadDirectory(message.data.home, 0);
+                }
+              });
+            }
           }
           return;
         }
@@ -232,12 +255,9 @@
       if (fileWS !== connection) return;
       fileWS = null;
       setFileStatus('已断开', 'bad');
-      pendingRequests.forEach(function (pending) {
-        clearTimeout(pending.timer);
-        pending.reject(new Error('文件管理连接已断开'));
-      });
-      pendingRequests.clear();
+      rejectPendingFileRequests();
     };
+    return connection;
   }
 
   function startConnectionHeartbeat() {
@@ -309,9 +329,13 @@
         fileListWrap.scrollTop = Math.min(Math.max(0, requestedScroll), maximumScroll);
       });
       if (data.truncated) showToast('目录项目超过 1000 个，仅显示前 1000 个', true);
+      return true;
     } catch (err) {
-      renderFileError(err.message);
-      showToast(err.message, true);
+      if (!viewOptions.silentError) {
+        renderFileError(err.message);
+        showToast(err.message, true);
+      }
+      return false;
     }
   }
 
@@ -422,6 +446,19 @@
 
   function reloadCurrentDirectory() {
     return loadDirectory(fileState.path, fileState.offset, { scrollTop: currentFileScroll() });
+  }
+
+  function refreshFiles() {
+    if (fileWS && fileWS.readyState === WebSocket.OPEN) {
+      reloadCurrentDirectory();
+      return;
+    }
+    if (fileWS && fileWS.readyState === WebSocket.CONNECTING) {
+      setFileStatus('连接中');
+      return;
+    }
+    setFileStatus('重新连接中');
+    connectFiles({ restorePath: fileState.path || fileState.home, reconnecting: true });
   }
 
   function updateClipboardUI() {
@@ -876,7 +913,7 @@
   function bindFileUI() {
     byId('homeButton').addEventListener('click', function () { loadDirectory(fileState.home || '', 0); });
     byId('upButton').addEventListener('click', function () { loadDirectory(fileState.parent || fileState.path, 0); });
-    byId('refreshButton').addEventListener('click', reloadCurrentDirectory);
+    byId('refreshButton').addEventListener('click', refreshFiles);
     pathInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') loadDirectory(pathInput.value, 0); });
     byId('newFileButton').addEventListener('click', function () { createEntry('create'); });
     byId('newFolderButton').addEventListener('click', function () { createEntry('mkdir'); });
