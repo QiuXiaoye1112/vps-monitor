@@ -32,6 +32,7 @@
   var contextMenu = byId('contextMenu');
   var fileListWrap = document.querySelector('.file-list-wrap');
   var pasteButton = byId('pasteButton');
+  var reconnectButton = byId('reconnectButton');
 
   function isDirectoryItem(item) { return !!(item && (item.is_dir || item.link_is_dir)); }
   function selectedItems() { return fileState.items.filter(function (item) { return fileState.selectedPaths.has(item.path); }); }
@@ -82,6 +83,14 @@
 
   function filesURL() {
     return websocketURL('/api/admin/client/' + encodeURIComponent(uuid) + '/files');
+  }
+
+  function isWSOpen(socket) {
+    return !!socket && socket.readyState === WebSocket.OPEN;
+  }
+
+  function isWSConnecting(socket) {
+    return !!socket && socket.readyState === WebSocket.CONNECTING;
   }
 
   async function rpc(method, rpcParams) {
@@ -158,9 +167,8 @@
   }
 
   function connectTerminal(displayName) {
-    if (ws) {
-      try { ws.close(); } catch (_) {}
-    }
+    if (!uuid) return null;
+    if (isWSOpen(ws) || isWSConnecting(ws)) return ws;
     setStatus('连接中');
     var connection = new WebSocket(terminalURL());
     ws = connection;
@@ -180,6 +188,15 @@
       setStatus('已断开', 'bad');
       if (term) term.writeln('\r\n\r\n[connection closed]');
     };
+    return connection;
+  }
+
+  function reconnectDisconnectedChannels() {
+    if (!term || !uuid) return;
+    if (!isWSOpen(ws) && !isWSConnecting(ws)) connectTerminal(nodeName);
+    if (!isWSOpen(fileWS) && !isWSConnecting(fileWS)) {
+      connectFiles({ restorePath: fileState.path || fileState.home, reconnecting: true });
+    }
   }
 
   function rejectPendingFileRequests() {
@@ -193,7 +210,7 @@
   function connectFiles(options) {
     options = options || {};
     if (!uuid) return null;
-    if (fileWS && !options.force && (fileWS.readyState === WebSocket.OPEN || fileWS.readyState === WebSocket.CONNECTING)) {
+    if (!options.force && (isWSOpen(fileWS) || isWSConnecting(fileWS))) {
       return fileWS;
     }
     var reconnectPath = options.restorePath || fileState.path || fileState.home;
@@ -449,11 +466,11 @@
   }
 
   function refreshFiles() {
-    if (fileWS && fileWS.readyState === WebSocket.OPEN) {
+    if (isWSOpen(fileWS)) {
       reloadCurrentDirectory();
       return;
     }
-    if (fileWS && fileWS.readyState === WebSocket.CONNECTING) {
+    if (isWSConnecting(fileWS)) {
       setFileStatus('连接中');
       return;
     }
@@ -978,6 +995,7 @@
   }
 
   function bindLayout() {
+    reconnectButton.addEventListener('click', reconnectDisconnectedChannels);
     byId('filesToggle').addEventListener('click', function () {
       if (window.matchMedia('(max-width: 980px)').matches) {
         setFilesVisible(!document.body.classList.contains('mobile-files'));

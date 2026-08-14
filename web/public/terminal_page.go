@@ -40,6 +40,7 @@ func serveTerminalPage(c *gin.Context) {
         <div class="metric download"><span>实时下行</span><strong id="metricDown">--</strong></div>
       </div>
       <div class="top-actions">
+        <button class="icon-button" id="reconnectButton" type="button" title="重新连接断开的通道" aria-label="重新连接断开的通道">↻</button>
         <button class="icon-button files-toggle" id="filesToggle" type="button" title="显示或隐藏文件管理">文件</button>
         <div class="status" id="status"><span class="dot"></span><span id="statusText">初始化</span></div>
       </div>
@@ -131,7 +132,7 @@ func serveTerminalPage(c *gin.Context) {
   <div class="toast" id="toast" hidden></div>
   <script src="/terminal-assets/xterm.js"></script>
   <script src="/terminal-assets/xterm-addon-fit.js"></script>
-  <script src="/terminal-assets/terminal-page.js?v=20260723-1"></script>
+  <script src="/terminal-assets/terminal-page.js?v=20260814-1"></script>
 </body>
 </html>`
 	c.Header("Cache-Control", "no-store")
