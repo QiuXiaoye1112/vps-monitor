@@ -2,8 +2,9 @@ package filemanager
 
 import (
 	"sync"
+	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/monitor-monitor/monitor/web/connection"
 )
 
 const maxFileMessageSize = 3 << 20
@@ -11,9 +12,11 @@ const maxFileMessageSize = 3 << 20
 type fileSession struct {
 	UUID        string
 	UserUUID    string
-	Browser     *websocket.Conn
-	Agent       *websocket.Conn
+	Browser     *connection.SafeConn
+	Agent       *connection.SafeConn
 	RequesterIP string
+	closeOnce   sync.Once
+	waitTimer   *time.Timer
 }
 
 var (
@@ -26,10 +29,4 @@ func getFileSession(id string) (*fileSession, bool) {
 	defer fileSessionsMu.Unlock()
 	session, ok := fileSessions[id]
 	return session, ok
-}
-
-func deleteFileSession(id string) {
-	fileSessionsMu.Lock()
-	delete(fileSessions, id)
-	fileSessionsMu.Unlock()
 }

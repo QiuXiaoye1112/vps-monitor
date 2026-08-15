@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/monitor-monitor/monitor/web/api"
+	"github.com/monitor-monitor/monitor/web/connection"
 )
 
 func EstablishConnection(c *gin.Context) {
@@ -28,16 +29,22 @@ func EstablishConnection(c *gin.Context) {
 		return
 	}
 	agent.SetReadLimit(maxFileMessageSize)
+	safeAgent := connection.NewSafeConn(agent)
 
 	fileSessionsMu.Lock()
 	current, stillExists := fileSessions[id]
 	if !stillExists || current != session || session.Browser == nil || session.Agent != nil {
 		fileSessionsMu.Unlock()
-		_ = agent.Close()
+		_ = safeAgent.Close()
 		return
 	}
-	session.Agent = agent
+	session.Agent = safeAgent
+	waitTimer := session.waitTimer
+	session.waitTimer = nil
 	fileSessionsMu.Unlock()
+	if waitTimer != nil {
+		waitTimer.Stop()
+	}
 
 	_ = session.Browser.WriteJSON(gin.H{"type": "system", "ok": true, "status": "connected"})
 	go forwardFileManager(id, session)
