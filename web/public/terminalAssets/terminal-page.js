@@ -283,9 +283,6 @@
       if (ws && ws.readyState === WebSocket.OPEN && term) {
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
       }
-      if (fileWS && fileWS.readyState === WebSocket.OPEN) {
-        fileRequest('ping', {}, 10000).catch(function () {});
-      }
     }, 25000);
   }
 
