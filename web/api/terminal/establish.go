@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/monitor-monitor/monitor/web/api"
+	"github.com/monitor-monitor/monitor/web/connection"
 )
 
 func EstablishConnection(c *gin.Context) {
@@ -21,29 +22,26 @@ func EstablishConnection(c *gin.Context) {
 	}
 	conn, err := api.UpgradeWebSocket(c)
 	if err != nil {
-		TerminalSessionsMutex.Lock()
-		if session.Browser != nil {
-			session.Browser.Close()
-		}
-		delete(TerminalSessions, session_id)
-		TerminalSessionsMutex.Unlock()
+		closeTerminalSession(session_id, session)
 		return
 	}
+	agent := connection.NewSafeConn(conn)
 	TerminalSessionsMutex.Lock()
 	current, stillExists := TerminalSessions[session_id]
 	if !stillExists || current != session || session.Browser == nil {
 		TerminalSessionsMutex.Unlock()
-		conn.Close()
+		_ = agent.Close()
 		return
 	}
-	session.Agent = conn
+	session.Agent = agent
+	waitTimer := session.waitTimer
+	session.waitTimer = nil
 	TerminalSessionsMutex.Unlock()
+	if waitTimer != nil {
+		waitTimer.Stop()
+	}
 	conn.SetCloseHandler(func(code int, text string) error {
-		deleteTerminalSession(session_id)
-		// 通知 Browser 关闭终端连接
-		if session.Browser != nil {
-			session.Browser.Close()
-		}
+		closeTerminalSession(session_id, session)
 		return nil
 	})
 	go ForwardTerminal(session_id)

@@ -2,16 +2,19 @@ package terminal
 
 import (
 	"sync"
+	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/monitor-monitor/monitor/web/connection"
 )
 
 type TerminalSession struct {
 	UUID        string
 	UserUUID    string
-	Browser     *websocket.Conn
-	Agent       *websocket.Conn
+	Browser     *connection.SafeConn
+	Agent       *connection.SafeConn
 	RequesterIp string
+	closeOnce   sync.Once
+	waitTimer   *time.Timer
 }
 
 var TerminalSessionsMutex = &sync.Mutex{}
@@ -24,8 +27,30 @@ func getTerminalSession(id string) (*TerminalSession, bool) {
 	return session, exists
 }
 
-func deleteTerminalSession(id string) {
-	TerminalSessionsMutex.Lock()
-	delete(TerminalSessions, id)
-	TerminalSessionsMutex.Unlock()
+func closeTerminalSession(id string, session *TerminalSession) {
+	if session == nil {
+		return
+	}
+
+	session.closeOnce.Do(func() {
+		TerminalSessionsMutex.Lock()
+		if current, exists := TerminalSessions[id]; exists && current == session {
+			delete(TerminalSessions, id)
+		}
+		agent := session.Agent
+		browser := session.Browser
+		waitTimer := session.waitTimer
+		session.waitTimer = nil
+		TerminalSessionsMutex.Unlock()
+
+		if waitTimer != nil {
+			waitTimer.Stop()
+		}
+		if agent != nil {
+			_ = agent.Close()
+		}
+		if browser != nil {
+			_ = browser.Close()
+		}
+	})
 }
