@@ -466,16 +466,7 @@
   }
 
   function refreshFiles() {
-    if (isWSOpen(fileWS)) {
-      reloadCurrentDirectory();
-      return;
-    }
-    if (isWSConnecting(fileWS)) {
-      setFileStatus('连接中');
-      return;
-    }
-    setFileStatus('重新连接中');
-    connectFiles({ restorePath: fileState.path || fileState.home, reconnecting: true });
+    if (isWSOpen(fileWS)) reloadCurrentDirectory();
   }
 
   function updateClipboardUI() {
