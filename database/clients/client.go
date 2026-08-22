@@ -359,149 +359,6 @@ func updateLastReportAt(db *gorm.DB, clientUUID string, reportedAt time.Time) er
 	return nil
 }
 
-// ResetTrafficAccounting starts a fresh cumulative traffic ledger at an exact
-// agent-side counter snapshot without deleting monitoring history.
-func ResetTrafficAccounting(uuid string, clearedAt time.Time, baselineUp, baselineDown int64) error {
-	if baselineUp < 0 || baselineDown < 0 {
-		return fmt.Errorf("invalid negative traffic baseline")
-	}
-	db := dbcore.GetDBInstance()
-	result := db.Model(&models.Client{}).Where("uuid = ?", uuid).Updates(map[string]interface{}{
-		"traffic_compensation":          int64(0),
-		"traffic_carry":                 int64(0),
-		"traffic_carry_up":              int64(0),
-		"traffic_carry_down":            int64(0),
-		"traffic_compensation_reset_at": clearedAt,
-		"traffic_cleared_at":            clearedAt,
-		"traffic_baseline_up":           baselineUp,
-		"traffic_baseline_down":         baselineDown,
-		"updated_at":                    clearedAt,
-	})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("client not found: %s", uuid)
-	}
-	return nil
-}
-
-// ResetTrafficCompensationForDueClients 检查所有节点，若已进入新的流量计费周期则将
-// 用户补偿 traffic_compensation 与上下行内部结转一并清零。
-// 判断依据：以当前时间为准，用 TrafficWindow 算出本周期起始时间；若 client 的 traffic_compensation_reset_at
-// 早于该起始时间，且补偿或内部结转不为 0，则视为上一周期的值并清零。
-func ResetTrafficCompensationForDueClients() {
-	db := dbcore.GetDBInstance()
-	allClients, err := GetAllClientBasicInfo()
-	if err != nil {
-		log.Printf("[traffic_comp_reset] failed to get clients: %v", err)
-		return
-	}
-	now := time.Now()
-	for _, c := range allClients {
-		reset, err := resetTrafficCompensationIfDue(db, c, now)
-		if err != nil {
-			log.Printf("[traffic_comp_reset] failed to reset comp for %s: %v", c.UUID, err)
-		} else if reset {
-			log.Printf(
-				"[traffic_comp_reset] reset traffic accounting for %s (compensation=%d, carry_up=%d, carry_down=%d)",
-				c.UUID,
-				c.TrafficComp,
-				c.TrafficCarryUp,
-				c.TrafficCarryDown,
-			)
-		}
-	}
-}
-
-// resetTrafficCompensationIfDue uses the client snapshot's updated_at as an
-// optimistic lock. If an admin edit wins the race, the stale scheduled update
-// affects zero rows instead of overwriting the newer compensation value.
-func resetTrafficCompensationIfDue(db *gorm.DB, client models.Client, now time.Time) (bool, error) {
-	if !shouldResetTrafficCompensation(client, now) {
-		return false, nil
-	}
-
-	start := trafficResetStart(client, now)
-	query := db.Model(&models.Client{}).Where("uuid = ?", client.UUID)
-	if client.UpdatedAt.ToTime().IsZero() {
-		query = query.Where("updated_at IS NULL")
-	} else {
-		query = query.Where("updated_at = ?", client.UpdatedAt)
-	}
-	result := query.Updates(map[string]interface{}{
-		"traffic_compensation":          int64(0),
-		"traffic_carry":                 int64(0), // Clear any pre-v3 residue as well.
-		"traffic_carry_up":              int64(0),
-		"traffic_carry_down":            int64(0),
-		"traffic_compensation_reset_at": start,
-		"updated_at":                    now,
-	})
-	if result.Error != nil {
-		return false, result.Error
-	}
-	return result.RowsAffected == 1, nil
-}
-
-func shouldResetTrafficCompensation(client models.Client, now time.Time) bool {
-	if (client.TrafficComp == 0 &&
-		client.TrafficCarry == 0 &&
-		client.TrafficCarryUp == 0 &&
-		client.TrafficCarryDown == 0) ||
-		!client.TrafficResetEnabled {
-		return false
-	}
-	start := trafficResetStart(client, now)
-	compResetTime := client.TrafficCompResetAt.ToTime()
-	if compResetTime.IsZero() {
-		compResetTime = client.CreatedAt.ToTime()
-	}
-	return compResetTime.Before(start)
-}
-
-// trafficResetStart 返回当前计费周期的起始时间（Asia/Shanghai 时区）。
-func trafficResetStart(client models.Client, now time.Time) time.Time {
-	loc, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		loc = time.FixedZone("Asia/Shanghai", 8*60*60)
-	}
-	localNow := now.In(loc)
-	day := client.TrafficResetDay
-	if day <= 0 {
-		day = 1
-	}
-	hour := client.TrafficResetHour
-	if hour < 0 || hour > 23 {
-		hour = 0
-	}
-	minute := client.TrafficResetMinute
-	if minute < 0 || minute > 59 {
-		minute = 0
-	}
-	// 本月重置时间点
-	lastDayOfMonth := time.Date(localNow.Year(), localNow.Month()+1, 0, 0, 0, 0, 0, loc).Day()
-	resetDay := day
-	if resetDay > lastDayOfMonth {
-		resetDay = lastDayOfMonth
-	}
-	thisReset := time.Date(localNow.Year(), localNow.Month(), resetDay, hour, minute, 0, 0, loc)
-	if localNow.Before(thisReset) {
-		// 当前时刻还没到本月重置点，周期起点是上个月的重置点
-		prevYear, prevMonth := localNow.Year(), localNow.Month()-1
-		if prevMonth == 0 {
-			prevMonth = 12
-			prevYear--
-		}
-		lastDayPrev := time.Date(prevYear, prevMonth+1, 0, 0, 0, 0, 0, loc).Day()
-		prevDay := day
-		if prevDay > lastDayPrev {
-			prevDay = lastDayPrev
-		}
-		return time.Date(prevYear, prevMonth, prevDay, hour, minute, 0, 0, loc)
-	}
-	return thisReset
-}
-
 func SaveClient(updates map[string]interface{}) error {
 	return saveClient(dbcore.GetDBInstance(), updates, time.Now())
 }
@@ -510,6 +367,13 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	clientUUID, ok := updates["uuid"].(string)
 	if !ok || clientUUID == "" {
 		return fmt.Errorf("invalid client UUID")
+	}
+	for _, removed := range []string{
+		"traffic_compensation",
+		"traffic_compensation_base",
+		"traffic_compensation_reset_at",
+	} {
+		delete(updates, removed)
 	}
 
 	// 确保更新的字段不为空
@@ -593,34 +457,6 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	if err := validateInteger("traffic_reset_minute", 0, 59); err != nil {
 		return err
 	}
-	if err := validateInteger("traffic_compensation", math.MinInt64, math.MaxInt64); err != nil {
-		return err
-	}
-
-	// The edit form submits compensation on every save. Only a real value
-	// change starts compensation in the current billing period; otherwise a
-	// stale pre-boundary value could be reclassified as current and survive an
-	// automatic clear.
-	if value, exists := updates["traffic_compensation"]; exists {
-		normalized, _ := toInt64(value)
-		var current models.Client
-		if err := db.Select("uuid", "traffic_compensation").
-			Where("uuid = ?", clientUUID).
-			First(&current).Error; err != nil {
-			return err
-		}
-		if normalized == current.TrafficComp {
-			delete(updates, "traffic_compensation")
-		} else {
-			updates["traffic_compensation"] = normalized
-			resetAt, err := models.FromTime(now).Value()
-			if err != nil {
-				return err
-			}
-			updates["traffic_compensation_reset_at"] = gorm.Expr("?", resetAt)
-		}
-	}
-
 	updatedAt, err := models.FromTime(now).Value()
 	if err != nil {
 		return err

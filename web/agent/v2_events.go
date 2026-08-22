@@ -136,6 +136,9 @@ func coalesceV2EventLocked(q *v2EventQueue, event v2.Event) {
 }
 
 func v2EventCoalesceKey(event v2.Event) string {
+	if event.Method == v2.MethodAgentTrafficConfig {
+		return event.Method
+	}
 	if event.Method != v2.MethodAgentPing {
 		return ""
 	}

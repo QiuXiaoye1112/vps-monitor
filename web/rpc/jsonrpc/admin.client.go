@@ -76,7 +76,7 @@ func init() {
 	})
 	RegisterWithGroupAndMeta("resetClientTraffic", rpc.RoleAdmin, adminResetClientTraffic, &rpc.MethodMeta{
 		Name:    "admin:resetClientTraffic",
-		Summary: "Reset one client's cumulative traffic and compensation",
+		Summary: "Reset one client's Agent-owned monthly traffic ledger",
 		Params: []rpc.ParamMeta{
 			{Name: "uuid", Type: "string", Required: true, Description: "Client UUID"},
 		},
@@ -148,7 +148,6 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 		"traffic_reset_day",
 		"traffic_reset_hour",
 		"traffic_reset_minute",
-		"traffic_compensation",
 		"traffic_reset_enabled",
 	} {
 		value, ok := raw[key]
@@ -166,7 +165,7 @@ func normalizeClientCreateValue(key string, value interface{}) interface{} {
 		if n, ok := asInt64(value); ok {
 			return int(n)
 		}
-	case "traffic_limit", "traffic_compensation":
+	case "traffic_limit":
 		if n, ok := asInt64(value); ok {
 			return n
 		}
@@ -246,9 +245,28 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
 	}
-	delete(update, "traffic_compensation_base")
+	trafficConfigChanged := false
+	for _, key := range []string{"traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute"} {
+		if _, ok := update[key]; ok {
+			trafficConfigChanged = true
+			break
+		}
+	}
 	if err := clients.SaveClient(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
+	}
+	if trafficConfigChanged {
+		clientConfig, err := clients.GetClientByUUID(uuid)
+		if err != nil {
+			return nil, rpc.MakeError(rpc.InternalError, "流量周期配置已保存，但读取配置失败："+err.Error(), nil)
+		}
+		agent_runtime.DispatchTrafficConfig(uuid, v2.TrafficConfigParams{
+			Enabled:  clientConfig.TrafficResetEnabled,
+			Day:      clientConfig.TrafficResetDay,
+			Hour:     clientConfig.TrafficResetHour,
+			Minute:   clientConfig.TrafficResetMinute,
+			Timezone: "Asia/Shanghai",
+		})
 	}
 	if hasPingTaskOrder {
 		if err := tasks.SetClientPingTaskOrder(uuid, pingTaskOrder); err != nil {
@@ -355,31 +373,17 @@ func adminResetClientTraffic(ctx context.Context, req *rpc.JsonRpcRequest) (any,
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
 	params.UUID = strings.TrimSpace(params.UUID)
-	var snapshot v2.TrafficSnapshotResultParams
-	var clearedAt time.Time
-	err := report_cache.WithTrafficPersistencePaused(params.UUID, func() error {
-		var err error
-		snapshot, err = agent_runtime.RequestTrafficSnapshot(params.UUID, 12*time.Second)
-		if err != nil {
-			return err
+	snapshot, err := agent_runtime.RequestTrafficReset(params.UUID, 12*time.Second)
+	if err == nil {
+		if _, parseErr := time.Parse(time.RFC3339Nano, snapshot.CapturedAt); parseErr != nil {
+			err = fmt.Errorf("Agent 返回的流量清零时间无效")
+		} else if snapshot.TotalUp != 0 || snapshot.TotalDown != 0 {
+			err = fmt.Errorf("Agent 流量账本未归零")
 		}
-		if _, err = time.Parse(time.RFC3339Nano, snapshot.CapturedAt); err != nil {
-			return fmt.Errorf("Agent 返回的流量快照时间无效")
-		}
-		// Record history uses center receive times, so the center clock is the
-		// authoritative database boundary. Exact bytes come from the snapshot.
-		clearedAt = time.Now()
-		return clients.ResetTrafficAccounting(
-			params.UUID,
-			clearedAt,
-			snapshot.TotalUp,
-			snapshot.TotalDown,
-		)
-	})
+	}
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "流量清零失败："+err.Error(), nil)
 	}
-	monthlyTrafficCache.Delete(params.UUID)
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "reset client traffic:"+params.UUID, "warn")
 	return nil, nil

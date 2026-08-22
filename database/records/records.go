@@ -1,21 +1,30 @@
 package records
 
 import (
-	"errors"
 	"log"
 	"sort"
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/monitor-monitor/monitor/cmd/flags"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/utils"
 )
 
 const longTermRecordInterval = 15 * time.Minute
+
+// applyLocalTimeRange binds bounds using the timezone-less storage format of
+// models.LocalTime. It is shared by monitoring-history queries only.
+func applyLocalTimeRange(query *gorm.DB, start, end time.Time) *gorm.DB {
+	if !start.IsZero() {
+		query = query.Where("time >= ?", models.FromTime(start))
+	}
+	if !end.IsZero() {
+		query = query.Where("time <= ?", models.FromTime(end))
+	}
+	return query
+}
 
 func DeleteAll() error {
 	db := dbcore.GetDBInstance()
@@ -32,70 +41,12 @@ func DeleteRecordBefore(before time.Time) error {
 	return deleteLegacyRecordsBefore(dbcore.GetDBInstance(), before, time.Now())
 }
 
-func deleteLegacyRecordsBefore(db *gorm.DB, before, now time.Time) error {
+func deleteLegacyRecordsBefore(db *gorm.DB, before, _ time.Time) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		// Raw records are only the high-resolution history. Traffic that is old
-		// enough to reach this cutoff has already been rolled up by CompactRecord.
 		if err := tx.Table("records").Where("time < ?", models.FromTime(before)).Delete(&models.Record{}).Error; err != nil {
 			return err
 		}
-
-		var clients []models.Client
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Select("uuid", "traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute", "traffic_cleared_at").
-			Find(&clients).Error; err != nil {
-			return err
-		}
-
-		clientUUIDs := make([]string, 0, len(clients))
-		for _, client := range clients {
-			clientUUIDs = append(clientUUIDs, client.UUID)
-
-			// Fold traffic deltas that still belong to the active billing window
-			// into the internal carry before deleting old chart history.
-			// This keeps cumulative traffic stable while allowing every historical
-			// record row (CPU/RAM/etc.) older than seven days to be removed without
-			// changing the user-managed traffic compensation field.
-			foldStart := time.Time{}
-			if client.TrafficResetEnabled {
-				foldStart, _ = TrafficWindow(client, now)
-			}
-			foldStart = trafficAccountingStart(client, foldStart)
-			var folded struct {
-				Up   int64
-				Down int64
-			}
-			foldQuery := tx.Table("records_long_term").
-				Select("COALESCE(SUM(CASE WHEN traffic_up > 0 THEN traffic_up ELSE 0 END), 0) AS up, COALESCE(SUM(CASE WHEN traffic_down > 0 THEN traffic_down ELSE 0 END), 0) AS down").
-				Where("client = ? AND time < ?", client.UUID, models.FromTime(before))
-			if !foldStart.IsZero() {
-				foldQuery = foldQuery.Where("time >= ?", models.FromTime(foldStart))
-			}
-			if err := foldQuery.Scan(&folded).Error; err != nil {
-				return err
-			}
-			if folded.Up > 0 || folded.Down > 0 {
-				if err := tx.Model(&models.Client{}).Where("uuid = ?", client.UUID).Updates(map[string]interface{}{
-					"traffic_carry_up":              gorm.Expr("traffic_carry_up + ?", folded.Up),
-					"traffic_carry_down":            gorm.Expr("traffic_carry_down + ?", folded.Down),
-					"traffic_compensation_reset_at": now,
-				}).Error; err != nil {
-					return err
-				}
-			}
-			if err := tx.Table("records_long_term").
-				Where("client = ? AND time < ?", client.UUID, models.FromTime(before)).
-				Delete(&models.Record{}).Error; err != nil {
-				return err
-			}
-		}
-
-		// Records belonging to deleted nodes no longer contribute to any total.
-		orphanQuery := tx.Table("records_long_term").Where("time < ?", models.FromTime(before))
-		if len(clientUUIDs) > 0 {
-			orphanQuery = orphanQuery.Where("client NOT IN ?", clientUUIDs)
-		}
-		return orphanQuery.Delete(&models.Record{}).Error
+		return tx.Table("records_long_term").Where("time < ?", models.FromTime(before)).Delete(&models.Record{}).Error
 	})
 }
 
@@ -271,19 +222,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 	if len(records) == 0 {
 		return nil
 	}
-	previousByClient, err := getPreviousTrafficRecordsBefore(db, records)
-	if err != nil {
-		return err
-	}
-	trafficClearBaselines, err := getTrafficClearBaselines(db, records)
-	if err != nil {
-		return err
-	}
-	repairZeroTrafficDeltasWithBaselines(records, previousByClient, trafficClearBaselines)
-	trafficClearTimes := make(map[string]time.Time, len(trafficClearBaselines))
-	for clientUUID, baseline := range trafficClearBaselines {
-		trafficClearTimes[clientUUID] = baseline.At
-	}
 
 	// 按 Client 和 15 分钟时间段分组，并存储所有记录以计算分位数
 	type groupKey struct {
@@ -304,8 +242,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		NetOut          []int64
 		NetTotalUp      []int64
 		NetTotalDown    []int64
-		TrafficUp       int64
-		TrafficDown     int64
 		LatestTime      time.Time
 		LatestTotalUp   int64
 		LatestTotalDown int64
@@ -320,7 +256,7 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		recordTime := record.Time.ToTime()
 		key := groupKey{
 			Client: record.Client,
-			Slot:   trafficCompactionSlot(recordTime, trafficClearTimes[record.Client]),
+			Slot:   recordTime.Truncate(longTermRecordInterval),
 		}
 		if _, ok := groupedRecords[key]; !ok {
 			groupedRecords[key] = &groupData{}
@@ -339,8 +275,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 		data.NetOut = append(data.NetOut, record.NetOut)
 		data.NetTotalUp = append(data.NetTotalUp, record.NetTotalUp)
 		data.NetTotalDown = append(data.NetTotalDown, record.NetTotalDown)
-		data.TrafficUp += record.TrafficUp
-		data.TrafficDown += record.TrafficDown
 		if data.LatestTime.IsZero() || record.Time.ToTime().After(data.LatestTime) {
 			data.LatestTime = record.Time.ToTime()
 			data.LatestTotalUp = record.NetTotalUp
@@ -432,8 +366,6 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 				NetOut:         getIntPercentile(data.NetOut, 0.2),
 				NetTotalUp:     data.LatestTotalUp,
 				NetTotalDown:   data.LatestTotalDown,
-				TrafficUp:      data.TrafficUp,
-				TrafficDown:    data.TrafficDown,
 				Process:        getInt32Percentile(data.Process, high_percentile),
 				Connections:    getInt32Percentile(data.Connections, high_percentile),
 				ConnectionsUdp: getInt32Percentile(data.ConnectionsUdp, high_percentile),
@@ -459,161 +391,4 @@ func migrateOldRecordsAt(db *gorm.DB, now time.Time) error {
 
 		return nil
 	})
-}
-
-type trafficClearBaseline struct {
-	At   time.Time
-	Up   int64
-	Down int64
-}
-
-func getTrafficClearBaselines(db *gorm.DB, records []models.Record) (map[string]trafficClearBaseline, error) {
-	baselines := make(map[string]trafficClearBaseline)
-	if !db.Migrator().HasTable(&models.Client{}) {
-		return baselines, nil
-	}
-
-	clientIDs := make([]string, 0)
-	seen := make(map[string]struct{})
-	for _, record := range records {
-		if record.Client == "" {
-			continue
-		}
-		if _, exists := seen[record.Client]; exists {
-			continue
-		}
-		seen[record.Client] = struct{}{}
-		clientIDs = append(clientIDs, record.Client)
-	}
-	if len(clientIDs) == 0 {
-		return baselines, nil
-	}
-
-	var clients []models.Client
-	if err := db.Select("uuid", "traffic_cleared_at", "traffic_baseline_up", "traffic_baseline_down").
-		Where("uuid IN ?", clientIDs).
-		Find(&clients).Error; err != nil {
-		return nil, err
-	}
-	for _, client := range clients {
-		clearedAt := client.TrafficClearedAt.ToTime()
-		if clearedAt.IsZero() {
-			continue
-		}
-		baselines[client.UUID] = trafficClearBaseline{
-			At:   clearedAt,
-			Up:   client.TrafficBaselineUp,
-			Down: client.TrafficBaselineDown,
-		}
-	}
-	return baselines, nil
-}
-
-// trafficCompactionSlot splits the one 15-minute bucket containing a manual
-// traffic clear at the exact clear time. This keeps pre-clear deltas excluded
-// while preserving every post-clear delta after raw history is compacted.
-func trafficCompactionSlot(recordTime, clearedAt time.Time) time.Time {
-	slot := recordTime.Truncate(longTermRecordInterval)
-	if clearedAt.After(slot) &&
-		clearedAt.Before(slot.Add(longTermRecordInterval)) &&
-		!recordTime.Before(clearedAt) {
-		return clearedAt
-	}
-	return slot
-}
-
-func getPreviousTrafficRecordsBefore(db *gorm.DB, records []models.Record) (map[string]*models.Record, error) {
-	firstTimeByClient := make(map[string]time.Time)
-	for _, record := range records {
-		recordTime := record.Time.ToTime()
-		firstTime, ok := firstTimeByClient[record.Client]
-		if !ok || recordTime.Before(firstTime) {
-			firstTimeByClient[record.Client] = recordTime
-		}
-	}
-
-	previousByClient := make(map[string]*models.Record, len(firstTimeByClient))
-	for clientUUID, firstTime := range firstTimeByClient {
-		previous, err := getPreviousTrafficRecordBefore(db, clientUUID, firstTime)
-		if err != nil {
-			return nil, err
-		}
-		if previous != nil {
-			previousByClient[clientUUID] = previous
-		}
-	}
-	return previousByClient, nil
-}
-
-func getPreviousTrafficRecordBefore(db *gorm.DB, clientUUID string, before time.Time) (*models.Record, error) {
-	var latest *models.Record
-	for _, table := range []string{"records", "records_long_term"} {
-		var record models.Record
-		queryBefore := before
-		if table == "records_long_term" {
-			queryBefore = before.Truncate(15 * time.Minute)
-		}
-		err := db.Table(table).
-			Where("client = ? AND time < ?", clientUUID, models.FromTime(queryBefore)).
-			Order("time DESC").
-			First(&record).Error
-		if err == nil {
-			if latest == nil || record.Time.ToTime().After(latest.Time.ToTime()) {
-				latest = &record
-			}
-			continue
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-	}
-	return latest, nil
-}
-
-func repairZeroTrafficDeltas(records []models.Record, previousByClient map[string]*models.Record) {
-	repairZeroTrafficDeltasWithBaselines(records, previousByClient, nil)
-}
-
-func repairZeroTrafficDeltasWithBaselines(
-	records []models.Record,
-	previousByClient map[string]*models.Record,
-	baselines map[string]trafficClearBaseline,
-) {
-	recordsByClient := make(map[string][]*models.Record)
-	for i := range records {
-		recordsByClient[records[i].Client] = append(recordsByClient[records[i].Client], &records[i])
-	}
-
-	for _, clientRecords := range recordsByClient {
-		sort.Slice(clientRecords, func(i, j int) bool {
-			return clientRecords[i].Time.ToTime().Before(clientRecords[j].Time.ToTime())
-		})
-		var previous *models.Record
-		if previousByClient != nil {
-			previous = previousByClient[clientRecords[0].Client]
-		}
-		for _, current := range clientRecords {
-			if baseline, ok := baselines[current.Client]; ok &&
-				!current.Time.ToTime().Before(baseline.At) &&
-				(previous == nil || previous.Time.ToTime().Before(baseline.At)) {
-				previous = &models.Record{
-					Client:       current.Client,
-					Time:         models.FromTime(baseline.At),
-					NetTotalUp:   baseline.Up,
-					NetTotalDown: baseline.Down,
-				}
-			}
-			if previous == nil {
-				previous = current
-				continue
-			}
-			if current.TrafficUp == 0 {
-				current.TrafficUp = utils.ComputeTrafficDelta(current.NetTotalUp, previous.NetTotalUp)
-			}
-			if current.TrafficDown == 0 {
-				current.TrafficDown = utils.ComputeTrafficDelta(current.NetTotalDown, previous.NetTotalDown)
-			}
-			previous = current
-		}
-	}
 }

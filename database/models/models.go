@@ -41,14 +41,6 @@ type Client struct {
 	TrafficResetHour    int       `json:"traffic_reset_hour" gorm:"type:int;default:0"`
 	TrafficResetMinute  int       `json:"traffic_reset_minute" gorm:"type:int;default:0"`
 	TrafficResetEnabled bool      `json:"traffic_reset_enabled" gorm:"type:boolean;default:true"`
-	TrafficComp         int64     `json:"traffic_compensation" gorm:"column:traffic_compensation;type:bigint;default:0"`
-	TrafficCarry        int64     `json:"-" gorm:"column:traffic_carry;type:bigint;default:0"` // Legacy aggregate; migrated into the directional fields below.
-	TrafficCarryUp      int64     `json:"-" gorm:"column:traffic_carry_up;type:bigint;default:0"`
-	TrafficCarryDown    int64     `json:"-" gorm:"column:traffic_carry_down;type:bigint;default:0"`
-	TrafficCompResetAt  LocalTime `json:"traffic_compensation_reset_at" gorm:"column:traffic_compensation_reset_at"`
-	TrafficClearedAt    LocalTime `json:"traffic_cleared_at" gorm:"column:traffic_cleared_at"`
-	TrafficBaselineUp   int64     `json:"-" gorm:"column:traffic_baseline_up;type:bigint;default:0"`
-	TrafficBaselineDown int64     `json:"-" gorm:"column:traffic_baseline_down;type:bigint;default:0"`
 	PingTaskOrder       UintArray `json:"ping_task_order" gorm:"type:longtext"`
 	CreatedAt           LocalTime `json:"created_at"`
 	UpdatedAt           LocalTime `json:"updated_at"`
@@ -99,8 +91,6 @@ type Record struct {
 	NetOut         int64     `json:"net_out" gorm:"type:bigint"`
 	NetTotalUp     int64     `json:"net_total_up" gorm:"type:bigint"`
 	NetTotalDown   int64     `json:"net_total_down" gorm:"type:bigint"`
-	TrafficUp      int64     `json:"traffic_up" gorm:"type:bigint"`
-	TrafficDown    int64     `json:"traffic_down" gorm:"type:bigint"`
 	Process        int       `json:"process"`
 	Connections    int       `json:"connections"`
 	ConnectionsUdp int       `json:"connections_udp"`

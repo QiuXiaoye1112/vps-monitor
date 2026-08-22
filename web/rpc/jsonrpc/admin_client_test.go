@@ -31,15 +31,17 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 		"traffic_reset_day",
 		"traffic_reset_hour",
 		"traffic_reset_minute",
-		"traffic_compensation",
 		"traffic_reset_enabled",
 	} {
 		if _, ok := update[key]; !ok {
 			t.Fatalf("expected update field %q to be kept", key)
 		}
 	}
+	if _, ok := update["traffic_compensation"]; ok {
+		t.Fatal("traffic_compensation must not be accepted")
+	}
 	if _, ok := update["traffic_compensation_base"]; ok {
-		t.Fatal("traffic_compensation_base must not affect the stored compensation")
+		t.Fatal("traffic_compensation_base must not be accepted")
 	}
 	if _, ok := update["token"]; ok {
 		t.Fatal("token must not be accepted during client creation update")
@@ -52,8 +54,5 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 	}
 	if got, ok := update["traffic_reset_minute"].(int); !ok || got != 37 {
 		t.Fatalf("traffic_reset_minute = %#v, want int(37)", update["traffic_reset_minute"])
-	}
-	if got, ok := update["traffic_compensation"].(int64); !ok || got != -2*1024*1024*1024 {
-		t.Fatalf("traffic_compensation = %#v, want int64 -2GiB", update["traffic_compensation"])
 	}
 }

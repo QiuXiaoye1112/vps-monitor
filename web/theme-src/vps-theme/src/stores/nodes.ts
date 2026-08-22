@@ -28,7 +28,6 @@ export interface NodeData {
   traffic_reset_hour?: number
   traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
-  traffic_compensation?: number
   mem_total: number
   swap_total: number
   disk_total: number
@@ -64,6 +63,7 @@ export interface NodeData {
   net_out: number
   net_total_up: number
   net_total_down: number
+  monthly_traffic?: number
   traffic_up?: number
   traffic_down?: number
   process: number
@@ -93,11 +93,11 @@ interface StatusData {
   net_out: number
   net_total_up: number
   net_total_down: number
+  monthly_traffic?: number
   traffic_reset_day?: number
   traffic_reset_hour?: number
   traffic_reset_minute?: number
   traffic_reset_enabled?: boolean
-  traffic_compensation?: number
   traffic_up?: number
   traffic_down?: number
   process: number
@@ -195,7 +195,6 @@ const useNodesStore = defineStore('nodes', () => {
       traffic_reset_hour: client.traffic_reset_hour,
       traffic_reset_minute: client.traffic_reset_minute,
       traffic_reset_enabled: client.traffic_reset_enabled,
-      traffic_compensation: client.traffic_compensation,
       mem_total: client.mem_total,
       swap_total: client.swap_total,
       disk_total: client.disk_total,
@@ -231,6 +230,7 @@ const useNodesStore = defineStore('nodes', () => {
       net_out: 0,
       net_total_up: 0,
       net_total_down: 0,
+      monthly_traffic: 0,
       traffic_up: 0,
       traffic_down: 0,
       process: 0,
@@ -279,6 +279,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.net_total_up = status.net_total_up
     if (node.net_total_down !== status.net_total_down)
       node.net_total_down = status.net_total_down
+    if (node.monthly_traffic !== status.monthly_traffic)
+      node.monthly_traffic = status.monthly_traffic
     if (node.traffic_reset_day !== status.traffic_reset_day)
       node.traffic_reset_day = status.traffic_reset_day
     if (node.traffic_reset_hour !== status.traffic_reset_hour)
@@ -287,8 +289,6 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_minute = status.traffic_reset_minute
     if (node.traffic_reset_enabled !== status.traffic_reset_enabled)
       node.traffic_reset_enabled = status.traffic_reset_enabled
-    if (node.traffic_compensation !== status.traffic_compensation)
-      node.traffic_compensation = status.traffic_compensation
     if (node.traffic_up !== status.traffic_up)
       node.traffic_up = status.traffic_up
     if (node.traffic_down !== status.traffic_down)
@@ -349,8 +349,6 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_minute = client.traffic_reset_minute
     if (node.traffic_reset_enabled !== client.traffic_reset_enabled)
       node.traffic_reset_enabled = client.traffic_reset_enabled
-    if (node.traffic_compensation !== client.traffic_compensation)
-      node.traffic_compensation = client.traffic_compensation
     if (node.mem_total !== client.mem_total)
       node.mem_total = client.mem_total
     if (node.swap_total !== client.swap_total)

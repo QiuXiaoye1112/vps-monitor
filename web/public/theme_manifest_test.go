@@ -73,6 +73,8 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 		`l: "亮色背景 URL"`,
 		`l: "暗色背景 URL"`,
 		`o: ["image", "video"]`,
+		`traffic_compensation`,
+		`流量补偿`,
 	} {
 		if strings.Contains(html, removed) {
 			t.Fatalf("removed admin feature %q is still present", removed)

@@ -305,9 +305,6 @@ func GetDBInstance() *gorm.DB {
 		if err != nil {
 			log.Fatalf("Failed to create tables: %v", err)
 		}
-		if err := migrations.BackfillTrafficCarry(instance); err != nil {
-			log.Fatalf("Failed to migrate traffic carry: %v", err)
-		}
 		if err := migrations.BackfillClientPingTaskOrder(instance); err != nil {
 			log.Fatalf("Failed to migrate client Ping task order: %v", err)
 		}

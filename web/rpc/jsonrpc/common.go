@@ -13,7 +13,6 @@ import (
 	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
-	"github.com/monitor-monitor/monitor/database/records"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/config"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
@@ -25,28 +24,8 @@ import (
 	cache "github.com/patrickmn/go-cache"
 )
 
-func adjustedTrafficTotals(up, down, compensation int64) (int64, int64) {
-	half := compensation / 2
-	remainder := compensation % 2
-	adjustedUp := up + half + remainder
-	adjustedDown := down + half
-	if adjustedUp < 0 {
-		adjustedDown += adjustedUp
-		adjustedUp = 0
-	}
-	if adjustedDown < 0 {
-		adjustedUp += adjustedDown
-		adjustedDown = 0
-	}
-	if adjustedUp < 0 {
-		adjustedUp = 0
-	}
-	return adjustedUp, adjustedDown
-}
-
 // pingstats:<uuid>:<enabled-scoped-task-ids>
 var pingStatsCache = cache.New(1*time.Minute, 2*time.Minute)
-var monthlyTrafficCache = cache.New(cache.NoExpiration, 10*time.Minute)
 
 type pingStat struct {
 	Name   string  `json:"name"`
@@ -388,11 +367,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		NetOut              int64               `json:"net_out"`
 		NetTotalUp          int64               `json:"net_total_up"`
 		NetTotalDown        int64               `json:"net_total_down"`
-		RawNetTotalUp       int64               `json:"raw_net_total_up"`
-		RawNetTotalDown     int64               `json:"raw_net_total_down"`
 		MonthlyTraffic      int64               `json:"monthly_traffic"`
-		MonthlyTrafficRaw   int64               `json:"monthly_traffic_raw"`
-		TrafficCompensation int64               `json:"traffic_compensation"`
 		TrafficResetDay     int                 `json:"traffic_reset_day"`
 		TrafficResetHour    int                 `json:"traffic_reset_hour"`
 		TrafficResetMinute  int                 `json:"traffic_reset_minute"`
@@ -415,32 +390,9 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			return
 		}
 		stats := getPingStatsForNode(uuid, pingTasks, clientByUUID[uuid].PingTaskOrder)
-		monthlyUp := rep.Network.TotalUp
-		monthlyDown := rep.Network.TotalDown
-		var monthly records.MonthlyTraffic
-		if client, ok := clientByUUID[uuid]; ok {
-			if mt, err := records.CurrentMonthlyTraffic(client, time.Now()); err == nil {
-				monthly = mt
-				monthlyTrafficCache.Set(uuid, mt, cache.NoExpiration)
-				monthlyUp, monthlyDown = adjustedTrafficTotals(
-					mt.Up+mt.CarryUp,
-					mt.Down+mt.CarryDown,
-					mt.Compensation,
-				)
-			} else if cached, found := monthlyTrafficCache.Get(uuid); found {
-				if mt, valid := cached.(records.MonthlyTraffic); valid {
-					monthly = mt
-					monthlyUp, monthlyDown = adjustedTrafficTotals(
-						mt.Up+mt.CarryUp,
-						mt.Down+mt.CarryDown,
-						mt.Compensation,
-					)
-				}
-				log.Printf("failed to calculate monthly traffic for %s, using last known value: %v", uuid, err)
-			} else {
-				log.Printf("failed to calculate monthly traffic for %s and no cached value is available: %v", uuid, err)
-			}
-		}
+		monthlyUp := maxInt64(0, rep.Network.TotalUp)
+		monthlyDown := maxInt64(0, rep.Network.TotalDown)
+		monthlyTotal := saturatingInt64Add(monthlyUp, monthlyDown)
 		resetDay := clientByUUID[uuid].TrafficResetDay
 		if !clientByUUID[uuid].TrafficResetEnabled {
 			resetDay = 0
@@ -463,11 +415,7 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 			NetOut:              rep.Network.Up,
 			NetTotalUp:          monthlyUp,
 			NetTotalDown:        monthlyDown,
-			RawNetTotalUp:       rep.Network.TotalUp,
-			RawNetTotalDown:     rep.Network.TotalDown,
-			MonthlyTraffic:      monthlyUp + monthlyDown,
-			MonthlyTrafficRaw:   monthly.RawTotal,
-			TrafficCompensation: monthly.Compensation,
+			MonthlyTraffic:      monthlyTotal,
 			TrafficResetDay:     resetDay,
 			TrafficResetHour:    clientByUUID[uuid].TrafficResetHour,
 			TrafficResetMinute:  clientByUUID[uuid].TrafficResetMinute,
@@ -505,10 +453,21 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	return respMap, nil
 }
 
-func applyTrafficCompensation(up, down, compensation int64) (int64, int64) {
-	half := compensation / 2
-	rem := compensation % 2
-	return up + half + rem, down + half
+func saturatingInt64Add(left, right int64) int64 {
+	if right > 0 && left > math.MaxInt64-right {
+		return math.MaxInt64
+	}
+	if right < 0 && left < math.MinInt64-right {
+		return math.MinInt64
+	}
+	return left + right
+}
+
+func maxInt64(left, right int64) int64 {
+	if left > right {
+		return left
+	}
+	return right
 }
 
 func getMe(ctx context.Context, _ *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {

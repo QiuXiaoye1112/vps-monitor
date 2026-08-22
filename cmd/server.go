@@ -18,7 +18,6 @@ import (
 	"github.com/monitor-monitor/monitor/database"
 	"github.com/monitor-monitor/monitor/database/accounts"
 	"github.com/monitor-monitor/monitor/database/auditlog"
-	"github.com/monitor-monitor/monitor/database/clients"
 	"github.com/monitor-monitor/monitor/database/dbcore"
 	"github.com/monitor-monitor/monitor/database/models"
 	"github.com/monitor-monitor/monitor/database/records"
@@ -168,7 +167,6 @@ func DoScheduledWork() {
 }
 
 func cleanupScheduledData() {
-	clients.ResetTrafficCompensationForDueClients()
 	records.CompactRecord()
 	records.DeleteRecordBefore(time.Now().Add(-time.Hour * time.Duration(config.DefaultRecordPreserveTime)))
 	records.DeleteHistoryBefore(time.Now().Add(-7 * 24 * time.Hour))
@@ -185,7 +183,6 @@ func minuteScheduledWork() {
 		records.DeleteAll()
 		tasks.DeleteAllPingRecords()
 	}
-	clients.ResetTrafficCompensationForDueClients()
 }
 
 func historyScheduledWork() {

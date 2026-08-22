@@ -126,6 +126,18 @@ func handleV2RPC(uuid string, req v2.Request, allowWait bool) v2.Response {
 			return v2.Error(req.ID, -32004, "traffic snapshot is no longer pending", err.Error())
 		}
 		return v2.Success(req.ID, gin.H{"status": "success"})
+	case v2.MethodAgentTrafficResetResult:
+		var params v2.TrafficResetResultParams
+		if err := bindV2Params(req.Params, &params); err != nil {
+			return v2.Error(req.ID, -32602, "invalid traffic reset params", err.Error())
+		}
+		if err := agent_runtime.ResolveTrafficReset(uuid, params); err != nil {
+			if errors.Is(err, agent_runtime.ErrTrafficSnapshotNotPending) {
+				return v2.Success(req.ID, gin.H{"status": "ignored"})
+			}
+			return v2.Error(req.ID, -32004, "traffic reset is no longer pending", err.Error())
+		}
+		return v2.Success(req.ID, gin.H{"status": "success"})
 	case v2.MethodAgentPull:
 		var params v2.PullParams
 		if err := bindV2Params(req.Params, &params); err != nil {
@@ -196,6 +208,17 @@ func WebSocketV2RPC(c *gin.Context) {
 	defer func() {
 		agent_runtime.DeleteClientConditionally(uuid, conn)
 	}()
+	if clientConfig, err := clients.GetClientByUUID(uuid); err != nil {
+		log.Printf("failed to load traffic config for %s: %v", uuid, err)
+	} else {
+		agent_runtime.EnqueueTrafficConfig(uuid, v2.TrafficConfigParams{
+			Enabled:  clientConfig.TrafficResetEnabled,
+			Day:      clientConfig.TrafficResetDay,
+			Hour:     clientConfig.TrafficResetHour,
+			Minute:   clientConfig.TrafficResetMinute,
+			Timezone: "Asia/Shanghai",
+		})
+	}
 	if !pushQueuedV2Events(conn, uuid) {
 		return
 	}

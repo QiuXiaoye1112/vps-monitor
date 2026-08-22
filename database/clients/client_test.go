@@ -82,22 +82,26 @@ func TestSaveClientStoresLocalTimeUpdatesInConfiguredFormat(t *testing.T) {
 	require.NoError(t, db.Create(&models.Client{
 		UUID:                "node-1",
 		Token:               "token-1",
-		TrafficComp:         1,
 		TrafficResetEnabled: true,
 	}).Error)
 
 	now := time.Date(2026, time.August, 10, 3, 45, 0, 0, time.UTC)
 	require.NoError(t, saveClient(db, map[string]interface{}{
-		"uuid":                 "node-1",
-		"traffic_compensation": 2,
+		"uuid":                          "node-1",
+		"name":                          "updated",
+		"traffic_compensation":          123,
+		"traffic_compensation_base":     456,
+		"traffic_compensation_reset_at": now,
 	}, now))
 
-	var updatedAt, resetAt string
-	require.NoError(t, db.Table("clients").Select("CAST(updated_at AS TEXT), CAST(traffic_compensation_reset_at AS TEXT)").Where("uuid = ?", "node-1").Row().Scan(&updatedAt, &resetAt))
+	var updatedAt string
+	require.NoError(t, db.Table("clients").Select("CAST(updated_at AS TEXT)").Where("uuid = ?", "node-1").Row().Scan(&updatedAt))
 	expected, err := models.FromTime(now).Value()
 	require.NoError(t, err)
 	require.Equal(t, expected, updatedAt)
-	require.Equal(t, expected, resetAt)
+	var saved models.Client
+	require.NoError(t, db.First(&saved, "uuid = ?", "node-1").Error)
+	require.Equal(t, "updated", saved.Name)
 }
 
 func TestUpdateLastReportAtPersistsAcrossClientReload(t *testing.T) {

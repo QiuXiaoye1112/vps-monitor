@@ -26,6 +26,16 @@ type pendingTrafficSnapshot struct {
 // sample. The operation is intentionally synchronous: strict clearing must not
 // report success until the counter boundary has actually been captured.
 func RequestTrafficSnapshot(uuid string, timeout time.Duration) (v2.TrafficSnapshotResultParams, error) {
+	return requestTrafficOperation(uuid, timeout, v2.MethodAgentTrafficSnapshot)
+}
+
+// RequestTrafficReset asks the Agent to atomically reset its local traffic
+// ledger. The center does not maintain a second baseline or cumulative ledger.
+func RequestTrafficReset(uuid string, timeout time.Duration) (v2.TrafficResetResultParams, error) {
+	return requestTrafficOperation(uuid, timeout, v2.MethodAgentTrafficReset)
+}
+
+func requestTrafficOperation(uuid string, timeout time.Duration, method string) (v2.TrafficSnapshotResultParams, error) {
 	if !IsV2Client(uuid) || !IsAgentOnline(uuid) {
 		return v2.TrafficSnapshotResultParams{}, errors.New("Agent 离线或版本过低，无法严格清零")
 	}
@@ -44,9 +54,11 @@ func RequestTrafficSnapshot(uuid string, timeout time.Duration) (v2.TrafficSnaps
 		trafficSnapshotMu.Unlock()
 	}()
 
-	if !DispatchV2Event(uuid, v2.MethodAgentTrafficSnapshot, v2.TrafficSnapshotParams{
-		OperationID: operationID,
-	}) {
+	var params any = v2.TrafficSnapshotParams{OperationID: operationID}
+	if method == v2.MethodAgentTrafficReset {
+		params = v2.TrafficResetParams{OperationID: operationID}
+	}
+	if !DispatchV2Event(uuid, method, params) {
 		return v2.TrafficSnapshotResultParams{}, errors.New("Agent 不支持严格流量清零")
 	}
 
@@ -84,4 +96,8 @@ func ResolveTrafficSnapshot(uuid string, result v2.TrafficSnapshotResultParams) 
 	default:
 	}
 	return nil
+}
+
+func ResolveTrafficReset(uuid string, result v2.TrafficResetResultParams) error {
+	return ResolveTrafficSnapshot(uuid, result)
 }

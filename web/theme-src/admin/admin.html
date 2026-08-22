@@ -979,7 +979,7 @@
             titleId +
             '">确认清零流量</h3><div class="traffic-confirm-node">节点：' +
             E(nodeName || "未命名节点") +
-            '</div></div><button class="btn btn-ghost traffic-confirm-close" type="button" aria-label="关闭">×</button></div><div class="traffic-confirm-body"><p class="traffic-confirm-lead">将以 Agent 当前的即时流量快照建立新的统计起点。此操作无法撤销。</p><div class="traffic-confirm-summary"><div class="traffic-confirm-row"><span class="traffic-confirm-label">清零内容</span><span class="traffic-confirm-value">累计上行、累计下行、流量补偿</span></div><div class="traffic-confirm-row"><span class="traffic-confirm-label">自动清零计划</span><span class="traffic-confirm-value">保持不变，不移动周期起点</span></div></div><div class="traffic-confirm-note"><span>●</span><span>Agent 必须在线并支持严格快照。任何一步失败都不会修改当前流量。</span></div><div class="traffic-confirm-error" style="display:none"></div><div class="traffic-confirm-actions"><button class="btn btn-outline traffic-confirm-cancel" type="button">取消</button><button class="btn btn-danger traffic-confirm-submit" type="button">确认清零</button></div></div></div></div>',
+            '</div></div><button class="btn btn-ghost traffic-confirm-close" type="button" aria-label="关闭">×</button></div><div class="traffic-confirm-body"><p class="traffic-confirm-lead">将立即清零 Agent 本地的本月流量账本。此操作无法撤销。</p><div class="traffic-confirm-summary"><div class="traffic-confirm-row"><span class="traffic-confirm-label">清零内容</span><span class="traffic-confirm-value">本月累计上行、本月累计下行</span></div><div class="traffic-confirm-row"><span class="traffic-confirm-label">自动清零计划</span><span class="traffic-confirm-value">保持不变，不移动周期起点</span></div></div><div class="traffic-confirm-note"><span>●</span><span>Agent 必须在线并支持严格清零。任何一步失败都不会修改当前流量。</span></div><div class="traffic-confirm-error" style="display:none"></div><div class="traffic-confirm-actions"><button class="btn btn-outline traffic-confirm-cancel" type="button">取消</button><button class="btn btn-danger traffic-confirm-submit" type="button">确认清零</button></div></div></div></div>',
         );
         var busy = false;
         var cancelButton = ov.querySelector(".traffic-confirm-cancel");
@@ -1161,7 +1161,7 @@
               ).padStart(2, "0") +
               '"></div></div><p class="text-xs text-muted mb-3">每月到达所设日期和时间时执行；当月没有所填日期时，使用该月最后一天。</p>' +
               (canClearNow
-                ? '<div class="traffic-plan-danger"><div class="traffic-plan-danger-title">立即清零流量</div><div class="traffic-plan-danger-copy">立即建立新的流量统计起点并清空流量补偿，不会改变上面的自动清零计划。</div><button class="btn btn-danger w-full traffic-plan-clear-now" type="button">立即清零</button></div>'
+                ? '<div class="traffic-plan-danger"><div class="traffic-plan-danger-title">立即清零流量</div><div class="traffic-plan-danger-copy">立即清零 Agent 本地的本月累计流量，不会改变上面的自动清零计划。</div><button class="btn btn-danger w-full traffic-plan-clear-now" type="button">立即清零</button></div>'
                 : "") +
               '<div class="flex gap-2 mt-4"><button class="btn btn-outline traffic-plan-cancel" style="flex:1" type="button">取消</button><button class="btn btn-primary traffic-plan-apply" style="flex:1" type="button">应用</button></div>',
           );
@@ -1989,7 +1989,6 @@
         var nrd = n.traffic_reset_day || 1;
         var nrh = n.traffic_reset_hour || 0;
         var nrm = n.traffic_reset_minute || 0;
-        var ncomp = ((n.traffic_compensation || 0) / 1073741824).toFixed(2);
         var nre =
           n.traffic_reset_enabled !== undefined
             ? n.traffic_reset_enabled
@@ -2027,11 +2026,9 @@
             '>下行</option></select></div><div class="form-group">' +
             renderTrafficPlanControl(id, nrd, nrh, nrm) +
             "</div></div>" +
-            '<div class="modal-grid"><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="' +
-            ncomp +
-            '"></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
+            '<div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
             ntl +
-            '"></div></div>' +
+            '"></div>' +
             renderNodePingSelector(pingTasks, n.ping_task_order || []) +
             '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>',
         );
@@ -2039,16 +2036,12 @@
         bindNodePingSelector(editForm);
         bindTrafficPlan(editForm, n.name, async function () {
             await RPCStrict("admin:resetClientTraffic", { uuid: uuid });
-            document.querySelector(
-              "#ef" + id + ' [name="traffic_compensation"]',
-            ).value = "0.00";
-            toast("累计流量和流量补偿已清零");
+            toast("本月累计流量已清零");
         });
         editForm.onsubmit = async function (e) {
           e.preventDefault();
           var f = new FormData(e.target);
           var submitButton = e.target.querySelector('button[type="submit"]');
-          var compGB = parseFloat(f.get("traffic_compensation")) || 0;
           var data = {
             uuid: uuid,
             name: f.get("name"),
@@ -2061,7 +2054,6 @@
             traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
             traffic_reset_minute:
               parseInt(f.get("traffic_reset_minute")) || 0,
-            traffic_compensation: Math.round(compGB * 1073741824),
             traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
             ping_task_order: collectNodePingOrder(e.target),
           };
@@ -2532,8 +2524,8 @@
                 '<div class="modal-grid"><div class="form-group"><label>阈值类型</label><select name="traffic_limit_type"><option value="sum" selected>合计</option><option value="up">上行</option><option value="down">下行</option></select></div><div class="form-group">' +
                 renderTrafficPlanControl(id, 1, 0, 0) +
                 "</div></div>" +
-                '<div class="modal-grid"><div class="form-group"><label>流量补偿 (GB)</label><input name="traffic_compensation" type="number" step="0.01" value="0.00"></div><div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="0"></div></div>' +
-                '<div class="text-xs text-muted mt-1">流量补偿支持负数，每月到达自动清零时间后清零。</div><button class="btn btn-primary w-full mt-3" type="submit">创建</button></form>',
+                '<div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="0"></div>' +
+                '<button class="btn btn-primary w-full mt-3" type="submit">创建</button></form>',
             );
             var addForm = _d.getElementById("anf" + id);
             addForm
@@ -2550,7 +2542,6 @@
               var submitButton = e.target.querySelector(
                 'button[type="submit"]',
               );
-              var compGB = parseFloat(f.get("traffic_compensation")) || 0;
               var data = {
                 name: f.get("name"),
                 group: f.get("group"),
@@ -2562,7 +2553,6 @@
                 traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
                 traffic_reset_minute:
                   parseInt(f.get("traffic_reset_minute")) || 0,
-                traffic_compensation: Math.round(compGB * 1073741824),
                 traffic_reset_enabled:
                   f.get("traffic_reset_enabled") === "true",
                 ping_task_order: collectNodePingOrder(e.target),

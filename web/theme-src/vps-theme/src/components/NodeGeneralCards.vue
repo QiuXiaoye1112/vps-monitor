@@ -8,6 +8,7 @@ import { CardX } from '@/components/ui/card-x'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { formatBytesPerSecondSplit, formatBytesSplit } from '@/utils/helper'
+import { getTotalTraffic } from '@/utils/nodeMetricsHelper'
 
 interface GeneralMetricCard {
   key: GeneralCardKey
@@ -57,16 +58,12 @@ onBeforeUnmount(() => {
 })
 
 const totalTraffic = computed(() => summaryNodes.value.reduce(
-  (result, node) => {
-    result.up += node.net_total_up || 0
-    result.down += node.net_total_down || 0
-    return result
-  },
-  { up: 0, down: 0 },
+  (result, node) => result + getTotalTraffic(node),
+  0,
 ))
 
 const formattedTraffic = computed(() => formatBytesSplit(
-  totalTraffic.value.up + totalTraffic.value.down,
+  totalTraffic.value,
   appStore.byteDecimals,
 ))
 const formattedSpeedUp = computed(() => formatBytesPerSecondSplit(displayedTotalSpeed.value.up, appStore.byteDecimals))

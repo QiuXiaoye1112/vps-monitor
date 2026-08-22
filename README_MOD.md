@@ -58,7 +58,6 @@ monitor-agent/                 # 被控节点 Agent（Go，独立项目）
 | 字段 | 说明 |
 |------|------|
 | `traffic_reset_day` / `traffic_reset_hour` | 流量重置时间（中心主机 Asia/Shanghai 时区计算） |
-| `traffic_compensation` | 流量补偿值 |
 
 ## 编译
 
