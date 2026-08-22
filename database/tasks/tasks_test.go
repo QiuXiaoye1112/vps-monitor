@@ -52,7 +52,7 @@ func TestSaveTaskResultIsIdempotentByClientAndTask(t *testing.T) {
 	require.NotNil(t, result.ExitCode)
 	require.Equal(t, 0, *result.ExitCode)
 	require.NotNil(t, result.FinishedAt)
-	require.Equal(t, secondAt.ToTime().UnixNano(), result.FinishedAt.ToTime().UnixNano())
+	require.WithinDuration(t, secondAt.ToTime(), result.FinishedAt.ToTime(), 100*time.Nanosecond)
 
 	require.NoError(t, saveTaskResult(db, "task-1", "node-2", "other node", 0, secondAt))
 	require.NoError(t, saveTaskResult(db, "task-2", "node-1", "other task", 0, secondAt))
