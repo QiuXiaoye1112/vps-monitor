@@ -121,3 +121,27 @@ func TestUpdateLastReportAtPersistsAcrossClientReload(t *testing.T) {
 	require.True(t, reloaded.LastReportAt.ToTime().Equal(reportedAt))
 	require.True(t, reloaded.UpdatedAt.ToTime().Equal(updatedAt.ToTime()))
 }
+
+func TestValidateTrafficResetTimezone(t *testing.T) {
+	for _, value := range []string{"UTC", "UTC+08:00", "UTC-05:30", "Asia/Tokyo", "America/New_York"} {
+		require.NoError(t, ValidateTrafficResetTimezone(value), value)
+	}
+	for _, value := range []string{"", "UTC+15:00", "UTC+08:99", "UTC+8:5", "Mars/Olympus"} {
+		require.Error(t, ValidateTrafficResetTimezone(value), value)
+	}
+}
+
+func TestSaveClientPersistsTrafficResetTimezone(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.Client{}))
+	require.NoError(t, db.Create(&models.Client{UUID: "node-timezone", Token: "token-timezone"}).Error)
+
+	require.NoError(t, saveClient(db, map[string]interface{}{
+		"uuid":                   "node-timezone",
+		"traffic_reset_timezone": "UTC-05:00",
+	}, time.Now()))
+	var saved models.Client
+	require.NoError(t, db.First(&saved, "uuid = ?", "node-timezone").Error)
+	require.Equal(t, "UTC-05:00", saved.TrafficResetTimezone)
+}

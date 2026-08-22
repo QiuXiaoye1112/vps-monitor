@@ -175,7 +175,7 @@ func buildSQLiteDSN(databaseFile string) string {
 		databaseFile = "./data/monitor.db"
 	}
 
-	params := "_busy_timeout=5000&_txlock=immediate&_journal_mode=WAL&_synchronous=NORMAL"
+	params := "_busy_timeout=5000&_txlock=immediate&_journal_mode=WAL&_synchronous=NORMAL&_foreign_keys=on"
 	separator := "?"
 	if strings.Contains(databaseFile, "?") {
 		separator = "&"
@@ -274,15 +274,23 @@ func GetDBInstance() *gorm.DB {
 			} else {
 				log.Printf("Failed to access underlying sql.DB for SQLite tuning: %v", dbErr)
 			}
-			instance.Exec("PRAGMA wal = ON;")
+			if err := instance.Exec("PRAGMA foreign_keys = ON;").Error; err != nil {
+				log.Printf("Failed to enable SQLite foreign keys: %v", err)
+			}
 			if err := instance.Exec("PRAGMA journal_mode = WAL;").Error; err != nil {
 				log.Printf("Failed to enable WAL mode for SQLite: %v", err)
 			}
-			instance.Exec("PRAGMA synchronous = NORMAL;")
-			instance.Exec("PRAGMA busy_timeout = 5000;")
-			instance.Exec("PRAGMA cache_size = -65536;")
-			instance.Exec("PRAGMA temp_store = MEMORY;")
-			instance.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
+			for _, pragma := range []string{
+				"PRAGMA synchronous = NORMAL;",
+				"PRAGMA busy_timeout = 5000;",
+				"PRAGMA cache_size = -65536;",
+				"PRAGMA temp_store = MEMORY;",
+				"PRAGMA wal_checkpoint(TRUNCATE);",
+			} {
+				if err := instance.Exec(pragma).Error; err != nil {
+					log.Printf("Failed to apply SQLite setting %q: %v", pragma, err)
+				}
+			}
 		default:
 			log.Fatalf("Unsupported database type: %s (supported: %s)", flags.DatabaseType, flags.SupportedDatabaseTypes())
 		}
@@ -344,7 +352,18 @@ func GetDBInstance() *gorm.DB {
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_history_record_client_time ON history_records(client, time)")
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_ping_record_client_time ON ping_records(client, time)")
 		}
-		instance.Exec("UPDATE clients SET traffic_reset_enabled = ? WHERE traffic_reset_enabled IS NULL", true)
+		if err := instance.Exec("UPDATE clients SET traffic_reset_enabled = ? WHERE traffic_reset_enabled IS NULL", true).Error; err != nil {
+			log.Printf("Failed to backfill traffic reset setting: %v", err)
+		}
+		if err := instance.Exec("UPDATE clients SET traffic_reset_timezone = ? WHERE traffic_reset_timezone IS NULL OR traffic_reset_timezone = ''", "Asia/Shanghai").Error; err != nil {
+			log.Printf("Failed to backfill traffic reset timezone: %v", err)
+		}
+		if err := instance.Exec("UPDATE clients SET traffic_adjustment_up = 0 WHERE traffic_adjustment_up IS NULL").Error; err != nil {
+			log.Printf("Failed to backfill traffic adjustment up: %v", err)
+		}
+		if err := instance.Exec("UPDATE clients SET traffic_adjustment_down = 0 WHERE traffic_adjustment_down IS NULL").Error; err != nil {
+			log.Printf("Failed to backfill traffic adjustment down: %v", err)
+		}
 	})
 
 	return instance

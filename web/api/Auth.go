@@ -15,6 +15,26 @@ import (
 	"gorm.io/gorm"
 )
 
+const maxIdentityInspectionBodySize = 1 << 20
+
+type replayBody struct {
+	io.Reader
+	io.Closer
+}
+
+func inspectRequestBody(c *gin.Context) ([]byte, bool) {
+	if c.Request.Body == nil {
+		return nil, true
+	}
+	body := c.Request.Body
+	prefix, err := io.ReadAll(io.LimitReader(body, maxIdentityInspectionBodySize+1))
+	c.Request.Body = replayBody{
+		Reader: io.MultiReader(bytes.NewReader(prefix), body),
+		Closer: body,
+	}
+	return prefix, err == nil && len(prefix) <= maxIdentityInspectionBodySize
+}
+
 const (
 	RoleAdmin  = "admin"
 	RoleClient = "client"
@@ -105,11 +125,10 @@ func extractClientToken(c *gin.Context) string {
 	}
 
 	if c.Request.Method != http.MethodGet {
-		bodyBytes, err := io.ReadAll(c.Request.Body)
-		if err != nil {
+		bodyBytes, withinLimit := inspectRequestBody(c)
+		if !withinLimit {
 			return ""
 		}
-		c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 		var bodyMap map[string]interface{}
 		if len(bodyBytes) > 0 {

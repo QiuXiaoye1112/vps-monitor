@@ -350,34 +350,35 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 	}
 
 	type recordLike struct {
-		Client              string              `json:"client"`
-		Time                models.LocalTime    `json:"time"`
-		Cpu                 float32             `json:"cpu"`
-		Ram                 int64               `json:"ram"`
-		RamTotal            int64               `json:"ram_total"`
-		Swap                int64               `json:"swap"`
-		SwapTotal           int64               `json:"swap_total"`
-		Load                float32             `json:"load"`
-		Load5               float32             `json:"load5"`
-		Load15              float32             `json:"load15"`
-		Temp                float32             `json:"temp"`
-		Disk                int64               `json:"disk"`
-		DiskTotal           int64               `json:"disk_total"`
-		NetIn               int64               `json:"net_in"`
-		NetOut              int64               `json:"net_out"`
-		NetTotalUp          int64               `json:"net_total_up"`
-		NetTotalDown        int64               `json:"net_total_down"`
-		MonthlyTraffic      int64               `json:"monthly_traffic"`
-		TrafficResetDay     int                 `json:"traffic_reset_day"`
-		TrafficResetHour    int                 `json:"traffic_reset_hour"`
-		TrafficResetMinute  int                 `json:"traffic_reset_minute"`
-		TrafficResetEnabled bool                `json:"traffic_reset_enabled"`
-		Process             int                 `json:"process"`
-		Connections         int                 `json:"connections"`
-		ConnectionsUdp      int                 `json:"connections_udp"`
-		Online              bool                `json:"online"`
-		Uptime              int64               `json:"uptime"`
-		Ping                map[string]pingStat `json:"ping"`
+		Client               string              `json:"client"`
+		Time                 models.LocalTime    `json:"time"`
+		Cpu                  float32             `json:"cpu"`
+		Ram                  int64               `json:"ram"`
+		RamTotal             int64               `json:"ram_total"`
+		Swap                 int64               `json:"swap"`
+		SwapTotal            int64               `json:"swap_total"`
+		Load                 float32             `json:"load"`
+		Load5                float32             `json:"load5"`
+		Load15               float32             `json:"load15"`
+		Temp                 float32             `json:"temp"`
+		Disk                 int64               `json:"disk"`
+		DiskTotal            int64               `json:"disk_total"`
+		NetIn                int64               `json:"net_in"`
+		NetOut               int64               `json:"net_out"`
+		NetTotalUp           int64               `json:"net_total_up"`
+		NetTotalDown         int64               `json:"net_total_down"`
+		MonthlyTraffic       int64               `json:"monthly_traffic"`
+		TrafficResetDay      int                 `json:"traffic_reset_day"`
+		TrafficResetHour     int                 `json:"traffic_reset_hour"`
+		TrafficResetMinute   int                 `json:"traffic_reset_minute"`
+		TrafficResetTimezone string              `json:"traffic_reset_timezone"`
+		TrafficResetEnabled  bool                `json:"traffic_reset_enabled"`
+		Process              int                 `json:"process"`
+		Connections          int                 `json:"connections"`
+		ConnectionsUdp       int                 `json:"connections_udp"`
+		Online               bool                `json:"online"`
+		Uptime               int64               `json:"uptime"`
+		Ping                 map[string]pingStat `json:"ping"`
 	}
 
 	respMap := make(map[string]recordLike, len(latest))
@@ -392,40 +393,50 @@ func getNodesLatestStatus(ctx context.Context, req *rpc.JsonRpcRequest) (any, *r
 		stats := getPingStatsForNode(uuid, pingTasks, clientByUUID[uuid].PingTaskOrder)
 		monthlyUp := maxInt64(0, rep.Network.TotalUp)
 		monthlyDown := maxInt64(0, rep.Network.TotalDown)
+		client := clientByUUID[uuid]
+		if trafficAdjustmentApplies(client, rep) {
+			monthlyUp = adjustedTrafficValue(monthlyUp, client.TrafficAdjustmentUp)
+			monthlyDown = adjustedTrafficValue(monthlyDown, client.TrafficAdjustmentDown)
+		}
 		monthlyTotal := saturatingInt64Add(monthlyUp, monthlyDown)
-		resetDay := clientByUUID[uuid].TrafficResetDay
-		if !clientByUUID[uuid].TrafficResetEnabled {
+		resetDay := client.TrafficResetDay
+		resetTimezone := client.TrafficResetTimezone
+		if resetTimezone == "" {
+			resetTimezone = "Asia/Shanghai"
+		}
+		if !client.TrafficResetEnabled {
 			resetDay = 0
 		}
 		rl := recordLike{
-			Client:              uuid,
-			Time:                models.FromTime(rep.UpdatedAt),
-			Cpu:                 float32(rep.CPU.Usage),
-			Ram:                 rep.Ram.Used,
-			RamTotal:            rep.Ram.Total,
-			Swap:                rep.Swap.Used,
-			SwapTotal:           rep.Swap.Total,
-			Load:                float32(rep.Load.Load1),
-			Load5:               float32(rep.Load.Load5),
-			Load15:              float32(rep.Load.Load15),
-			Temp:                0,
-			Disk:                rep.Disk.Used,
-			DiskTotal:           rep.Disk.Total,
-			NetIn:               rep.Network.Down,
-			NetOut:              rep.Network.Up,
-			NetTotalUp:          monthlyUp,
-			NetTotalDown:        monthlyDown,
-			MonthlyTraffic:      monthlyTotal,
-			TrafficResetDay:     resetDay,
-			TrafficResetHour:    clientByUUID[uuid].TrafficResetHour,
-			TrafficResetMinute:  clientByUUID[uuid].TrafficResetMinute,
-			TrafficResetEnabled: clientByUUID[uuid].TrafficResetEnabled,
-			Process:             rep.Process,
-			Connections:         rep.Connections.TCP,
-			ConnectionsUdp:      rep.Connections.UDP,
-			Online:              onlineSet[uuid],
-			Uptime:              rep.Uptime,
-			Ping:                stats,
+			Client:               uuid,
+			Time:                 models.FromTime(rep.UpdatedAt),
+			Cpu:                  float32(rep.CPU.Usage),
+			Ram:                  rep.Ram.Used,
+			RamTotal:             rep.Ram.Total,
+			Swap:                 rep.Swap.Used,
+			SwapTotal:            rep.Swap.Total,
+			Load:                 float32(rep.Load.Load1),
+			Load5:                float32(rep.Load.Load5),
+			Load15:               float32(rep.Load.Load15),
+			Temp:                 0,
+			Disk:                 rep.Disk.Used,
+			DiskTotal:            rep.Disk.Total,
+			NetIn:                rep.Network.Down,
+			NetOut:               rep.Network.Up,
+			NetTotalUp:           monthlyUp,
+			NetTotalDown:         monthlyDown,
+			MonthlyTraffic:       monthlyTotal,
+			TrafficResetDay:      resetDay,
+			TrafficResetHour:     client.TrafficResetHour,
+			TrafficResetMinute:   client.TrafficResetMinute,
+			TrafficResetTimezone: resetTimezone,
+			TrafficResetEnabled:  client.TrafficResetEnabled,
+			Process:              rep.Process,
+			Connections:          rep.Connections.TCP,
+			ConnectionsUdp:       rep.Connections.UDP,
+			Online:               onlineSet[uuid],
+			Uptime:               rep.Uptime,
+			Ping:                 stats,
 		}
 		respMap[uuid] = rl
 	}
@@ -461,6 +472,23 @@ func saturatingInt64Add(left, right int64) int64 {
 		return math.MinInt64
 	}
 	return left + right
+}
+
+func trafficAdjustmentApplies(client models.Client, rep *reportmodel.Report) bool {
+	if client.TrafficAdjustmentUp == 0 && client.TrafficAdjustmentDown == 0 {
+		return false
+	}
+	if client.TrafficAdjustmentCycleID == "" || client.TrafficAdjustmentCycleID != rep.Network.CycleID {
+		return false
+	}
+	if client.TrafficAdjustmentGeneration != 0 && client.TrafficAdjustmentGeneration != rep.Network.CycleGeneration {
+		return false
+	}
+	return true
+}
+
+func adjustedTrafficValue(raw, adjustment int64) int64 {
+	return maxInt64(0, saturatingInt64Add(raw, adjustment))
 }
 
 func maxInt64(left, right int64) int64 {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -250,14 +251,15 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 	}
 	now := time.Now()
 	client := models.Client{
-		UUID:                clientUUID,
-		Token:               token,
-		Name:                name,
-		Group:               strings.TrimSpace(group),
-		TrafficResetEnabled: true,
-		PingTaskOrder:       models.UintArray{},
-		CreatedAt:           models.FromTime(now),
-		UpdatedAt:           models.FromTime(now),
+		UUID:                 clientUUID,
+		Token:                token,
+		Name:                 name,
+		Group:                strings.TrimSpace(group),
+		TrafficResetEnabled:  true,
+		TrafficResetTimezone: "Asia/Shanghai",
+		PingTaskOrder:        models.UintArray{},
+		CreatedAt:            models.FromTime(now),
+		UpdatedAt:            models.FromTime(now),
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -337,6 +339,82 @@ func GetAllClientBasicInfo() (clients []models.Client, err error) {
 // rolling records tables, so it survives report-history cleanup and restarts.
 func UpdateLastReportAt(clientUUID string, reportedAt time.Time) error {
 	return updateLastReportAt(dbcore.GetDBInstance(), clientUUID, reportedAt)
+}
+
+func SetTrafficAdjustment(clientUUID string, up, down int64, cycleID string, generation uint64) error {
+	clientUUID = strings.TrimSpace(clientUUID)
+	cycleID = strings.TrimSpace(cycleID)
+	if clientUUID == "" || cycleID == "" {
+		return fmt.Errorf("invalid traffic adjustment target")
+	}
+	result := dbcore.GetDBInstance().Model(&models.Client{}).
+		Where("uuid = ?", clientUUID).
+		Updates(map[string]interface{}{
+			"traffic_adjustment_up":         up,
+			"traffic_adjustment_down":       down,
+			"traffic_adjustment_cycle_id":   cycleID,
+			"traffic_adjustment_generation": generation,
+			"updated_at":                    models.FromTime(time.Now()),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func ClearTrafficAdjustment(clientUUID string) error {
+	clientUUID = strings.TrimSpace(clientUUID)
+	if clientUUID == "" {
+		return fmt.Errorf("invalid client UUID")
+	}
+	result := dbcore.GetDBInstance().Model(&models.Client{}).
+		Where("uuid = ?", clientUUID).
+		Updates(map[string]interface{}{
+			"traffic_adjustment_up":         0,
+			"traffic_adjustment_down":       0,
+			"traffic_adjustment_cycle_id":   "",
+			"traffic_adjustment_generation": 0,
+			"updated_at":                    models.FromTime(time.Now()),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func ClearStaleTrafficAdjustment(clientUUID, cycleID string, generation uint64) error {
+	clientUUID = strings.TrimSpace(clientUUID)
+	cycleID = strings.TrimSpace(cycleID)
+	if clientUUID == "" || cycleID == "" {
+		return fmt.Errorf("invalid traffic adjustment cycle")
+	}
+	db := dbcore.GetDBInstance()
+	var client models.Client
+	if err := db.Select("uuid", "traffic_adjustment_up", "traffic_adjustment_down", "traffic_adjustment_cycle_id", "traffic_adjustment_generation").Where("uuid = ?", clientUUID).First(&client).Error; err != nil {
+		return err
+	}
+	if client.TrafficAdjustmentUp == 0 && client.TrafficAdjustmentDown == 0 {
+		return nil
+	}
+	if client.TrafficAdjustmentCycleID == cycleID &&
+		(client.TrafficAdjustmentGeneration == 0 || client.TrafficAdjustmentGeneration == generation) {
+		return nil
+	}
+	return db.Model(&models.Client{}).
+		Where("uuid = ? AND traffic_adjustment_cycle_id = ? AND traffic_adjustment_generation = ?", clientUUID, client.TrafficAdjustmentCycleID, client.TrafficAdjustmentGeneration).
+		Updates(map[string]interface{}{
+			"traffic_adjustment_up":         0,
+			"traffic_adjustment_down":       0,
+			"traffic_adjustment_cycle_id":   "",
+			"traffic_adjustment_generation": 0,
+			"updated_at":                    models.FromTime(time.Now()),
+		}).Error
 }
 
 func updateLastReportAt(db *gorm.DB, clientUUID string, reportedAt time.Time) error {
@@ -457,6 +535,16 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	if err := validateInteger("traffic_reset_minute", 0, 59); err != nil {
 		return err
 	}
+	if value, exists := updates["traffic_reset_timezone"]; exists {
+		timezone, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("traffic_reset_timezone must be a string")
+		}
+		if err := ValidateTrafficResetTimezone(timezone); err != nil {
+			return err
+		}
+		updates["traffic_reset_timezone"] = strings.TrimSpace(timezone)
+	}
 	updatedAt, err := models.FromTime(now).Value()
 	if err != nil {
 		return err
@@ -469,6 +557,50 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	}
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func ValidateTrafficResetTimezone(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("traffic_reset_timezone must not be empty")
+	}
+	if value == "UTC" || value == "GMT" {
+		return nil
+	}
+	if _, err := time.LoadLocation(value); err == nil {
+		return nil
+	}
+	if !strings.HasPrefix(value, "UTC+") && !strings.HasPrefix(value, "UTC-") &&
+		!strings.HasPrefix(value, "GMT+") && !strings.HasPrefix(value, "GMT-") {
+		return fmt.Errorf("traffic_reset_timezone must be an IANA timezone or UTC offset")
+	}
+	offset := value[4:]
+	sign := value[3]
+	parts := strings.Split(offset, ":")
+	if len(parts) > 2 || parts[0] == "" {
+		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
+	}
+	hours, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
+	}
+	minutes := 0
+	if len(parts) == 2 {
+		if len(parts[1]) != 2 {
+			return fmt.Errorf("invalid traffic_reset_timezone %q", value)
+		}
+		minutes, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return fmt.Errorf("invalid traffic_reset_timezone %q", value)
+		}
+	}
+	if hours > 14 || minutes > 59 || (hours == 14 && minutes != 0) {
+		return fmt.Errorf("traffic_reset_timezone offset is outside UTC-14:00 to UTC+14:00")
+	}
+	if sign != '+' && sign != '-' {
+		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
 	}
 	return nil
 }

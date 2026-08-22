@@ -19,7 +19,10 @@ import (
 	"github.com/monitor-monitor/monitor/web/api"
 )
 
-const avatarPath = "./data/avatar/ethan-avatar.png"
+var (
+	avatarPath  = "./data/avatar/ethan-avatar.png"
+	faviconPath = "./data/favicon.ico"
+)
 
 func UploadAvatar(c *gin.Context) {
 	var raw []byte
@@ -115,7 +118,7 @@ func UploadAvatar(c *gin.Context) {
 	// 同步更新网站图标
 	src, _ := os.ReadFile(avatarPath)
 	if src != nil {
-		os.WriteFile("./data/favicon.ico", src, 0644)
+		_ = os.WriteFile(faviconPath, src, 0644)
 	}
 
 	api.RespondSuccessMessage(c, "头像已更新", gin.H{"path": "/images/ethan-avatar.png"})

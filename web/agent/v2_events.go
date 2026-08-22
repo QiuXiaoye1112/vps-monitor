@@ -37,14 +37,19 @@ func getV2EventQueueLocked(uuid string) *v2EventQueue {
 }
 
 func DispatchV2Event(uuid, method string, params any) bool {
+	_, ok := DispatchV2EventWithID(uuid, method, params)
+	return ok
+}
+
+func DispatchV2EventWithID(uuid, method string, params any) (string, bool) {
 	if !IsV2Client(uuid) {
-		return false
+		return "", false
 	}
 	event := EnqueueV2Event(uuid, method, params)
 	if conn := GetConnectedClients()[uuid]; conn != nil {
 		_ = conn.WriteJSON(v2EventRequest(event))
 	}
-	return true
+	return event.ID, true
 }
 
 func DispatchPing(uuid string, params v2.PingParams) bool {
@@ -215,6 +220,29 @@ func AckV2Events(uuid string, ackIDs []string) {
 		return
 	}
 	ackV2EventsLocked(q, ackIDs)
+}
+
+func CancelV2Event(uuid, eventID string) bool {
+	if uuid == "" || eventID == "" {
+		return false
+	}
+	v2EventMu.Lock()
+	defer v2EventMu.Unlock()
+	q := v2EventQueues[uuid]
+	if q == nil {
+		return false
+	}
+	filtered := q.events[:0]
+	found := false
+	for _, event := range q.events {
+		if event.ID == eventID {
+			found = true
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	q.events = filtered
+	return found
 }
 
 func takeV2EventsLocked(q *v2EventQueue, limit int) []v2.Event {

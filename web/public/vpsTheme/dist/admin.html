@@ -1024,30 +1024,65 @@
         return Math.min(max, Math.max(min, value));
       }
 
-      function nextTrafficResetAt(enabled, day, hour, minute, now) {
+      function trafficTimezoneOffsetMinutes(timezone, date) {
+        timezone = String(timezone || "Asia/Shanghai").trim();
+        var fixed = /^(?:UTC|GMT)([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(
+          timezone,
+        );
+        if (timezone === "UTC" || timezone === "GMT") return 0;
+        if (fixed) {
+          var fixedMinutes = parseInt(fixed[2], 10) * 60;
+          fixedMinutes += fixed[3] ? parseInt(fixed[3], 10) : 0;
+          return fixed[1] === "-" ? -fixedMinutes : fixedMinutes;
+        }
+        try {
+          var parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone,
+            timeZoneName: "longOffset",
+          }).formatToParts(date);
+          var offset = parts.find(function (part) {
+            return part.type === "timeZoneName";
+          });
+          var parsed = /GMT([+-])(\d{2})(?::(\d{2}))?/.exec(
+            offset ? offset.value : "",
+          );
+          if (!parsed) return 0;
+          var minutes = parseInt(parsed[2], 10) * 60;
+          minutes += parsed[3] ? parseInt(parsed[3], 10) : 0;
+          return parsed[1] === "-" ? -minutes : minutes;
+        } catch (_) {
+          return 0;
+        }
+      }
+
+      function nextTrafficResetAt(enabled, day, hour, minute, timezone, now) {
         if (!enabled) return null;
         day = clampTrafficPlanValue(day, 1, 31, 1);
         hour = clampTrafficPlanValue(hour, 0, 23, 0);
         minute = clampTrafficPlanValue(minute, 0, 59, 0);
         now = now || new Date();
-        var shanghaiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-        var year = shanghaiNow.getUTCFullYear();
-        var month = shanghaiNow.getUTCMonth();
+        timezone = String(timezone || "Asia/Shanghai").trim();
+        var nowOffset = trafficTimezoneOffsetMinutes(timezone, now);
+        var localNow = new Date(now.getTime() + nowOffset * 60 * 1000);
+        var year = localNow.getUTCFullYear();
+        var month = localNow.getUTCMonth();
         var candidate = function (candidateYear, candidateMonth) {
           var lastDay = new Date(
             Date.UTC(candidateYear, candidateMonth + 1, 0),
           ).getUTCDate();
-          return new Date(
+          var localGuess = new Date(
             Date.UTC(
               candidateYear,
               candidateMonth,
               Math.min(day, lastDay),
-              hour - 8,
+              hour,
               minute,
               0,
               0,
             ),
           );
+          var offset = trafficTimezoneOffsetMinutes(timezone, localGuess);
+          return new Date(localGuess.getTime() - offset * 60 * 1000);
         };
         var next = candidate(year, month);
         if (next.getTime() <= now.getTime()) {
@@ -1061,34 +1096,52 @@
         return next;
       }
 
-      function formatShanghaiDateTime(date) {
+      function formatTrafficDateTime(date, timezone) {
         if (!date) return "自动清零已关闭";
-        var local = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-        var pad = function (value) {
-          return String(value).padStart(2, "0");
-        };
-        return (
-          local.getUTCFullYear() +
-          "-" +
-          pad(local.getUTCMonth() + 1) +
-          "-" +
-          pad(local.getUTCDate()) +
-          " " +
-          pad(local.getUTCHours()) +
-          ":" +
-          pad(local.getUTCMinutes())
-        );
+        timezone = String(timezone || "Asia/Shanghai").trim();
+        try {
+          return new Intl.DateTimeFormat("zh-CN", {
+            timeZone: timezone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })
+            .format(date)
+            .replace(/\//g, "-");
+        } catch (_) {
+          var local = new Date(date.getTime());
+          var offset = trafficTimezoneOffsetMinutes(timezone, date);
+          local = new Date(local.getTime() + offset * 60 * 1000);
+          var pad = function (value) {
+            return String(value).padStart(2, "0");
+          };
+          return (
+            local.getUTCFullYear() +
+            "-" +
+            pad(local.getUTCMonth() + 1) +
+            "-" +
+            pad(local.getUTCDate()) +
+            " " +
+            pad(local.getUTCHours()) +
+            ":" +
+            pad(local.getUTCMinutes())
+          );
+        }
       }
 
-      function trafficPlanSummary(enabled, day, hour, minute) {
+      function trafficPlanSummary(enabled, day, hour, minute, timezone) {
         return enabled
-          ? formatShanghaiDateTime(
-              nextTrafficResetAt(true, day, hour, minute),
+          ? formatTrafficDateTime(
+              nextTrafficResetAt(true, day, hour, minute, timezone),
+              timezone,
             )
           : "自动清零已关闭";
       }
 
-      function renderTrafficPlanControl(id, day, hour, minute) {
+      function renderTrafficPlanControl(id, day, hour, minute, timezone) {
         return (
           '<input name="traffic_reset_day" type="hidden" value="' +
           clampTrafficPlanValue(day, 1, 31, 1) +
@@ -1096,6 +1149,8 @@
           clampTrafficPlanValue(hour, 0, 23, 0) +
           '"><input name="traffic_reset_minute" type="hidden" value="' +
           clampTrafficPlanValue(minute, 0, 59, 0) +
+          '"><input name="traffic_reset_timezone" type="hidden" value="' +
+          E(timezone || "Asia/Shanghai") +
           '"><label>自动清零计划</label>' +
           '<button class="btn traffic-plan-button" type="button" id="trafficPlan' +
           id +
@@ -1112,7 +1167,17 @@
         var dayInput = form.querySelector('[name="traffic_reset_day"]');
         var hourInput = form.querySelector('[name="traffic_reset_hour"]');
         var minuteInput = form.querySelector('[name="traffic_reset_minute"]');
-        if (!button || !enabledInput || !dayInput || !hourInput || !minuteInput)
+        var timezoneInput = form.querySelector(
+          '[name="traffic_reset_timezone"]',
+        );
+        if (
+          !button ||
+          !enabledInput ||
+          !dayInput ||
+          !hourInput ||
+          !minuteInput ||
+          !timezoneInput
+        )
           return;
         var enabled = enabledInput.value === "true";
         button.classList.toggle("is-disabled", !enabled);
@@ -1122,6 +1187,7 @@
             dayInput.value,
             hourInput.value,
             minuteInput.value,
+            timezoneInput.value,
           );
       }
 
@@ -1134,7 +1200,17 @@
         var dayInput = form.querySelector('[name="traffic_reset_day"]');
         var hourInput = form.querySelector('[name="traffic_reset_hour"]');
         var minuteInput = form.querySelector('[name="traffic_reset_minute"]');
-        if (!button || !enabledInput || !dayInput || !hourInput || !minuteInput)
+        var timezoneInput = form.querySelector(
+          '[name="traffic_reset_timezone"]',
+        );
+        if (
+          !button ||
+          !enabledInput ||
+          !dayInput ||
+          !hourInput ||
+          !minuteInput ||
+          !timezoneInput
+        )
           return;
 
         enabledInput.addEventListener("change", function () {
@@ -1159,7 +1235,9 @@
               String(
                 clampTrafficPlanValue(minuteInput.value, 0, 59, 0),
               ).padStart(2, "0") +
-              '"></div></div><p class="text-xs text-muted mb-3">每月到达所设日期和时间时执行；当月没有所填日期时，使用该月最后一天。</p>' +
+              '"></div><div class="form-group"><label>重置时区</label><input class="traffic-plan-timezone" type="text" value="' +
+              E(timezoneInput.value || "Asia/Shanghai") +
+              '" placeholder="UTC+08:00 或 Asia/Tokyo"></div></div><p class="text-xs text-muted mb-3">支持 UTC、UTC±HH:MM 或 IANA 时区，例如 Asia/Tokyo。每月到达所设日期和时间时执行；当月没有所填日期时，使用该月最后一天。</p>' +
               (canClearNow
                 ? '<div class="traffic-plan-danger"><div class="traffic-plan-danger-title">立即清零流量</div><div class="traffic-plan-danger-copy">立即清零 Agent 本地的本月累计流量，不会改变上面的自动清零计划。</div><button class="btn btn-danger w-full traffic-plan-clear-now" type="button">立即清零</button></div>'
                 : "") +
@@ -1168,6 +1246,7 @@
           var overlay = document.getElementById(planId);
           var planDay = overlay.querySelector(".traffic-plan-day");
           var planTime = overlay.querySelector(".traffic-plan-time");
+          var planTimezone = overlay.querySelector(".traffic-plan-timezone");
           var preview = overlay.querySelector(".traffic-plan-preview-time");
           var refreshPreview = function () {
             var timeParts = String(planTime.value || "00:00").split(":");
@@ -1176,10 +1255,12 @@
               planDay.value,
               timeParts[0],
               timeParts[1],
+              planTimezone.value,
             );
           };
           planDay.addEventListener("input", refreshPreview);
           planTime.addEventListener("input", refreshPreview);
+          planTimezone.addEventListener("input", refreshPreview);
           refreshPreview();
           overlay.querySelector(".traffic-plan-cancel").onclick = function () {
             closeModal(planId);
@@ -1199,6 +1280,9 @@
               59,
               0,
             );
+            timezoneInput.value =
+              String(planTimezone.value || "Asia/Shanghai").trim() ||
+              "Asia/Shanghai";
             updateTrafficPlanButton(form);
             closeModal(planId);
           };
@@ -1986,9 +2070,12 @@
         var nh = n.hidden || false;
         var ntl = Math.round((n.traffic_limit || 0) / 1073741824);
         var ntt = n.traffic_limit_type || "sum";
+        var nau = Number(n.traffic_adjustment_up || 0) / 1073741824;
+        var nad = Number(n.traffic_adjustment_down || 0) / 1073741824;
         var nrd = n.traffic_reset_day || 1;
         var nrh = n.traffic_reset_hour || 0;
         var nrm = n.traffic_reset_minute || 0;
+        var nrt = n.traffic_reset_timezone || "Asia/Shanghai";
         var nre =
           n.traffic_reset_enabled !== undefined
             ? n.traffic_reset_enabled
@@ -2024,11 +2111,16 @@
             '>上行</option><option value="down" ' +
             (ntt === "down" ? "selected" : "") +
             '>下行</option></select></div><div class="form-group">' +
-            renderTrafficPlanControl(id, nrd, nrh, nrm) +
+             renderTrafficPlanControl(id, nrd, nrh, nrm, nrt) +
             "</div></div>" +
-            '<div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
-            ntl +
-            '"></div>' +
+             '<div class="form-group"><label>流量阈值 (GB)</label><input name="traffic_limit" type="number" value="' +
+             ntl +
+             '"></div>' +
+             '<div class="modal-grid"><div class="form-group"><label>上行校准 (GiB)</label><input name="traffic_adjustment_up" type="number" step="0.01" value="' +
+             nau +
+             '"></div><div class="form-group"><label>下行校准 (GiB)</label><input name="traffic_adjustment_down" type="number" step="0.01" value="' +
+             nad +
+             '"></div></div><p class="text-xs text-muted mb-3">正数增加、负数减少当前流量显示。校准只作用于当前 Agent 周期，手动清零后自动清除，不修改 Agent 原始账本。</p>' +
             renderNodePingSelector(pingTasks, n.ping_task_order || []) +
             '<button class="btn btn-primary w-full mt-3" type="submit">保存</button></form>',
         );
@@ -2054,7 +2146,16 @@
             traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
             traffic_reset_minute:
               parseInt(f.get("traffic_reset_minute")) || 0,
+            traffic_reset_timezone:
+              String(f.get("traffic_reset_timezone") || "Asia/Shanghai").trim() ||
+              "Asia/Shanghai",
             traffic_reset_enabled: f.get("traffic_reset_enabled") === "true",
+            traffic_adjustment_up: Math.round(
+              (Number(f.get("traffic_adjustment_up")) || 0) * 1073741824,
+            ),
+            traffic_adjustment_down: Math.round(
+              (Number(f.get("traffic_adjustment_down")) || 0) * 1073741824,
+            ),
             ping_task_order: collectNodePingOrder(e.target),
           };
           submitButton.disabled = true;
@@ -2553,6 +2654,10 @@
                 traffic_reset_hour: parseInt(f.get("traffic_reset_hour")) || 0,
                 traffic_reset_minute:
                   parseInt(f.get("traffic_reset_minute")) || 0,
+                traffic_reset_timezone:
+                  String(
+                    f.get("traffic_reset_timezone") || "Asia/Shanghai",
+                  ).trim() || "Asia/Shanghai",
                 traffic_reset_enabled:
                   f.get("traffic_reset_enabled") === "true",
                 ping_task_order: collectNodePingOrder(e.target),

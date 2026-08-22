@@ -5,7 +5,8 @@
   var uuid = params.get('uuid') || '';
   var nodeName = uuid;
   var ws = null;
-  var fileWS = null;
+  var fileReady = false;
+  var fileInitialDirectoryLoaded = false;
   var fitAddon = null;
   var term = null;
   var metricTimer = null;
@@ -79,10 +80,6 @@
 
   function terminalURL() {
     return websocketURL('/api/admin/client/' + encodeURIComponent(uuid) + '/terminal');
-  }
-
-  function filesURL() {
-    return websocketURL('/api/admin/client/' + encodeURIComponent(uuid) + '/files');
   }
 
   function isWSOpen(socket) {
@@ -166,26 +163,84 @@
     if (data instanceof Blob) data.arrayBuffer().then(writeTerminalMessage);
   }
 
+  function handleWorkspaceMessage(connection, data) {
+    if (typeof data !== 'string') {
+      writeTerminalMessage(data);
+      return;
+    }
+    var message;
+    try { message = JSON.parse(data); } catch (_) {
+      writeTerminalMessage(data);
+      return;
+    }
+    if (!message || (message.type !== 'system' && message.type !== 'response')) {
+      writeTerminalMessage(data);
+      return;
+    }
+    if (message.type === 'system') {
+      if (!message.ok) {
+        fileReady = false;
+        setFileStatus(message.error || '连接失败', 'bad');
+        renderFileError(message.error || '文件管理连接失败');
+        return;
+      }
+      fileReady = true;
+      setFileStatus('已连接', 'ok');
+      if (message.data && message.data.home) {
+        fileState.home = message.data.home;
+        if (!fileInitialDirectoryLoaded) {
+          fileInitialDirectoryLoaded = true;
+          var initialPath = fileState.path || fileState.home;
+          loadDirectory(initialPath, 0, { silentError: initialPath !== fileState.home }).then(function (loaded) {
+            if (!loaded && initialPath !== fileState.home && ws === connection) loadDirectory(fileState.home, 0);
+          });
+        }
+      }
+      return;
+    }
+    if (message.type === 'response' && message.id) {
+      var pending = pendingRequests.get(message.id);
+      if (!pending) return;
+      pendingRequests.delete(message.id);
+      clearTimeout(pending.timer);
+      if (message.ok) pending.resolve(message.data);
+      else {
+        var error = new Error(message.error || '文件操作失败');
+        error.code = message.code || '';
+        error.details = message.details || null;
+        pending.reject(error);
+      }
+    }
+  }
+
   function connectTerminal(displayName) {
     if (!uuid) return null;
     if (isWSOpen(ws) || isWSConnecting(ws)) return ws;
     setStatus('连接中');
     var connection = new WebSocket(terminalURL());
     ws = connection;
+    fileReady = false;
+    fileInitialDirectoryLoaded = false;
     connection.binaryType = 'arraybuffer';
     connection.onopen = function () {
       if (ws !== connection) return;
       setStatus('已连接', 'ok');
+      setFileStatus('等待 Agent');
       term.writeln('\r\nConnected. Waiting for agent...');
       term.focus();
       fit();
     };
-    connection.onmessage = function (event) { writeTerminalMessage(event.data); };
+    connection.onmessage = function (event) {
+      if (ws === connection) handleWorkspaceMessage(connection, event.data);
+    };
     connection.onerror = function () { if (ws === connection) setStatus('连接错误', 'bad'); };
     connection.onclose = function () {
       if (ws !== connection) return;
       ws = null;
+      fileReady = false;
+      rejectPendingFileRequests();
       setStatus('已断开', 'bad');
+      setFileStatus('已断开', 'bad');
       if (term) term.writeln('\r\n\r\n[connection closed]');
     };
     return connection;
@@ -194,9 +249,6 @@
   function reconnectDisconnectedChannels() {
     if (!term || !uuid) return;
     if (!isWSOpen(ws) && !isWSConnecting(ws)) connectTerminal(nodeName);
-    if (!isWSOpen(fileWS) && !isWSConnecting(fileWS)) {
-      connectFiles({ restorePath: fileState.path || fileState.home, reconnecting: true });
-    }
   }
 
   function rejectPendingFileRequests() {
@@ -210,71 +262,8 @@
   function connectFiles(options) {
     options = options || {};
     if (!uuid) return null;
-    if (!options.force && (isWSOpen(fileWS) || isWSConnecting(fileWS))) {
-      return fileWS;
-    }
-    var reconnectPath = options.restorePath || fileState.path || fileState.home;
-    if (fileWS) {
-      try { fileWS.close(); } catch (_) {}
-      rejectPendingFileRequests();
-    }
-    setFileStatus(options.reconnecting ? '重新连接中' : '连接中');
-    var connection = new WebSocket(filesURL());
-    var initialDirectoryLoaded = false;
-    fileWS = connection;
-    connection.onopen = function () { if (fileWS === connection) setFileStatus('等待 Agent'); };
-    connection.onmessage = function (event) {
-      if (fileWS !== connection) return;
-      var parse = function (text) {
-        var message;
-        try { message = JSON.parse(text); } catch (_) { return; }
-        if (message.type === 'system') {
-          if (!message.ok) {
-            setFileStatus(message.error || '连接失败', 'bad');
-            renderFileError(message.error || '文件管理连接失败');
-            return;
-          }
-          if (message.status === 'connected') setFileStatus('已连接', 'ok');
-          if (message.data && message.data.home) {
-            fileState.home = message.data.home;
-            setFileStatus('已连接', 'ok');
-            if (!initialDirectoryLoaded) {
-              initialDirectoryLoaded = true;
-              var initialPath = reconnectPath || message.data.home;
-              loadDirectory(initialPath, 0, { silentError: initialPath !== message.data.home }).then(function (loaded) {
-                if (!loaded && initialPath !== message.data.home && fileWS === connection) {
-                  loadDirectory(message.data.home, 0);
-                }
-              });
-            }
-          }
-          return;
-        }
-        if (message.type === 'response' && message.id) {
-          var pending = pendingRequests.get(message.id);
-          if (!pending) return;
-          pendingRequests.delete(message.id);
-          clearTimeout(pending.timer);
-          if (message.ok) pending.resolve(message.data);
-          else {
-            var error = new Error(message.error || '文件操作失败');
-            error.code = message.code || '';
-            error.details = message.details || null;
-            pending.reject(error);
-          }
-        }
-      };
-      if (typeof event.data === 'string') parse(event.data);
-      else if (event.data instanceof Blob) event.data.text().then(parse);
-    };
-    connection.onerror = function () { if (fileWS === connection) setFileStatus('连接错误', 'bad'); };
-    connection.onclose = function () {
-      if (fileWS !== connection) return;
-      fileWS = null;
-      setFileStatus('已断开', 'bad');
-      rejectPendingFileRequests();
-    };
-    return connection;
+    if (!isWSOpen(ws) && !isWSConnecting(ws)) connectTerminal(nodeName);
+    return ws;
   }
 
   function startConnectionHeartbeat() {
@@ -294,7 +283,7 @@
 
   function fileRequest(type, payload, timeout) {
     return new Promise(function (resolve, reject) {
-      if (!fileWS || fileWS.readyState !== WebSocket.OPEN) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !fileReady) {
         reject(new Error('文件管理尚未连接'));
         return;
       }
@@ -305,7 +294,7 @@
         reject(new Error('文件操作超时'));
       }, timeout || 30000);
       pendingRequests.set(id, { resolve: resolve, reject: reject, timer: timer });
-      fileWS.send(JSON.stringify(request));
+      ws.send(JSON.stringify(request));
     });
   }
 
@@ -463,7 +452,7 @@
   }
 
   function refreshFiles() {
-    if (isWSOpen(fileWS)) reloadCurrentDirectory();
+    if (fileReady) reloadCurrentDirectory();
   }
 
   function updateClipboardUI() {
@@ -1074,7 +1063,6 @@
     clearInterval(metricTimer);
     stopConnectionHeartbeat();
     if (ws) ws.close();
-    if (fileWS) fileWS.close();
   });
 
   start().catch(function (err) {

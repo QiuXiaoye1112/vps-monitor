@@ -27,6 +27,7 @@ export interface NodeData {
   traffic_reset_day?: number
   traffic_reset_hour?: number
   traffic_reset_minute?: number
+  traffic_reset_timezone?: string
   traffic_reset_enabled?: boolean
   mem_total: number
   swap_total: number
@@ -97,6 +98,7 @@ interface StatusData {
   traffic_reset_day?: number
   traffic_reset_hour?: number
   traffic_reset_minute?: number
+  traffic_reset_timezone?: string
   traffic_reset_enabled?: boolean
   traffic_up?: number
   traffic_down?: number
@@ -194,6 +196,7 @@ const useNodesStore = defineStore('nodes', () => {
       traffic_reset_day: client.traffic_reset_day,
       traffic_reset_hour: client.traffic_reset_hour,
       traffic_reset_minute: client.traffic_reset_minute,
+      traffic_reset_timezone: client.traffic_reset_timezone,
       traffic_reset_enabled: client.traffic_reset_enabled,
       mem_total: client.mem_total,
       swap_total: client.swap_total,
@@ -287,6 +290,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_hour = status.traffic_reset_hour
     if (node.traffic_reset_minute !== status.traffic_reset_minute)
       node.traffic_reset_minute = status.traffic_reset_minute
+    if (node.traffic_reset_timezone !== status.traffic_reset_timezone)
+      node.traffic_reset_timezone = status.traffic_reset_timezone
     if (node.traffic_reset_enabled !== status.traffic_reset_enabled)
       node.traffic_reset_enabled = status.traffic_reset_enabled
     if (node.traffic_up !== status.traffic_up)
@@ -347,6 +352,8 @@ const useNodesStore = defineStore('nodes', () => {
       node.traffic_reset_hour = client.traffic_reset_hour
     if (node.traffic_reset_minute !== client.traffic_reset_minute)
       node.traffic_reset_minute = client.traffic_reset_minute
+    if (node.traffic_reset_timezone !== client.traffic_reset_timezone)
+      node.traffic_reset_timezone = client.traffic_reset_timezone
     if (node.traffic_reset_enabled !== client.traffic_reset_enabled)
       node.traffic_reset_enabled = client.traffic_reset_enabled
     if (node.mem_total !== client.mem_total)

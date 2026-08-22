@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,10 +66,14 @@ func DeleteClientConditionally(uuid string, connToRemove *connection.SafeConn) {
 }
 func DeleteConnectedClients(uuid string) {
 	mu.Lock()
-	// 只从 map 中删除，不再负责关闭连接
+	conn := connectedClients[uuid]
 	delete(connectedClients, uuid)
 	delete(connectedClientV2, uuid)
+	delete(presenceOnly, uuid)
 	mu.Unlock()
+	if conn != nil {
+		_ = conn.Close()
+	}
 	realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
 }
 
@@ -131,14 +137,101 @@ func GetLatestReport() map[string]*report.Report {
 	defer mu.RUnlock()
 	reportCopy := make(map[string]*report.Report)
 	for k, v := range latestReport {
-		reportCopy[k] = v
+		if v == nil {
+			continue
+		}
+		copy := *v
+		reportCopy[k] = &copy
 	}
 	return reportCopy
 }
-func SetLatestReport(uuid string, report *report.Report) {
+func ShouldAcceptReport(uuid string, incoming *report.Report) bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	return isNewerReport(latestReport[uuid], incoming)
+}
+
+func SetLatestReport(uuid string, incoming *report.Report) bool {
+	if incoming == nil {
+		return false
+	}
 	mu.Lock()
 	defer mu.Unlock()
-	latestReport[uuid] = report
+	if !isNewerReport(latestReport[uuid], incoming) {
+		return false
+	}
+	copy := *incoming
+	latestReport[uuid] = &copy
+	return true
+}
+
+func isNewerReport(current, incoming *report.Report) bool {
+	if incoming == nil {
+		return false
+	}
+	if current == nil {
+		return true
+	}
+	currentNetwork := current.Network
+	incomingNetwork := incoming.Network
+	if currentNetwork.LedgerEpoch != "" || incomingNetwork.LedgerEpoch != "" {
+		if incomingNetwork.LedgerEpoch != currentNetwork.LedgerEpoch {
+			if incomingNetwork.LedgerEpoch == "" {
+				return false
+			}
+			if currentNetwork.LedgerEpoch == "" {
+				return true
+			}
+			incomingEpoch, incomingEpochOK := ledgerEpochTime(incomingNetwork.LedgerEpoch)
+			currentEpoch, currentEpochOK := ledgerEpochTime(currentNetwork.LedgerEpoch)
+			if incomingEpochOK && currentEpochOK && incomingEpoch != currentEpoch {
+				return incomingEpoch > currentEpoch
+			}
+			if !incomingNetwork.CapturedAt.IsZero() && !currentNetwork.CapturedAt.IsZero() {
+				return incomingNetwork.CapturedAt.After(currentNetwork.CapturedAt)
+			}
+			// A new epoch indicates a rebuilt ledger. Accept it when capture
+			// timestamps are unavailable, then reject the previous epoch.
+			return true
+		}
+	}
+	if currentNetwork.CycleGeneration != 0 || incomingNetwork.CycleGeneration != 0 {
+		if incomingNetwork.CycleGeneration != currentNetwork.CycleGeneration {
+			return incomingNetwork.CycleGeneration > currentNetwork.CycleGeneration
+		}
+		if currentNetwork.SampleSequence != 0 || incomingNetwork.SampleSequence != 0 {
+			if incomingNetwork.SampleSequence != currentNetwork.SampleSequence {
+				return incomingNetwork.SampleSequence > currentNetwork.SampleSequence
+			}
+			if !incomingNetwork.CapturedAt.IsZero() || !currentNetwork.CapturedAt.IsZero() {
+				return incomingNetwork.CapturedAt.After(currentNetwork.CapturedAt)
+			}
+			return false
+		}
+	}
+
+	incomingStart, incomingStartErr := time.Parse(time.RFC3339Nano, incomingNetwork.CycleStartedAt)
+	currentStart, currentStartErr := time.Parse(time.RFC3339Nano, currentNetwork.CycleStartedAt)
+	incomingStartOK := incomingStartErr == nil
+	currentStartOK := currentStartErr == nil
+	if incomingStartOK && currentStartOK && !incomingStart.Equal(currentStart) {
+		return incomingStart.After(currentStart)
+	}
+	if !incomingNetwork.CapturedAt.IsZero() || !currentNetwork.CapturedAt.IsZero() {
+		return incomingNetwork.CapturedAt.After(currentNetwork.CapturedAt)
+	}
+	// Old agents do not provide ordering metadata. Preserve their existing
+	// behavior while newer agents are protected by generation and sequence.
+	return true
+}
+
+func ledgerEpochTime(epoch string) (int64, bool) {
+	prefix, _, found := strings.Cut(epoch, "-")
+	if !found {
+		prefix = epoch
+	}
+	value, err := strconv.ParseInt(prefix, 10, 64)
+	return value, err == nil
 }
 func DeleteLatestReport(uuid string) {
 	mu.Lock()

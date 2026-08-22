@@ -91,7 +91,8 @@ const trafficResetText = computed(() => {
   const day = data.value.traffic_reset_day || 1
   const hour = String(data.value.traffic_reset_hour ?? 0).padStart(2, '0')
   const minute = String(data.value.traffic_reset_minute ?? 0).padStart(2, '0')
-  return `每月 ${day} 日 ${hour}:${minute} 重置`
+  const timezone = data.value.traffic_reset_timezone || 'Asia/Shanghai'
+  return `每月 ${day} 日 ${hour}:${minute} (${timezone}) 重置`
 })
 </script>
 

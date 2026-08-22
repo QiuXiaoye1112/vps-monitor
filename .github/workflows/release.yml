@@ -9,29 +9,66 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify modules
+        run: go mod verify
+      - name: Run tests
+        run: go test ./...
+      - name: Run vet
+        run: go vet ./...
 
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
       - uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.13.0
-
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version-file: go.mod
 
-      - name: Build linux-amd64
+      - name: Build Linux binary
         env:
           VERSION: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
+          GOARCH: ${{ matrix.arch }}
         run: |
           LDFLAGS="-s -w -X github.com/monitor-monitor/monitor/utils.CurrentVersion=${VERSION} -X github.com/monitor-monitor/monitor/utils.VersionHash=${COMMIT_SHA}"
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC="zig cc -target x86_64-linux-musl" go build -o vps-monitor-linux-amd64 -ldflags="${LDFLAGS}" .
+          if [ "${GOARCH}" = "amd64" ]; then
+            export CC="zig cc -target x86_64-linux-musl"
+          else
+            export CC="zig cc -target aarch64-linux-musl"
+          fi
+          CGO_ENABLED=1 GOOS=linux go build -trimpath -o vps-monitor-linux-${GOARCH} -ldflags="${LDFLAGS}" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vps-monitor-linux-${{ matrix.arch }}
+          path: vps-monitor-linux-${{ matrix.arch }}
 
-      - name: Create Release
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: vps-monitor-linux-amd64
+          files: vps-monitor-linux-*
           generate_release_notes: true

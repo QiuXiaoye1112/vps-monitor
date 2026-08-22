@@ -193,6 +193,7 @@ func WebSocketV2RPC(c *gin.Context) {
 	}
 	conn := connection.NewSafeConn(unsafeConn)
 	defer conn.Close()
+	conn.SetReadLimit(maxV2DecompressedBodySize)
 	configureClientHeartbeat(conn)
 
 	uuid, ok := clientUUIDFromContext(c)
@@ -216,7 +217,7 @@ func WebSocketV2RPC(c *gin.Context) {
 			Day:      clientConfig.TrafficResetDay,
 			Hour:     clientConfig.TrafficResetHour,
 			Minute:   clientConfig.TrafficResetMinute,
-			Timezone: "Asia/Shanghai",
+			Timezone: clientConfig.TrafficResetTimezone,
 		})
 	}
 	if !pushQueuedV2Events(conn, uuid) {

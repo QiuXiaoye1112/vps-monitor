@@ -73,38 +73,43 @@ func publicClientInfoForSession(node models.Client, isLogin bool) map[string]any
 
 func publicClientInfo(node models.Client) map[string]any {
 	resetDay := node.TrafficResetDay
+	resetTimezone := node.TrafficResetTimezone
+	if resetTimezone == "" {
+		resetTimezone = "Asia/Shanghai"
+	}
 	if !node.TrafficResetEnabled {
 		resetDay = 0
 	}
 	return map[string]any{
-		"uuid":                  node.UUID,
-		"name":                  node.Name,
-		"cpu_name":              node.CpuName,
-		"virtualization":        node.Virtualization,
-		"arch":                  node.Arch,
-		"cpu_cores":             node.CpuCores,
-		"cpu_physical_cores":    node.CpuPhysicalCores,
-		"os":                    node.OS,
-		"kernel_version":        node.KernelVersion,
-		"region":                node.Region,
-		"mem_total":             node.MemTotal,
-		"swap_total":            node.SwapTotal,
-		"disk_total":            node.DiskTotal,
-		"weight":                node.Weight,
-		"group":                 node.Group,
-		"tags":                  node.Tags,
-		"hidden":                node.Hidden,
-		"traffic_limit":         node.TrafficLimit,
-		"traffic_limit_type":    node.TrafficLimitType,
-		"traffic_reset_day":     resetDay,
-		"traffic_reset_hour":    node.TrafficResetHour,
-		"traffic_reset_minute":  node.TrafficResetMinute,
-		"traffic_reset_enabled": node.TrafficResetEnabled,
-		"ping_task_order":       node.PingTaskOrder,
-		"created_at":            node.CreatedAt,
-		"updated_at":            node.UpdatedAt,
-		"ipv4":                  node.IPv4,
-		"ipv6":                  node.IPv6,
+		"uuid":                   node.UUID,
+		"name":                   node.Name,
+		"cpu_name":               node.CpuName,
+		"virtualization":         node.Virtualization,
+		"arch":                   node.Arch,
+		"cpu_cores":              node.CpuCores,
+		"cpu_physical_cores":     node.CpuPhysicalCores,
+		"os":                     node.OS,
+		"kernel_version":         node.KernelVersion,
+		"region":                 node.Region,
+		"mem_total":              node.MemTotal,
+		"swap_total":             node.SwapTotal,
+		"disk_total":             node.DiskTotal,
+		"weight":                 node.Weight,
+		"group":                  node.Group,
+		"tags":                   node.Tags,
+		"hidden":                 node.Hidden,
+		"traffic_limit":          node.TrafficLimit,
+		"traffic_limit_type":     node.TrafficLimitType,
+		"traffic_reset_day":      resetDay,
+		"traffic_reset_hour":     node.TrafficResetHour,
+		"traffic_reset_minute":   node.TrafficResetMinute,
+		"traffic_reset_timezone": resetTimezone,
+		"traffic_reset_enabled":  node.TrafficResetEnabled,
+		"ping_task_order":        node.PingTaskOrder,
+		"created_at":             node.CreatedAt,
+		"updated_at":             node.UpdatedAt,
+		"ipv4":                   node.IPv4,
+		"ipv6":                   node.IPv6,
 	}
 }
 

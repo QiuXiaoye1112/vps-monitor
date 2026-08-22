@@ -1,9 +1,7 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -81,11 +79,10 @@ func get2FACode(c *gin.Context) string {
 	if c.Request.Body == nil || c.Request.Method == http.MethodGet {
 		return ""
 	}
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
+	bodyBytes, withinLimit := inspectRequestBody(c)
+	if !withinLimit {
 		return ""
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	if len(bodyBytes) == 0 {
 		return ""
 	}

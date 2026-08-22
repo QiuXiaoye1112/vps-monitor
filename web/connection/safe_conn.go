@@ -66,6 +66,9 @@ func (sc *SafeConn) ReadJSON(v interface{}) error {
 func (sc *SafeConn) SetReadDeadline(t time.Time) error {
 	return sc.conn.SetReadDeadline(t)
 }
+func (sc *SafeConn) SetReadLimit(limit int64) {
+	sc.conn.SetReadLimit(limit)
+}
 func (sc *SafeConn) SetPingHandler(h func(appData string) error) {
 	sc.conn.SetPingHandler(h)
 }

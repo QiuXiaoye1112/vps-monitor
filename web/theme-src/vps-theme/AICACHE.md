@@ -13,10 +13,10 @@
 ## 当前任务
 
 - 状态：done。
-- 目标：配合 Center/Agent 流量账本重构，让前端只使用 Agent 实测周期总量和套餐流量阈值。
-- 范围：RPC 类型、节点响应式状态和纯流量计算 helper；已同步嵌入产物。
-- 数据边界：M5 协议语义调整；删除手动流量补偿，不改变套餐阈值和自动清零计划。
-- 里程碑：M5 流量账本单一数据源。
+- 目标：为每台主机增加独立的流量重置时区，并提供当前 Agent 周期范围内的管理员流量校准偏移。
+- 范围：Client 数据库字段、RPC 下发、Agent 周期计算、后台编辑表单、公开节点类型和嵌入产物；校准只影响 Center 展示/套餐统计，不修改 Agent 原始账本。
+- 数据边界：M5 新增每主机流量重置时区和上下行校准；旧节点默认保持 `Asia/Shanghai`，不改变已有周期。
+- 里程碑：M5 自定义流量重置时区与当前周期流量校准。
 
 ## 执行日志
 
@@ -28,6 +28,23 @@
 - 节点状态 store、总流量 helper 和总览卡已接入 `monthly_traffic`；方向型、最大值和最小值口径继续使用 Agent 实测上下行。
 - 运行 `web/theme-src/build-vps-theme.sh` 完成 TypeScript 检查、ESLint、Vite 生产构建和嵌入产物同步；仅有既有 VueUse PURE 注释与 globe 大 chunk 警告。
 - Center 相关包 race 测试、`go vet ./...`、`go build ./...` 通过；全量测试只剩干净基线已存在的 `web/public` 背景运行时守卫失败，与本次流量重构无关。
+
+### 2026-08-23 per-client traffic reset timezone
+
+- Client 新增 `traffic_reset_timezone`，数据库自动迁移并将旧记录补齐为 `Asia/Shanghai`。
+- 支持 `UTC`、`UTC±HH:MM` 和 IANA 时区名称；中心保存前校验，Agent 使用固定偏移或 `time.LoadLocation` 计算月度边界。
+- 中心不再硬编码 `Asia/Shanghai`，v2 `agent.trafficConfig` 和 Agent 重连时下发的配置均读取每台主机的时区。
+- 后台新增/编辑节点的自动清零计划支持配置时区，主题节点详情显示实际重置时区。
+- 已同步 `web/public/vpsTheme/dist`；主题 type-check、lint、生产构建通过。
+- 中心与 Agent 的完整测试、race、vet、build、mod verify 均通过；增加 UTC 偏移、IANA 时区和周期边界回归测试。
+
+### 2026-08-23 current-cycle traffic calibration
+
+- Client 新增上下行有符号校准偏移和目标周期/代次；后台编辑节点的流量区域允许用 GiB 正负值校准。
+- Center 只在当前 Agent `CycleID` 与 generation 匹配时应用校准，避免补偿跨月或跨 reset 重复计算；Agent 原始账本、历史原始报告和 reset 结果不被修改。
+- 手动严格清零成功后清除校准；收到新周期报告时自动清除过期校准；管理员操作写入审计日志。
+- 校准值使用饱和加法并下限限制为 0，防止负数造成负流量或 int64 溢出。
+- 验证：中心/Agent 全量 test、race、vet、build、mod verify 通过；主题 lint、type-check、生产构建和嵌入同步通过。
 
 ### 2026-07-31 light-mode general-card contrast
 

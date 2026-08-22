@@ -54,12 +54,16 @@ type DiskReport struct {
 }
 
 type NetworkReport struct {
-	Up             int64  `json:"up"`
-	Down           int64  `json:"down"`
-	TotalUp        int64  `json:"totalUp"`
-	TotalDown      int64  `json:"totalDown"`
-	CycleID        string `json:"cycleId"`
-	CycleStartedAt string `json:"cycleStartedAt"`
+	Up              int64     `json:"up"`
+	Down            int64     `json:"down"`
+	TotalUp         int64     `json:"totalUp"`
+	TotalDown       int64     `json:"totalDown"`
+	CycleID         string    `json:"cycleId"`
+	CycleStartedAt  string    `json:"cycleStartedAt"`
+	LedgerEpoch     string    `json:"ledgerEpoch"`
+	CycleGeneration uint64    `json:"cycleGeneration"`
+	SampleSequence  uint64    `json:"sampleSequence"`
+	CapturedAt      time.Time `json:"capturedAt"`
 }
 
 type ConnectionsReport struct {

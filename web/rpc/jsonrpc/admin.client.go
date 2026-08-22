@@ -148,6 +148,7 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 		"traffic_reset_day",
 		"traffic_reset_hour",
 		"traffic_reset_minute",
+		"traffic_reset_timezone",
 		"traffic_reset_enabled",
 	} {
 		value, ok := raw[key]
@@ -241,12 +242,43 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if uuid == "" {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
+	var (
+		hasTrafficAdjustment bool
+		hasAdjustmentUp      bool
+		hasAdjustmentDown    bool
+		adjustmentUp         int64
+		adjustmentDown       int64
+	)
+	for key, target := range map[string]*int64{
+		"traffic_adjustment_up":   &adjustmentUp,
+		"traffic_adjustment_down": &adjustmentDown,
+	} {
+		value, exists := update[key]
+		if !exists {
+			continue
+		}
+		parsed, ok := asInt64(value)
+		if !ok {
+			return nil, rpc.MakeError(rpc.InvalidParams, key+" must be an integer byte offset", nil)
+		}
+		*target = parsed
+		hasTrafficAdjustment = true
+		if key == "traffic_adjustment_up" {
+			hasAdjustmentUp = true
+		} else {
+			hasAdjustmentDown = true
+		}
+		delete(update, key)
+	}
+	if hasTrafficAdjustment && (!hasAdjustmentUp || !hasAdjustmentDown) {
+		return nil, rpc.MakeError(rpc.InvalidParams, "traffic adjustment fields must be provided together", nil)
+	}
 	pingTaskOrder, hasPingTaskOrder, err := popPingTaskOrder(update)
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
 	}
 	trafficConfigChanged := false
-	for _, key := range []string{"traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute"} {
+	for _, key := range []string{"traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute", "traffic_reset_timezone"} {
 		if _, ok := update[key]; ok {
 			trafficConfigChanged = true
 			break
@@ -265,8 +297,17 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 			Day:      clientConfig.TrafficResetDay,
 			Hour:     clientConfig.TrafficResetHour,
 			Minute:   clientConfig.TrafficResetMinute,
-			Timezone: "Asia/Shanghai",
+			Timezone: clientConfig.TrafficResetTimezone,
 		})
+	}
+	if hasTrafficAdjustment {
+		latest := agent_runtime.GetLatestReport()[uuid]
+		if latest == nil || strings.TrimSpace(latest.Network.CycleID) == "" {
+			return nil, rpc.MakeError(rpc.InvalidParams, "当前没有可用于校准的 Agent 流量周期", nil)
+		}
+		if err := clients.SetTrafficAdjustment(uuid, adjustmentUp, adjustmentDown, latest.Network.CycleID, latest.Network.CycleGeneration); err != nil {
+			return nil, rpc.MakeError(rpc.InternalError, "保存流量校准失败："+err.Error(), nil)
+		}
 	}
 	if hasPingTaskOrder {
 		if err := tasks.SetClientPingTaskOrder(uuid, pingTaskOrder); err != nil {
@@ -276,6 +317,9 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "edit client:"+uuid, "info")
+	if hasTrafficAdjustment {
+		auditlog.Log(ip, actor, fmt.Sprintf("adjust traffic:%s up=%d down=%d", uuid, adjustmentUp, adjustmentDown), "warn")
+	}
 	return nil, nil
 }
 
@@ -383,6 +427,9 @@ func adminResetClientTraffic(ctx context.Context, req *rpc.JsonRpcRequest) (any,
 	}
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, "流量清零失败："+err.Error(), nil)
+	}
+	if err := clients.ClearTrafficAdjustment(params.UUID); err != nil {
+		return nil, rpc.MakeError(rpc.InternalError, "流量已清零，但清除校准偏移失败："+err.Error(), nil)
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "reset client traffic:"+params.UUID, "warn")

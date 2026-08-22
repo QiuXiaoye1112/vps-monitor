@@ -1,6 +1,7 @@
 package client
 
 import (
+	"log"
 	"time"
 
 	"github.com/monitor-monitor/monitor/database/clients"
@@ -21,14 +22,22 @@ import (
 // markPresence 为 true 时按 POST 上报会话刷新在线状态（WS 连接自行管理在线状态，应传 false）。
 func ingestReport(uuid string, report report.Report, protocolVersion int, markPresence bool) error {
 	report.UUID = uuid
+	if !agent_runtime.ShouldAcceptReport(uuid, &report) {
+		return nil
+	}
 	savedReport, err := SaveClientReport(uuid, report)
 	if err != nil {
 		return err
 	}
+	if !agent_runtime.SetLatestReport(uuid, &savedReport) {
+		return nil
+	}
+	if err := clients.ClearStaleTrafficAdjustment(uuid, savedReport.Network.CycleID, savedReport.Network.CycleGeneration); err != nil {
+		log.Printf("failed to clear stale traffic adjustment for %s: %v", uuid, err)
+	}
 	if err := clients.UpdateLastReportAt(uuid, savedReport.UpdatedAt); err != nil {
 		return err
 	}
-	agent_runtime.SetLatestReport(uuid, &savedReport)
 	agent_runtime.SetClientProtocolVersion(uuid, protocolVersion)
 	realtime.Publish(realtime.Event{Kind: realtime.KindStatus, UUID: uuid})
 	if markPresence {

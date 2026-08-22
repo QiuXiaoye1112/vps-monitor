@@ -21,6 +21,7 @@ type LoginRequest struct {
 }
 
 const sessionCookieMaxAge = 2592000
+const maxLoginBodySize = 64 << 10
 
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
 	http.SetCookie(c.Writer, &http.Cookie{
@@ -41,9 +42,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		api.RespondError(c, http.StatusBadRequest, "Invalid request body: "+err.Error())
+	bodyBytes, err := io.ReadAll(io.LimitReader(c.Request.Body, maxLoginBodySize+1))
+	if err != nil || len(bodyBytes) > maxLoginBodySize {
+		message := "request body too large"
+		if err != nil {
+			message = "Invalid request body: " + err.Error()
+		}
+		api.RespondError(c, http.StatusBadRequest, message)
 		return
 	}
 	var data LoginRequest

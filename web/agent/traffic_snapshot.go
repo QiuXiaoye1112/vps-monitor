@@ -58,7 +58,8 @@ func requestTrafficOperation(uuid string, timeout time.Duration, method string) 
 	if method == v2.MethodAgentTrafficReset {
 		params = v2.TrafficResetParams{OperationID: operationID}
 	}
-	if !DispatchV2Event(uuid, method, params) {
+	eventID, dispatched := DispatchV2EventWithID(uuid, method, params)
+	if !dispatched {
 		return v2.TrafficSnapshotResultParams{}, errors.New("Agent 不支持严格流量清零")
 	}
 
@@ -68,6 +69,10 @@ func requestTrafficOperation(uuid string, timeout time.Duration, method string) 
 	case result := <-pending.result:
 		return result, nil
 	case <-timer.C:
+		// Do not leave a reset/snapshot event queued after its synchronous
+		// caller has given up. Otherwise a later reconnect could execute an
+		// old reset unexpectedly.
+		CancelV2Event(uuid, eventID)
 		return v2.TrafficSnapshotResultParams{}, errors.New("等待 Agent 流量快照超时，未执行清零")
 	}
 }

@@ -125,13 +125,13 @@ func ForwardTerminal(id string) {
 	go func() {
 		defer workers.Done()
 		for {
-			_, data, err := agent.ReadMessage()
+			messageType, data, err := agent.ReadMessage()
 			if err != nil {
 				logTerminalHeartbeatTimeout("agent", err)
 				stop()
 				return
 			}
-			if err := browser.WriteMessage(websocket.BinaryMessage, data); err != nil {
+			if err := browser.WriteMessage(messageType, data); err != nil {
 				stop()
 				return
 			}

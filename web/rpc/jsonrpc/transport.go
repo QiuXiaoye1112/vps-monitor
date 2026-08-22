@@ -16,6 +16,8 @@ import (
 	"github.com/monitor-monitor/monitor/web/connection"
 )
 
+const maxJSONRPCBodySize = 4 << 20
+
 // OnRpcRequest 是 /api/rpc2 的统一入口：GET 升级为 WebSocket，POST 处理单条/批量 JSON-RPC。
 func OnRpcRequest(c *gin.Context) {
 	// GET -> WebSocket
@@ -97,6 +99,7 @@ func serveWebSocket(c *gin.Context) {
 	}
 	conn := connection.NewSafeConn(_conn)
 	defer conn.Close()
+	conn.SetReadLimit(maxJSONRPCBodySize)
 
 	meta := buildContextMeta(c)
 	for {
@@ -121,9 +124,13 @@ func serveWebSocket(c *gin.Context) {
 }
 
 func servePost(c *gin.Context) {
-	body, err := io.ReadAll(c.Request.Body)
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxJSONRPCBodySize+1))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, rpc.ErrorResponse(nil, rpc.ParseError, "read body error", err.Error()))
+		return
+	}
+	if len(body) > maxJSONRPCBodySize {
+		c.JSON(http.StatusRequestEntityTooLarge, rpc.ErrorResponse(nil, rpc.ParseError, "request body too large", nil))
 		return
 	}
 	requests, jerr := rpc.ParseRequests(body)

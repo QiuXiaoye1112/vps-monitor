@@ -145,3 +145,20 @@ func TestTrafficConfigEventsCoalesceToLatest(t *testing.T) {
 	require.Equal(t, 8, config.Hour)
 	require.Equal(t, 30, config.Minute)
 }
+
+func TestTrafficResetTimeoutCancelsQueuedEvent(t *testing.T) {
+	const uuid = "traffic-reset-timeout-client"
+	SetClientProtocolVersion(uuid, 2)
+	SetPresence(uuid, 79, true)
+	t.Cleanup(func() {
+		SetPresence(uuid, 79, false)
+		DeleteConnectedClients(uuid)
+		v2EventMu.Lock()
+		delete(v2EventQueues, uuid)
+		v2EventMu.Unlock()
+	})
+
+	_, err := RequestTrafficReset(uuid, 10*time.Millisecond)
+	require.Error(t, err)
+	require.Empty(t, TakeV2Events(uuid, nil, 0))
+}

@@ -13,6 +13,7 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 		"traffic_reset_day":         float64(12),
 		"traffic_reset_hour":        float64(6),
 		"traffic_reset_minute":      float64(37),
+		"traffic_reset_timezone":    "UTC-05:00",
 		"traffic_compensation":      float64(-2 * 1024 * 1024 * 1024),
 		"traffic_compensation_base": float64(12 * 1024 * 1024 * 1024),
 		"traffic_reset_enabled":     false,
@@ -31,6 +32,7 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 		"traffic_reset_day",
 		"traffic_reset_hour",
 		"traffic_reset_minute",
+		"traffic_reset_timezone",
 		"traffic_reset_enabled",
 	} {
 		if _, ok := update[key]; !ok {

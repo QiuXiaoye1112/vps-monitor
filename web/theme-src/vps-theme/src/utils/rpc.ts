@@ -91,6 +91,7 @@ export interface Client {
   traffic_reset_day?: number
   traffic_reset_hour?: number
   traffic_reset_minute?: number
+  traffic_reset_timezone?: string
   traffic_reset_enabled?: boolean
   mem_total: number
   swap_total: number
@@ -177,6 +178,7 @@ export interface NodeStatus {
   traffic_reset_day?: number
   traffic_reset_hour?: number
   traffic_reset_minute?: number
+  traffic_reset_timezone?: string
   traffic_reset_enabled?: boolean
   traffic_up?: number
   traffic_down?: number

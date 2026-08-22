@@ -8,7 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +22,21 @@ func generateTestPNG() []byte {
 	return buf.Bytes()
 }
 
+func isolateAvatarStorage(t *testing.T) {
+	t.Helper()
+	oldAvatarPath := avatarPath
+	oldFaviconPath := faviconPath
+	dir := t.TempDir()
+	avatarPath = filepath.Join(dir, "avatar.png")
+	faviconPath = filepath.Join(dir, "favicon.ico")
+	t.Cleanup(func() {
+		avatarPath = oldAvatarPath
+		faviconPath = oldFaviconPath
+	})
+}
+
 func TestUploadAvatar_JSON(t *testing.T) {
+	isolateAvatarStorage(t)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/api/avatar", UploadAvatar)
@@ -38,11 +52,10 @@ func TestUploadAvatar_JSON(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	// Clean up
-	_ = os.Remove(avatarPath)
 }
 
 func TestUploadAvatar_Multipart(t *testing.T) {
+	isolateAvatarStorage(t)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/api/avatar", UploadAvatar)
@@ -64,6 +77,4 @@ func TestUploadAvatar_Multipart(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	// Clean up
-	_ = os.Remove(avatarPath)
 }
