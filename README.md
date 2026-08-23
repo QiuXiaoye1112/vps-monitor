@@ -70,6 +70,90 @@ iptables -I INPUT -p tcp --dport 25774 -j ACCEPT
 
 首次登录后在后台添加节点，生成 Token，然后在被控服务器上安装 Agent。
 
+## Nginx HTTPS 反向代理
+
+如果通过域名访问，建议让 Nginx 监听 80/443，并将请求反代到本机的 `127.0.0.1:25774`。Agent 使用 WebSocket 心跳，因此必须转发 `Upgrade` 和 `Connection` 请求头，否则 Agent 会出现 `400 Require WebSocket upgrade` 并显示离线。
+
+### 1. 配置 WebSocket 连接升级
+
+在 Nginx 的 `http {}` 上下文中加入映射。Debian/Ubuntu 可以保存为 `/etc/nginx/conf.d/connection-upgrade.conf`：
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+```
+
+### 2. 配置站点反代
+
+将下面内容保存为 `/etc/nginx/sites-available/monitor.example.com.conf`，把 `monitor.example.com` 替换成你的域名：
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name monitor.example.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name monitor.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/monitor.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/monitor.example.com/privkey.pem;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:25774;
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+```
+
+启用站点并检查配置：
+
+```bash
+ln -sfn /etc/nginx/sites-available/monitor.example.com.conf \\
+  /etc/nginx/sites-enabled/monitor.example.com.conf
+nginx -t
+systemctl reload nginx
+```
+
+证书可以使用 Certbot 申请。使用 Cloudflare DNS 验证时，证书续期也会自动沿用 DNS-01：
+
+```bash
+certbot certonly --dns-cloudflare \\
+  --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \\
+  --dns-cloudflare-propagation-seconds 60 \\
+  -d monitor.example.com
+```
+
+配置完成后，浏览器访问 `https://monitor.example.com`，并确认 Agent 日志出现：
+
+```text
+WebSocket heartbeat probe connected using v2 protocol
+Server heartbeat confirmed; enabling all reports
+```
+
 ## Agent 部署
 
 Agent 项目: [QiuXiaoye1112/monitor-agent](https://github.com/QiuXiaoye1112/monitor-agent)
