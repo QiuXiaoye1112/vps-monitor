@@ -352,12 +352,6 @@ func GetDBInstance() *gorm.DB {
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_history_record_client_time ON history_records(client, time)")
 			instance.Exec("CREATE INDEX IF NOT EXISTS idx_ping_record_client_time ON ping_records(client, time)")
 		}
-		if err := instance.Exec("UPDATE clients SET traffic_reset_enabled = ? WHERE traffic_reset_enabled IS NULL", true).Error; err != nil {
-			log.Printf("Failed to backfill traffic reset setting: %v", err)
-		}
-		if err := instance.Exec("UPDATE clients SET traffic_reset_timezone = ? WHERE traffic_reset_timezone IS NULL OR traffic_reset_timezone = ''", "Asia/Shanghai").Error; err != nil {
-			log.Printf("Failed to backfill traffic reset timezone: %v", err)
-		}
 		if err := instance.Exec("UPDATE clients SET traffic_adjustment_up = 0 WHERE traffic_adjustment_up IS NULL").Error; err != nil {
 			log.Printf("Failed to backfill traffic adjustment up: %v", err)
 		}

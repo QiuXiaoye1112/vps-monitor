@@ -45,3 +45,15 @@ func TestAdjustedTrafficValueClampsBounds(t *testing.T) {
 		t.Fatalf("overflow adjusted traffic = %d", got)
 	}
 }
+
+func TestTrafficCalibrationReplacesCurrentValueAndKeepsAccumulating(t *testing.T) {
+	raw := int64(8 << 30)
+	target := int64(20 << 30)
+	adjustment := trafficAdjustmentForTarget(raw, target)
+	if got := adjustedTrafficValue(raw, adjustment); got != target {
+		t.Fatalf("calibrated value = %d, want %d", got, target)
+	}
+	if got := adjustedTrafficValue(raw+(3<<30), adjustment); got != target+(3<<30) {
+		t.Fatalf("future traffic did not accumulate from calibrated value: %d", got)
+	}
+}

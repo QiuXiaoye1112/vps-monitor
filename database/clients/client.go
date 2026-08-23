@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -251,15 +250,13 @@ func createClient(name, group string) (clientUUID, token string, err error) {
 	}
 	now := time.Now()
 	client := models.Client{
-		UUID:                 clientUUID,
-		Token:                token,
-		Name:                 name,
-		Group:                strings.TrimSpace(group),
-		TrafficResetEnabled:  true,
-		TrafficResetTimezone: "Asia/Shanghai",
-		PingTaskOrder:        models.UintArray{},
-		CreatedAt:            models.FromTime(now),
-		UpdatedAt:            models.FromTime(now),
+		UUID:          clientUUID,
+		Token:         token,
+		Name:          name,
+		Group:         strings.TrimSpace(group),
+		PingTaskOrder: models.UintArray{},
+		CreatedAt:     models.FromTime(now),
+		UpdatedAt:     models.FromTime(now),
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -526,25 +523,6 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	if err := validateInteger("traffic_limit", 0, math.MaxInt64); err != nil {
 		return err
 	}
-	if err := validateInteger("traffic_reset_day", 1, 31); err != nil {
-		return err
-	}
-	if err := validateInteger("traffic_reset_hour", 0, 23); err != nil {
-		return err
-	}
-	if err := validateInteger("traffic_reset_minute", 0, 59); err != nil {
-		return err
-	}
-	if value, exists := updates["traffic_reset_timezone"]; exists {
-		timezone, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("traffic_reset_timezone must be a string")
-		}
-		if err := ValidateTrafficResetTimezone(timezone); err != nil {
-			return err
-		}
-		updates["traffic_reset_timezone"] = strings.TrimSpace(timezone)
-	}
 	updatedAt, err := models.FromTime(now).Value()
 	if err != nil {
 		return err
@@ -557,50 +535,6 @@ func saveClient(db *gorm.DB, updates map[string]interface{}, now time.Time) erro
 	}
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
-func ValidateTrafficResetTimezone(value string) error {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return fmt.Errorf("traffic_reset_timezone must not be empty")
-	}
-	if value == "UTC" || value == "GMT" {
-		return nil
-	}
-	if _, err := time.LoadLocation(value); err == nil {
-		return nil
-	}
-	if !strings.HasPrefix(value, "UTC+") && !strings.HasPrefix(value, "UTC-") &&
-		!strings.HasPrefix(value, "GMT+") && !strings.HasPrefix(value, "GMT-") {
-		return fmt.Errorf("traffic_reset_timezone must be an IANA timezone or UTC offset")
-	}
-	offset := value[4:]
-	sign := value[3]
-	parts := strings.Split(offset, ":")
-	if len(parts) > 2 || parts[0] == "" {
-		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
-	}
-	hours, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
-	}
-	minutes := 0
-	if len(parts) == 2 {
-		if len(parts[1]) != 2 {
-			return fmt.Errorf("invalid traffic_reset_timezone %q", value)
-		}
-		minutes, err = strconv.Atoi(parts[1])
-		if err != nil {
-			return fmt.Errorf("invalid traffic_reset_timezone %q", value)
-		}
-	}
-	if hours > 14 || minutes > 59 || (hours == 14 && minutes != 0) {
-		return fmt.Errorf("traffic_reset_timezone offset is outside UTC-14:00 to UTC+14:00")
-	}
-	if sign != '+' && sign != '-' {
-		return fmt.Errorf("invalid traffic_reset_timezone %q", value)
 	}
 	return nil
 }

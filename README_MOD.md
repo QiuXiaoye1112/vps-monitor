@@ -57,7 +57,10 @@ monitor-agent/                 # 被控节点 Agent（Go，独立项目）
 
 | 字段 | 说明 |
 |------|------|
-| `traffic_reset_day` / `traffic_reset_hour` | 流量重置时间（中心主机 Asia/Shanghai 时区计算） |
+| `traffic_adjustment_up` / `traffic_adjustment_down` | 当前手动周期的中心侧流量校准偏移；后台按最终累计上行/下行进行校准 |
+| `traffic_adjustment_cycle_id` / `traffic_adjustment_generation` | 限定校准只应用于当前 Agent 手动周期 |
+
+流量不会按日期、时间或时区自动清零。后台仅提供手动清零和绝对值流量校准。
 
 ## 编译
 

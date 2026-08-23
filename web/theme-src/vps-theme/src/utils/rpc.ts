@@ -88,11 +88,6 @@ export interface Client {
   region: string
   remark?: string
   public_remark: string
-  traffic_reset_day?: number
-  traffic_reset_hour?: number
-  traffic_reset_minute?: number
-  traffic_reset_timezone?: string
-  traffic_reset_enabled?: boolean
   mem_total: number
   swap_total: number
   disk_total: number
@@ -175,11 +170,6 @@ export interface NodeStatus {
   net_total_up: number
   net_total_down: number
   monthly_traffic?: number
-  traffic_reset_day?: number
-  traffic_reset_hour?: number
-  traffic_reset_minute?: number
-  traffic_reset_timezone?: string
-  traffic_reset_enabled?: boolean
   traffic_up?: number
   traffic_down?: number
   process: number

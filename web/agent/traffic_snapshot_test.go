@@ -125,27 +125,6 @@ func TestRequestTrafficResetWaitsForMatchingAgentResult(t *testing.T) {
 	}
 }
 
-func TestTrafficConfigEventsCoalesceToLatest(t *testing.T) {
-	const uuid = "traffic-config-client"
-	t.Cleanup(func() {
-		v2EventMu.Lock()
-		delete(v2EventQueues, uuid)
-		v2EventMu.Unlock()
-	})
-
-	EnqueueTrafficConfig(uuid, v2.TrafficConfigParams{Enabled: true, Day: 1, Timezone: "Asia/Shanghai"})
-	EnqueueTrafficConfig(uuid, v2.TrafficConfigParams{Enabled: true, Day: 15, Hour: 8, Minute: 30, Timezone: "Asia/Shanghai"})
-
-	events := TakeV2Events(uuid, nil, 0)
-	require.Len(t, events, 1)
-	require.Equal(t, v2.MethodAgentTrafficConfig, events[0].Method)
-	var config v2.TrafficConfigParams
-	require.NoError(t, bindV2EventParams(events[0].Params, &config))
-	require.Equal(t, 15, config.Day)
-	require.Equal(t, 8, config.Hour)
-	require.Equal(t, 30, config.Minute)
-}
-
 func TestTrafficResetTimeoutCancelsQueuedEvent(t *testing.T) {
 	const uuid = "traffic-reset-timeout-client"
 	SetClientProtocolVersion(uuid, 2)

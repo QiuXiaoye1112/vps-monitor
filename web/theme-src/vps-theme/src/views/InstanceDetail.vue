@@ -84,16 +84,6 @@ const trafficStatus = computed(() => {
     return 'info'
   return 'success'
 })
-
-const trafficResetText = computed(() => {
-  if (!data.value?.traffic_reset_enabled)
-    return '无'
-  const day = data.value.traffic_reset_day || 1
-  const hour = String(data.value.traffic_reset_hour ?? 0).padStart(2, '0')
-  const minute = String(data.value.traffic_reset_minute ?? 0).padStart(2, '0')
-  const timezone = data.value.traffic_reset_timezone || 'Asia/Shanghai'
-  return `每月 ${day} 日 ${hour}:${minute} (${timezone}) 重置`
-})
 </script>
 
 <template>
@@ -226,14 +216,6 @@ const trafficResetText = computed(() => {
                 </div>
                 <div class="text-lg font-bold">
                   {{ formatUptime(data.uptime ?? 0) }}
-                </div>
-              </div>
-              <div class="traffic-tile">
-                <div class="text-xs text-muted-foreground">
-                  流量重置时间
-                </div>
-                <div class="text-lg font-bold">
-                  {{ trafficResetText }}
                 </div>
               </div>
             </div>

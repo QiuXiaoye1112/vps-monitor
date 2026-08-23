@@ -13,7 +13,6 @@ import (
 	"github.com/monitor-monitor/monitor/database/records"
 	"github.com/monitor-monitor/monitor/database/tasks"
 	"github.com/monitor-monitor/monitor/pkg/rpc"
-	v2 "github.com/monitor-monitor/monitor/protocol/v2"
 	agent_runtime "github.com/monitor-monitor/monitor/web/agent"
 	report_cache "github.com/monitor-monitor/monitor/web/report"
 )
@@ -82,6 +81,16 @@ func init() {
 		},
 		Returns: "null",
 	})
+	RegisterWithGroupAndMeta("calibrateClientTraffic", rpc.RoleAdmin, adminCalibrateClientTraffic, &rpc.MethodMeta{
+		Name:    "admin:calibrateClientTraffic",
+		Summary: "Replace the current accumulated traffic with administrator supplied values",
+		Params: []rpc.ParamMeta{
+			{Name: "uuid", Type: "string", Required: true, Description: "Client UUID"},
+			{Name: "total_up", Type: "integer", Required: true, Description: "Target accumulated upload bytes"},
+			{Name: "total_down", Type: "integer", Required: true, Description: "Target accumulated download bytes"},
+		},
+		Returns: "{ total_up: integer, total_down: integer }",
+	})
 }
 
 // auditActor 从上下文提取审计用的 actor UUID 与来源 IP。
@@ -145,11 +154,6 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 		"hidden",
 		"traffic_limit",
 		"traffic_limit_type",
-		"traffic_reset_day",
-		"traffic_reset_hour",
-		"traffic_reset_minute",
-		"traffic_reset_timezone",
-		"traffic_reset_enabled",
 	} {
 		value, ok := raw[key]
 		if !ok {
@@ -162,10 +166,6 @@ func clientCreateUpdateFromParams(uuid string, raw map[string]interface{}) map[s
 
 func normalizeClientCreateValue(key string, value interface{}) interface{} {
 	switch key {
-	case "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute":
-		if n, ok := asInt64(value); ok {
-			return int(n)
-		}
 	case "traffic_limit":
 		if n, ok := asInt64(value); ok {
 			return n
@@ -242,72 +242,14 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	if uuid == "" {
 		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid or missing UUID", nil)
 	}
-	var (
-		hasTrafficAdjustment bool
-		hasAdjustmentUp      bool
-		hasAdjustmentDown    bool
-		adjustmentUp         int64
-		adjustmentDown       int64
-	)
-	for key, target := range map[string]*int64{
-		"traffic_adjustment_up":   &adjustmentUp,
-		"traffic_adjustment_down": &adjustmentDown,
-	} {
-		value, exists := update[key]
-		if !exists {
-			continue
-		}
-		parsed, ok := asInt64(value)
-		if !ok {
-			return nil, rpc.MakeError(rpc.InvalidParams, key+" must be an integer byte offset", nil)
-		}
-		*target = parsed
-		hasTrafficAdjustment = true
-		if key == "traffic_adjustment_up" {
-			hasAdjustmentUp = true
-		} else {
-			hasAdjustmentDown = true
-		}
-		delete(update, key)
-	}
-	if hasTrafficAdjustment && (!hasAdjustmentUp || !hasAdjustmentDown) {
-		return nil, rpc.MakeError(rpc.InvalidParams, "traffic adjustment fields must be provided together", nil)
-	}
+	delete(update, "traffic_adjustment_up")
+	delete(update, "traffic_adjustment_down")
 	pingTaskOrder, hasPingTaskOrder, err := popPingTaskOrder(update)
 	if err != nil {
 		return nil, rpc.MakeError(rpc.InvalidParams, err.Error(), nil)
 	}
-	trafficConfigChanged := false
-	for _, key := range []string{"traffic_reset_enabled", "traffic_reset_day", "traffic_reset_hour", "traffic_reset_minute", "traffic_reset_timezone"} {
-		if _, ok := update[key]; ok {
-			trafficConfigChanged = true
-			break
-		}
-	}
 	if err := clients.SaveClient(update); err != nil {
 		return nil, rpc.MakeError(rpc.InternalError, err.Error(), nil)
-	}
-	if trafficConfigChanged {
-		clientConfig, err := clients.GetClientByUUID(uuid)
-		if err != nil {
-			return nil, rpc.MakeError(rpc.InternalError, "流量周期配置已保存，但读取配置失败："+err.Error(), nil)
-		}
-		agent_runtime.DispatchTrafficConfig(uuid, v2.TrafficConfigParams{
-			Enabled:  clientConfig.TrafficResetEnabled,
-			Day:      clientConfig.TrafficResetDay,
-			Hour:     clientConfig.TrafficResetHour,
-			Minute:   clientConfig.TrafficResetMinute,
-			Timezone: clientConfig.TrafficResetTimezone,
-		})
-	}
-	if hasTrafficAdjustment {
-		latest := agent_runtime.GetLatestReport()[uuid]
-		if latest == nil || strings.TrimSpace(latest.Network.CycleID) == "" {
-			return nil, rpc.MakeError(rpc.InvalidParams, "当前没有可用于校准的 Agent 流量周期", nil)
-		}
-		if err := clients.SetTrafficAdjustment(uuid, adjustmentUp, adjustmentDown, latest.Network.CycleID, latest.Network.CycleGeneration); err != nil {
-			return nil, rpc.MakeError(rpc.InternalError, "保存流量校准失败："+err.Error(), nil)
-		}
 	}
 	if hasPingTaskOrder {
 		if err := tasks.SetClientPingTaskOrder(uuid, pingTaskOrder); err != nil {
@@ -317,9 +259,6 @@ func adminEditClient(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.Js
 	}
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "edit client:"+uuid, "info")
-	if hasTrafficAdjustment {
-		auditlog.Log(ip, actor, fmt.Sprintf("adjust traffic:%s up=%d down=%d", uuid, adjustmentUp, adjustmentDown), "warn")
-	}
 	return nil, nil
 }
 
@@ -434,4 +373,40 @@ func adminResetClientTraffic(ctx context.Context, req *rpc.JsonRpcRequest) (any,
 	actor, ip := auditActor(ctx)
 	auditlog.Log(ip, actor, "reset client traffic:"+params.UUID, "warn")
 	return nil, nil
+}
+
+func adminCalibrateClientTraffic(ctx context.Context, req *rpc.JsonRpcRequest) (any, *rpc.JsonRpcError) {
+	var params map[string]interface{}
+	if err := req.BindParams(&params); err != nil || params == nil {
+		return nil, rpc.MakeError(rpc.InvalidParams, "Invalid params", nil)
+	}
+	uuid, _ := params["uuid"].(string)
+	uuid = strings.TrimSpace(uuid)
+	targetUp, upOK := asInt64(params["total_up"])
+	targetDown, downOK := asInt64(params["total_down"])
+	if uuid == "" || !upOK || !downOK || targetUp < 0 || targetDown < 0 {
+		return nil, rpc.MakeError(rpc.InvalidParams, "UUID and non-negative total_up/total_down are required", nil)
+	}
+	latest := agent_runtime.GetLatestReport()[uuid]
+	if latest == nil || strings.TrimSpace(latest.Network.CycleID) == "" {
+		return nil, rpc.MakeError(rpc.InvalidParams, "当前没有可用于校准的 Agent 流量数据", nil)
+	}
+	rawUp := maxInt64(0, latest.Network.TotalUp)
+	rawDown := maxInt64(0, latest.Network.TotalDown)
+	if err := clients.SetTrafficAdjustment(
+		uuid,
+		trafficAdjustmentForTarget(rawUp, targetUp),
+		trafficAdjustmentForTarget(rawDown, targetDown),
+		latest.Network.CycleID,
+		latest.Network.CycleGeneration,
+	); err != nil {
+		return nil, rpc.MakeError(rpc.InternalError, "保存流量校准失败："+err.Error(), nil)
+	}
+	actor, ip := auditActor(ctx)
+	auditlog.Log(ip, actor, fmt.Sprintf("calibrate client traffic:%s up=%d down=%d", uuid, targetUp, targetDown), "warn")
+	return map[string]int64{"total_up": targetUp, "total_down": targetDown}, nil
+}
+
+func trafficAdjustmentForTarget(raw, target int64) int64 {
+	return target - raw
 }

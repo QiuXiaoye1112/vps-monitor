@@ -10,13 +10,8 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 		"hidden":                    true,
 		"traffic_limit":             float64(500 * 1024 * 1024 * 1024),
 		"traffic_limit_type":        "sum",
-		"traffic_reset_day":         float64(12),
-		"traffic_reset_hour":        float64(6),
-		"traffic_reset_minute":      float64(37),
-		"traffic_reset_timezone":    "UTC-05:00",
 		"traffic_compensation":      float64(-2 * 1024 * 1024 * 1024),
 		"traffic_compensation_base": float64(12 * 1024 * 1024 * 1024),
-		"traffic_reset_enabled":     false,
 		"token":                     "must-not-pass-through",
 	})
 
@@ -29,11 +24,6 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 		"hidden",
 		"traffic_limit",
 		"traffic_limit_type",
-		"traffic_reset_day",
-		"traffic_reset_hour",
-		"traffic_reset_minute",
-		"traffic_reset_timezone",
-		"traffic_reset_enabled",
 	} {
 		if _, ok := update[key]; !ok {
 			t.Fatalf("expected update field %q to be kept", key)
@@ -53,8 +43,5 @@ func TestClientCreateUpdateFromParamsKeepsCreateFields(t *testing.T) {
 	}
 	if got, ok := update["traffic_limit"].(int64); !ok || got != 500*1024*1024*1024 {
 		t.Fatalf("traffic_limit = %#v, want int64 500GiB", update["traffic_limit"])
-	}
-	if got, ok := update["traffic_reset_minute"].(int); !ok || got != 37 {
-		t.Fatalf("traffic_reset_minute = %#v, want int(37)", update["traffic_reset_minute"])
 	}
 }

@@ -209,17 +209,6 @@ func WebSocketV2RPC(c *gin.Context) {
 	defer func() {
 		agent_runtime.DeleteClientConditionally(uuid, conn)
 	}()
-	if clientConfig, err := clients.GetClientByUUID(uuid); err != nil {
-		log.Printf("failed to load traffic config for %s: %v", uuid, err)
-	} else {
-		agent_runtime.EnqueueTrafficConfig(uuid, v2.TrafficConfigParams{
-			Enabled:  clientConfig.TrafficResetEnabled,
-			Day:      clientConfig.TrafficResetDay,
-			Hour:     clientConfig.TrafficResetHour,
-			Minute:   clientConfig.TrafficResetMinute,
-			Timezone: clientConfig.TrafficResetTimezone,
-		})
-	}
 	if !pushQueuedV2Events(conn, uuid) {
 		return
 	}

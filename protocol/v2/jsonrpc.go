@@ -18,7 +18,6 @@ const (
 	MethodAgentPull                  = "agent.pull"
 	MethodAgentTrafficSnapshot       = "agent.trafficSnapshot"
 	MethodAgentTrafficSnapshotResult = "agent.trafficSnapshotResult"
-	MethodAgentTrafficConfig         = "agent.trafficConfig"
 	MethodAgentTrafficReset          = "agent.trafficReset"
 	MethodAgentTrafficResetResult    = "agent.trafficResetResult"
 )
@@ -115,14 +114,6 @@ type TrafficSnapshotResultParams struct {
 	CycleStartedAt string `json:"cycle_started_at"`
 	TotalUp        int64  `json:"total_up"`
 	TotalDown      int64  `json:"total_down"`
-}
-
-type TrafficConfigParams struct {
-	Enabled  bool   `json:"enabled"`
-	Day      int    `json:"day"`
-	Hour     int    `json:"hour"`
-	Minute   int    `json:"minute"`
-	Timezone string `json:"timezone"`
 }
 
 type TrafficResetParams struct {

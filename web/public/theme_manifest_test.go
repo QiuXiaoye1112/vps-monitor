@@ -91,9 +91,8 @@ func TestVPSAdminDoesNotExposeTaskHistoryAndUsesSafeDefaults(t *testing.T) {
 		`id: "backgroundDarkInput", slot: "dark"`,
 		`/api/admin/theme/background`,
 		`选择图片并上传`,
-		`traffic_reset_timezone`,
-		`traffic_adjustment_up`,
-		`traffic_adjustment_down`,
+		`admin:calibrateClientTraffic`,
+		`一键校准`,
 	} {
 		if !strings.Contains(html, required) {
 			t.Fatalf("expected admin regression guard %q", required)
@@ -174,7 +173,6 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 		`__VPS_BACKGROUND_PRELOADED__`,
 		`VPS Monitor`,
 		`累计流量`,
-		`流量重置时间`,
 	} {
 		if !strings.Contains(bundle, required) {
 			t.Fatalf("image-only background runtime guard %q is missing", required)
@@ -184,6 +182,7 @@ func TestVPSThemeRuntimeOnlyUsesImagesAndFallsBackToLightBackground(t *testing.T
 		`background-video`,
 		`搜索节点`,
 		`显示高级工具`,
+		`流量重置时间`,
 	} {
 		if strings.Contains(bundle, removed) {
 			t.Fatalf("removed theme runtime %q is still present", removed)

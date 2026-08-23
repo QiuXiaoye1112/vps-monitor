@@ -37,15 +37,10 @@ type Client struct {
 	Hidden                      bool      `json:"hidden" gorm:"default:false"`
 	TrafficLimit                int64     `json:"traffic_limit" gorm:"type:bigint"`
 	TrafficLimitType            string    `json:"traffic_limit_type" gorm:"type:varchar(10);default:'max'"` // 流量阈值类型：sum max min up down
-	TrafficAdjustmentUp         int64     `json:"traffic_adjustment_up" gorm:"type:bigint;default:0"`
-	TrafficAdjustmentDown       int64     `json:"traffic_adjustment_down" gorm:"type:bigint;default:0"`
+	TrafficAdjustmentUp         int64     `json:"-" gorm:"type:bigint;default:0"`
+	TrafficAdjustmentDown       int64     `json:"-" gorm:"type:bigint;default:0"`
 	TrafficAdjustmentCycleID    string    `json:"-" gorm:"type:varchar(64)"`
 	TrafficAdjustmentGeneration uint64    `json:"-" gorm:"type:bigint;default:0"`
-	TrafficResetDay             int       `json:"traffic_reset_day" gorm:"type:int;default:1"`
-	TrafficResetHour            int       `json:"traffic_reset_hour" gorm:"type:int;default:0"`
-	TrafficResetMinute          int       `json:"traffic_reset_minute" gorm:"type:int;default:0"`
-	TrafficResetTimezone        string    `json:"traffic_reset_timezone" gorm:"type:varchar(64);default:'Asia/Shanghai'"`
-	TrafficResetEnabled         bool      `json:"traffic_reset_enabled" gorm:"type:boolean;default:true"`
 	PingTaskOrder               UintArray `json:"ping_task_order" gorm:"type:longtext"`
 	CreatedAt                   LocalTime `json:"created_at"`
 	UpdatedAt                   LocalTime `json:"updated_at"`
